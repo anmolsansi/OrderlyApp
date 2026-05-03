@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: orderlyapp-api
+    env: python
+    rootDir: backend
+    buildCommand: pip install -e .
+    startCommand: python scripts/migrate.py && python scripts/seed_postgres.py && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: ORDERLY_CORS_ORIGINS
+        sync: false
+
+  - type: web
+    name: orderlyapp-web
+    env: node
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NEXT_PUBLIC_APP_URL
+        sync: false
+      - key: NEXT_PUBLIC_API_BASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_VOICE_MODE
+        value: browser
