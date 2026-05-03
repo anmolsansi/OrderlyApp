@@ -1,0 +1,15 @@
+node_modules
+.next
+.git
+.gitignore
+.env
+.env.local
+.env.*.local
+test-results
+playwright-report
+coverage
+.DS_Store
+backend/.venv
+backend/__pycache__
+backend/app/__pycache__
+backend/data/*.local.json

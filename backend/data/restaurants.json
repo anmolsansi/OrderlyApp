@@ -1,0 +1,80 @@
+[
+  {
+    "id": "marios-pizza",
+    "name": "Mario's Pizza Lab",
+    "cuisine": "Pizza",
+    "rating": 4.8,
+    "delivery_minutes": "20–30 min",
+    "delivery_fee_cents": 199,
+    "image_emoji": "🍕",
+    "tags": ["Popular", "Thin crust", "Open late"],
+    "menu": [
+      {
+        "id": "margherita",
+        "name": "Classic Margherita",
+        "description": "Tomato, mozzarella, basil, olive oil.",
+        "price_cents": 1299,
+        "image_emoji": "🌿",
+        "popular": true,
+        "modifier_groups": [
+          {
+            "id": "size",
+            "name": "Size",
+            "type": "single",
+            "required": true,
+            "options": [
+              { "id": "small", "name": "Small", "price_delta_cents": 0 },
+              { "id": "medium", "name": "Medium", "price_delta_cents": 300 },
+              { "id": "large", "name": "Large", "price_delta_cents": 600 }
+            ]
+          },
+          {
+            "id": "toppings",
+            "name": "Toppings",
+            "type": "multiple",
+            "max_selected": 4,
+            "options": [
+              { "id": "pepperoni", "name": "Pepperoni", "price_delta_cents": 150 },
+              { "id": "mushrooms", "name": "Mushrooms", "price_delta_cents": 100 },
+              { "id": "jalapenos", "name": "Jalapeños", "price_delta_cents": 100 },
+              { "id": "extra-cheese", "name": "Extra cheese", "price_delta_cents": 175 }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "pepperoni-feast",
+        "name": "Pepperoni Feast",
+        "description": "Double pepperoni, mozzarella, red sauce.",
+        "price_cents": 1499,
+        "image_emoji": "🍕",
+        "popular": true,
+        "modifier_groups": [
+          {
+            "id": "size",
+            "name": "Size",
+            "type": "single",
+            "required": true,
+            "options": [
+              { "id": "small", "name": "Small", "price_delta_cents": 0 },
+              { "id": "medium", "name": "Medium", "price_delta_cents": 300 },
+              { "id": "large", "name": "Large", "price_delta_cents": 600 }
+            ]
+          },
+          {
+            "id": "toppings",
+            "name": "Toppings",
+            "type": "multiple",
+            "max_selected": 4,
+            "options": [
+              { "id": "pepperoni", "name": "Pepperoni", "price_delta_cents": 150 },
+              { "id": "mushrooms", "name": "Mushrooms", "price_delta_cents": 100 },
+              { "id": "jalapenos", "name": "Jalapeños", "price_delta_cents": 100 },
+              { "id": "extra-cheese", "name": "Extra cheese", "price_delta_cents": 175 }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]
