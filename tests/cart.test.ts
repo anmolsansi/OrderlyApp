@@ -6,7 +6,9 @@ import type { CartItem } from '../lib/types';
 const item = restaurants[0].menu[1];
 const validModifiers = [
   { groupId: 'size', optionIds: ['large'] },
-  { groupId: 'toppings', optionIds: ['pepperoni', 'extra-cheese'] },
+  { groupId: 'crust', optionIds: ['classic'] },
+  { groupId: 'cheese', optionIds: ['extra-cheese'] },
+  { groupId: 'toppings', optionIds: ['pepperoni'] },
 ];
 
 describe('cart logic', () => {
