@@ -4,7 +4,8 @@ test('loads restaurants and adds a customized item to cart', async ({ page }) =>
   await page.goto('/');
   await expect(page.getByRole('heading', { name: /order pizza with your voice/i })).toBeVisible();
   await expect(page.getByRole('button', { name: /mario's pizza lab/i })).toBeVisible();
-  await page.locator('.menu-item').filter({ hasText: 'Pepperoni Feast' }).click();
+  await expect(page.getByText(/restaurants seeded/i)).toBeVisible();
+  await page.getByRole('button', { name: /pepperoni feast/i }).click();
   await expect(page.locator('.customizer-card h2')).toHaveText(/pepperoni feast/i);
   await page.getByLabel(/large/i).check();
   await page.getByLabel(/jalapeños/i).check();
