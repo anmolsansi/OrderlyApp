@@ -42,7 +42,19 @@ export function parseVoiceIntent(transcript: string): VoiceIntent {
       .filter(word => text.includes(word))
       .map(word => word === 'jalapeños' ? 'jalapenos' : word.replace(' ', '-'));
 
+    const restaurant = findRestaurantFromText(text);
     const matched = findMenuItemFromText(text);
+
+    if (restaurant && !matched) {
+      return {
+        type: 'select_restaurant',
+        transcript,
+        restaurantName: restaurant.name,
+        confidence: 'high',
+        clarification: `Showing ${restaurant.name}. Pick a menu item to add to your cart.`,
+      };
+    }
+
     if (!matched) {
       return {
         type: 'unknown',
@@ -56,6 +68,7 @@ export function parseVoiceIntent(transcript: string): VoiceIntent {
       type: 'add_to_cart',
       transcript,
       itemName: matched.item.name,
+      restaurantName: matched.restaurant.name,
       size,
       toppings,
       confidence: size ? 'high' : 'medium',
@@ -69,6 +82,19 @@ export function parseVoiceIntent(transcript: string): VoiceIntent {
     confidence: 'low',
     clarification: 'Try commands like “add a large pepperoni pizza”, “view cart”, or “remove item”.',
   };
+}
+
+export function findRestaurantFromText(text: string): Restaurant | undefined {
+  const normalized = normalize(text);
+
+  return restaurants.find(restaurant => {
+    const restaurantWords = restaurant.name
+      .toLowerCase()
+      .replace(/[.'&]/g, '')
+      .split(/\s+/)
+      .filter(word => word.length > 2 && word !== 'pizza');
+    return restaurantWords.length > 0 && restaurantWords.every(word => normalized.includes(word));
+  });
 }
 
 export function findMenuItemFromText(text: string): { restaurant: Restaurant; item: MenuItem } | undefined {
@@ -91,10 +117,6 @@ export function findMenuItemFromText(text: string): { restaurant: Restaurant; it
         return { restaurant, item };
       }
     }
-  }
-
-  if (normalized.includes('pizza')) {
-    return { restaurant: restaurants[0], item: restaurants[0].menu[0] };
   }
 
   return undefined;

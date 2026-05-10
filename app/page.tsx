@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { clearBackendCart, createBackendOrder, fetchCart, fetchOrder, fetchRestaurants, saveCart } from '@/lib/api';
 import { orderStatusSteps, restaurants as fallbackRestaurants, validateFixtures } from '@/lib/mock-data';
-import { findMenuItemFromText, parseVoiceIntent } from '@/lib/voice';
+import { findMenuItemFromText, findRestaurantFromText, parseVoiceIntent } from '@/lib/voice';
 import { type CartItem, type CartItemModifier, type MenuItem, type Order, type OrderStatus, type Restaurant, type VoiceIntent, formatMoney } from '@/lib/types';
 
 const CART_STORAGE_KEY = 'orderlyapp.cart.v1';
@@ -416,6 +416,19 @@ export default function HomePage() {
       const modifiers = applyVoiceModifiers(match.item, intent);
       setSelectedModifiers(modifiers);
       addItemToCart(match.restaurant, match.item, modifiers);
+      return;
+    }
+
+    if (intent.type === 'select_restaurant') {
+      const restaurant = findRestaurantFromText(transcript);
+      if (!restaurant) {
+        setAssistantMessage(intent.clarification ?? 'I could not find that restaurant.');
+        showToast('Voice command needs clarification.');
+        return;
+      }
+      selectRestaurant(restaurant);
+      setAssistantMessage(intent.clarification ?? `Showing ${restaurant.name}. Pick a menu item to add to your cart.`);
+      showToast(`Restaurant selected: ${restaurant.name}`);
       return;
     }
 

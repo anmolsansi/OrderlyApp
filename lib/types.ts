@@ -70,12 +70,13 @@ export interface Order {
   createdAt: string;
 }
 
-export type VoiceIntentType = 'add_to_cart' | 'view_cart' | 'remove_item' | 'clear_cart' | 'unknown';
+export type VoiceIntentType = 'add_to_cart' | 'select_restaurant' | 'view_cart' | 'remove_item' | 'clear_cart' | 'unknown';
 
 export interface VoiceIntent {
   type: VoiceIntentType;
   transcript: string;
   itemName?: string;
+  restaurantName?: string;
   size?: string;
   toppings?: string[];
   confidence: 'high' | 'medium' | 'low';

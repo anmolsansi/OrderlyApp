@@ -2,6 +2,18 @@ import { restaurants as fallbackRestaurants } from './mock-data';
 import type { CartItem, MenuItem, ModifierGroup, Order, Restaurant } from './types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
+const API_TIMEOUT_MS = 1_500;
+
+async function fetchApi(input: string, init?: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 
 interface ApiModifierOption {
   id: string;
@@ -92,7 +104,7 @@ export function getApiBaseUrl(): string {
 
 export async function fetchRestaurants(): Promise<RestaurantLoadResult> {
   try {
-    const response = await fetch(`${getApiBaseUrl()}/restaurants`, { cache: 'no-store' });
+    const response = await fetchApi(`${getApiBaseUrl()}/restaurants`, { cache: 'no-store' });
     if (!response.ok) {
       throw new Error(`API returned ${response.status}`);
     }
@@ -109,7 +121,7 @@ export async function fetchRestaurants(): Promise<RestaurantLoadResult> {
 
 export async function fetchRestaurant(restaurantId: string): Promise<Restaurant | undefined> {
   try {
-    const response = await fetch(`${getApiBaseUrl()}/restaurants/${restaurantId}`, { cache: 'no-store' });
+    const response = await fetchApi(`${getApiBaseUrl()}/restaurants/${restaurantId}`, { cache: 'no-store' });
     if (!response.ok) return undefined;
     return normalizeRestaurant(await response.json() as ApiRestaurant);
   } catch {
@@ -119,7 +131,7 @@ export async function fetchRestaurant(restaurantId: string): Promise<Restaurant 
 
 export async function fetchCart(sessionId: string): Promise<CartItem[] | undefined> {
   try {
-    const response = await fetch(`${getApiBaseUrl()}/sessions/${sessionId}/cart`, { cache: 'no-store' });
+    const response = await fetchApi(`${getApiBaseUrl()}/sessions/${sessionId}/cart`, { cache: 'no-store' });
     if (!response.ok) return undefined;
     const cart = await response.json() as ApiCart;
     return cart.items.map(normalizeCartItem);
@@ -130,7 +142,7 @@ export async function fetchCart(sessionId: string): Promise<CartItem[] | undefin
 
 export async function saveCart(sessionId: string, items: CartItem[]): Promise<boolean> {
   try {
-    const response = await fetch(`${getApiBaseUrl()}/sessions/${sessionId}/cart`, {
+    const response = await fetchApi(`${getApiBaseUrl()}/sessions/${sessionId}/cart`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ items: items.map(toApiCartItem) }),
@@ -143,7 +155,7 @@ export async function saveCart(sessionId: string, items: CartItem[]): Promise<bo
 
 export async function clearBackendCart(sessionId: string): Promise<boolean> {
   try {
-    const response = await fetch(`${getApiBaseUrl()}/sessions/${sessionId}/cart`, { method: 'DELETE' });
+    const response = await fetchApi(`${getApiBaseUrl()}/sessions/${sessionId}/cart`, { method: 'DELETE' });
     return response.ok;
   } catch {
     return false;
@@ -152,7 +164,7 @@ export async function clearBackendCart(sessionId: string): Promise<boolean> {
 
 export async function createBackendOrder(sessionId: string, cartItems: CartItem[], subtotalCents: number): Promise<Order | undefined> {
   try {
-    const response = await fetch(`${getApiBaseUrl()}/orders`, {
+    const response = await fetchApi(`${getApiBaseUrl()}/orders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -170,7 +182,7 @@ export async function createBackendOrder(sessionId: string, cartItems: CartItem[
 
 export async function fetchOrder(orderId: string): Promise<Order | undefined> {
   try {
-    const response = await fetch(`${getApiBaseUrl()}/orders/${orderId}`, { cache: 'no-store' });
+    const response = await fetchApi(`${getApiBaseUrl()}/orders/${orderId}`, { cache: 'no-store' });
     if (!response.ok) return undefined;
     return normalizeOrder(await response.json() as ApiOrder);
   } catch {

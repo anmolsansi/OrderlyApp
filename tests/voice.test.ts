@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findMenuItemFromText, parseVoiceIntent } from '../lib/voice';
+import { findMenuItemFromText, findRestaurantFromText, parseVoiceIntent } from '../lib/voice';
 
 describe('voice intent parsing', () => {
   it('parses add-to-cart with size and toppings', () => {
@@ -19,5 +19,12 @@ describe('voice intent parsing', () => {
   it('matches menu items from natural language', () => {
     const match = findMenuItemFromText('I want bbq chicken pizza');
     expect(match?.item.name).toContain('BBQ Chicken');
+  });
+
+  it('selects a restaurant instead of adding a default pizza when only restaurant is named', () => {
+    const intent = parseVoiceIntent('I want to order pizza from Chicago square cut');
+    expect(intent.type).toBe('select_restaurant');
+    expect(intent.restaurantName).toBe('Chicago Square Cut');
+    expect(findRestaurantFromText('Chicago square cut')?.name).toBe('Chicago Square Cut');
   });
 });

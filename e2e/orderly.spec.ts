@@ -25,3 +25,14 @@ test('typed voice command adds item and checkout creates order status', async ({
   await expect(page.getByRole('status')).toContainText(/mock order/i);
   await expect(page.getByText(/order placed/i).last()).toBeVisible();
 });
+
+test('restaurant-only voice command selects restaurant without adding a default pizza', async ({ page }) => {
+  await page.goto('/');
+  await page.getByLabel(/try a command/i).fill('I want to order pizza from Chicago square cut');
+  await page.getByRole('button', { name: 'Run' }).click();
+  await expect(page.getByText(/intent: select_restaurant/i)).toBeVisible();
+  await expect(page.getByRole('heading', { level: 2, name: /chicago square cut/i })).toBeVisible();
+  await expect(page.locator('.transcript')).toContainText(/showing chicago square cut/i);
+  await expect(page.getByText(/your cart is empty/i)).toBeVisible();
+  await expect(page.getByRole('button', { name: /continue to mock checkout/i })).toBeDisabled();
+});
