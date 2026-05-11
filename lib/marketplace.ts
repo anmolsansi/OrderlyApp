@@ -9,7 +9,26 @@ import {
 } from './mock-data';
 import type { CartItem, CartItemModifier, MenuItem, Restaurant } from './types';
 
-export const quickFilters = ['All restaurants', 'Fast delivery', 'Top rated', 'Wood fired', 'Open late'];
+export const quickFilters = ['All pizza', 'Fast delivery', 'Top rated', 'Wood fired', 'Open late', 'Open now'];
+
+export const discoveryCuisineFilters = ['All pizza', 'Vegan Pizza', 'NY style', 'Detroit style', 'Neapolitan', 'Fusion'];
+
+export const discoveryMockStates = {
+  loadingRows: [
+    { id: 'image', width: '46%' },
+    { id: 'title', width: '74%' },
+    { id: 'metadata', width: '62%' },
+    { id: 'tags', width: '88%' },
+  ],
+  empty: {
+    title: 'No restaurants found',
+    description: 'Show helpful reset actions when search and filters remove every seeded restaurant.',
+  },
+  error: {
+    title: 'Discovery temporarily unavailable',
+    description: 'Show a retry action and keep the selected search/filter context in view.',
+  },
+};
 
 export const cuisineRoadmap = [
   { label: 'V1 Pizza', icon: '🍕', description: 'Pizza-only discovery, menus, crust/topping modifiers, cart, checkout, and live order status.' },
@@ -54,6 +73,8 @@ export function filterRestaurants(query = '', filter = 'All restaurants'): Resta
     const matchesFilter = filter === 'All restaurants'
       || (filter === 'Fast delivery' && Number.parseInt(restaurant.deliveryMinutes, 10) <= 20)
       || (filter === 'Top rated' && restaurant.rating >= 4.8)
+      || (filter === 'Open now' && restaurant.status !== 'closed')
+      || restaurant.cuisine.toLowerCase() === filter.toLowerCase()
       || restaurant.tags.some(tag => tag.toLowerCase() === filter.toLowerCase());
     return matchesSearch && matchesFilter;
   });

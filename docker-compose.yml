@@ -4,15 +4,19 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3100}
+        NEXT_PUBLIC_APP_URL: ${ORDERLY_COMPOSE_APP_URL:-http://localhost:3100}
         NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
         NEXT_PUBLIC_VOICE_MODE: ${NEXT_PUBLIC_VOICE_MODE:-browser}
+        NEXT_PUBLIC_CHECKOUT_MODE: ${NEXT_PUBLIC_CHECKOUT_MODE:-mock}
+        NEXT_PUBLIC_AUTH_PROVIDER: ${NEXT_PUBLIC_AUTH_PROVIDER:-none}
     ports:
       - "${WEB_PORT:-3100}:3000"
     environment:
-      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3100}
+      NEXT_PUBLIC_APP_URL: ${ORDERLY_COMPOSE_APP_URL:-http://localhost:3100}
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
       NEXT_PUBLIC_VOICE_MODE: ${NEXT_PUBLIC_VOICE_MODE:-browser}
+      NEXT_PUBLIC_CHECKOUT_MODE: ${NEXT_PUBLIC_CHECKOUT_MODE:-mock}
+      NEXT_PUBLIC_AUTH_PROVIDER: ${NEXT_PUBLIC_AUTH_PROVIDER:-none}
     depends_on:
       api:
         condition: service_healthy

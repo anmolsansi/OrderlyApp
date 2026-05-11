@@ -40,6 +40,8 @@ export interface MenuCategory {
   items: MenuItem[];
 }
 
+export type RestaurantStatus = 'open' | 'closed';
+
 export interface Restaurant {
   id: string;
   name: string;
@@ -55,6 +57,11 @@ export interface Restaurant {
   tags: string[];
   menuCategories: MenuCategory[];
   menu: MenuItem[];
+  distanceMiles?: number;
+  promotion?: string;
+  status?: RestaurantStatus;
+  imageAvailable?: boolean;
+  outsideDeliveryRange?: boolean;
 }
 
 export interface CartItemModifier {

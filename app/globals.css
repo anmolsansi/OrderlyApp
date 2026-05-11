@@ -1167,3 +1167,353 @@ h3 {
     grid-template-columns: 1fr;
   }
 }
+
+.restaurant-discovery-page .lead {
+  margin-bottom: 0;
+}
+
+.discovery-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 20px;
+  align-items: end;
+  margin-bottom: 18px;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(34, 197, 94, 0.2), transparent 34%),
+    radial-gradient(circle at 88% 10%, rgba(20, 184, 166, 0.16), transparent 30%),
+    linear-gradient(145deg, rgba(16, 43, 36, 0.96), rgba(9, 9, 11, 0.98));
+}
+
+.discovery-hero h1 {
+  margin-bottom: 12px;
+  font-size: clamp(40px, 7vw, 78px);
+}
+
+.discovery-hero-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(110px, 1fr));
+  gap: 10px;
+}
+
+.discovery-hero-metrics span {
+  display: grid;
+  gap: 4px;
+  min-height: 76px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.discovery-hero-metrics strong {
+  color: #d1fae5;
+  font-size: 24px;
+}
+
+.discovery-controls {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) auto minmax(170px, auto);
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.discovery-search {
+  width: 100%;
+  max-width: none;
+  margin-top: 0;
+}
+
+.segmented-control {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(92px, 1fr));
+  min-height: 46px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.segmented-control a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  color: var(--muted);
+}
+
+.segmented-control a.active {
+  color: #03140f;
+  background: #22c55e;
+  font-weight: 800;
+}
+
+.mock-select-label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.mock-select-label select {
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 0 14px;
+  color: var(--text);
+  background: #18181b;
+  font: inherit;
+}
+
+.discovery-filter-row {
+  grid-column: 1 / -1;
+  margin-top: 0;
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  padding-bottom: 4px;
+}
+
+.discovery-results-layout {
+  grid-template-columns: 260px minmax(0, 1fr);
+}
+
+.discovery-sidebar .filter-chip {
+  min-height: 44px;
+}
+
+.discovery-note {
+  margin-top: 18px;
+  padding: 14px;
+  border: 1px dashed rgba(196, 181, 253, 0.32);
+  border-radius: 18px;
+  background: rgba(139, 92, 246, 0.08);
+}
+
+.discovery-note p {
+  margin: 8px 0 0;
+}
+
+.discovery-list-heading h2 {
+  margin-bottom: 8px;
+  font-size: clamp(32px, 4vw, 54px);
+}
+
+.state-toggle-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.active-state {
+  border-color: rgba(34, 197, 94, 0.72);
+  color: #d1fae5;
+  background: rgba(34, 197, 94, 0.14);
+}
+
+.restaurant-discovery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.discovery-restaurant-card {
+  display: grid;
+  grid-template-rows: 170px 1fr;
+  gap: 16px;
+  min-height: 390px;
+  padding: 14px;
+  overflow: hidden;
+  transition: border-color 160ms ease, transform 160ms ease, opacity 160ms ease;
+}
+
+.discovery-restaurant-card:hover {
+  border-color: rgba(34, 197, 94, 0.52);
+  transform: translateY(-2px);
+}
+
+.discovery-restaurant-card.is-deprioritized {
+  opacity: 0.58;
+}
+
+.restaurant-image-block {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 170px;
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 28% 24%, rgba(34, 197, 94, 0.24), transparent 30%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.035));
+  font-size: 58px;
+}
+
+.restaurant-image-block em,
+.missing-image {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  max-width: calc(100% - 24px);
+  padding: 7px 10px;
+  border-radius: 999px;
+  color: #03140f;
+  background: #bbf7d0;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.missing-image {
+  position: static;
+  color: #e4e4e7;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.restaurant-card-copy,
+.loading-preview-card {
+  display: grid;
+  gap: 10px;
+}
+
+.restaurant-card-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.restaurant-card-title-row h3 {
+  margin-bottom: 4px;
+  font-size: 21px;
+}
+
+.restaurant-card-title-row p,
+.restaurant-summary {
+  margin: 0;
+  color: var(--muted);
+}
+
+.status-badge {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.status-badge.open {
+  color: #bbf7d0;
+  background: rgba(34, 197, 94, 0.16);
+}
+
+.status-badge.closed {
+  color: #fecaca;
+  background: rgba(239, 68, 68, 0.16);
+}
+
+.compact-tags {
+  max-height: 68px;
+  overflow: hidden;
+}
+
+.discovery-state-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 18px;
+  align-items: center;
+  min-height: 260px;
+}
+
+.discovery-state-card > span {
+  font-size: 48px;
+}
+
+.error-state {
+  border-color: rgba(248, 113, 113, 0.5);
+  background: linear-gradient(180deg, rgba(127, 29, 29, 0.26), rgba(17,17,19,0.96));
+}
+
+.no-results-state {
+  border-color: rgba(251, 191, 36, 0.42);
+  background: linear-gradient(180deg, rgba(120, 53, 15, 0.2), rgba(17,17,19,0.96));
+}
+
+.state-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.skeleton-line {
+  display: block;
+  height: 18px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.06), rgba(255,255,255,0.18), rgba(255,255,255,0.06));
+  background-size: 220% 100%;
+  animation: skeleton-pulse 1400ms ease-in-out infinite;
+}
+
+.skeleton-line:first-of-type {
+  height: 86px;
+  border-radius: 20px;
+}
+
+.discovery-state-mini {
+  min-height: 180px;
+}
+
+.error-state-mini {
+  border-color: rgba(248, 113, 113, 0.38);
+}
+
+@keyframes skeleton-pulse {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+@media (max-width: 960px) {
+  .discovery-hero,
+  .discovery-controls,
+  .discovery-results-layout,
+  .state-preview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .discovery-hero-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .discovery-sidebar {
+    position: static;
+  }
+
+  .state-toggle-row {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .discovery-search,
+  .discovery-state-card,
+  .restaurant-card-title-row {
+    grid-template-columns: 1fr;
+  }
+
+  .discovery-search button,
+  .filter-chip,
+  .segmented-control a,
+  .mock-select-label select {
+    min-height: 44px;
+  }
+
+  .discovery-restaurant-card {
+    min-height: auto;
+  }
+}

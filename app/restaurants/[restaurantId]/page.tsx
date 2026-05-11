@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { MarketplaceNav } from '@/app/components/MarketplaceNav';
 import { getRestaurant } from '@/lib/marketplace';
+import { routes } from '@/lib/routes';
 import { formatMoney } from '@/lib/types';
 
 interface RestaurantMenuPageProps {
@@ -28,7 +29,7 @@ export default async function RestaurantMenuPage({ params }: RestaurantMenuPageP
               {restaurant.tags.map(tag => <span className="tag" key={tag}>{tag}</span>)}
             </div>
           </div>
-          <Link className="checkout-button inline-action" href="/checkout">View cart</Link>
+          <Link className="checkout-button inline-action" href={routes.checkout}>View cart</Link>
         </section>
 
         <nav className="category-tabs" aria-label="Menu categories">
@@ -43,9 +44,10 @@ export default async function RestaurantMenuPage({ params }: RestaurantMenuPageP
           <span className="pill">{restaurant.menu.length} items</span>
         </section>
 
-        {restaurant.menuCategories.map(category => (
-          <section className="menu-page-grid" id={category.id} key={category.id}>
-            <div className="section-heading compact-heading">
+        <section className="menu-page-grid">
+          {restaurant.menu.map(item => (
+            <Link className="card menu-page-card" href={routes.item(restaurant.id, item.id)} key={item.id}>
+              <span className="menu-emoji">{item.imageEmoji}</span>
               <div>
                 <span className="kicker">{category.items.length} items</span>
                 <h2>{category.name}</h2>
