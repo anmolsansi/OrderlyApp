@@ -64,7 +64,7 @@ export default function HomePage() {
           ))}
         </section>
 
-        <section className="section-heading">
+        <section className="section-heading" id="restaurants">
           <div>
             <span className="kicker">Homepage</span>
             <h2>Famous near you</h2>
