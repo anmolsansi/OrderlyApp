@@ -62,8 +62,8 @@ def pill(x,y,s,fill=None,w=None):
 def nav(active='Home'):
     items = ['Home','Search','Menu','Cart','Orders']
     out = rect(56,34,1328,68,'#081626','#20324e',34,1, 'filter="url(#shadow)"')
-    out += text(88,78,'OrderlyApp',25,COLORS['text'],800)
     out += rect(64,47,36,36,'url(#accent)',None,18) + text(82,72,'O',19,'#03140f',900,'middle')
+    out += text(116,78,'OrderlyApp',25,COLORS['text'],800)
     x=610
     for item in items:
         if item==active:

@@ -588,11 +588,7 @@ h3 {
   width: 34px;
   height: 34px;
   border-radius: 999px;
-<<<<<<< codex/create-ui-mocks-for-pizza-delivery-app
   background: linear-gradient(135deg, #22c55e, #14b8a6);
-=======
-  background: linear-gradient(135deg, #ef4444, #f97316);
->>>>>>> main
 }
 
 .nav-links a {
@@ -612,11 +608,7 @@ h3 {
 
 .nav-cart {
   padding: 9px 14px;
-<<<<<<< codex/create-ui-mocks-for-pizza-delivery-app
   background: #22c55e;
-=======
-  background: #ef4444;
->>>>>>> main
 }
 
 .marketplace-hero {
@@ -627,13 +619,8 @@ h3 {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 36px;
   background:
-<<<<<<< codex/create-ui-mocks-for-pizza-delivery-app
     radial-gradient(circle at 18% 18%, rgba(34, 197, 94, 0.24), transparent 28%),
     radial-gradient(circle at 82% 22%, rgba(20, 184, 166, 0.22), transparent 28%),
-=======
-    radial-gradient(circle at 18% 18%, rgba(239, 68, 68, 0.32), transparent 28%),
-    radial-gradient(circle at 82% 22%, rgba(249, 115, 22, 0.28), transparent 28%),
->>>>>>> main
     linear-gradient(145deg, rgba(24, 24, 27, 0.94), rgba(9, 9, 11, 0.98));
   overflow: hidden;
 }
@@ -675,13 +662,8 @@ h3 {
 }
 
 .filter-chip.active {
-<<<<<<< codex/create-ui-mocks-for-pizza-delivery-app
   border-color: rgba(34, 197, 94, 0.72);
   background: rgba(34, 197, 94, 0.18);
-=======
-  border-color: rgba(239, 68, 68, 0.72);
-  background: rgba(239, 68, 68, 0.22);
->>>>>>> main
 }
 
 .delivery-preview {
@@ -718,15 +700,9 @@ h3 {
   min-height: 230px;
   border-radius: 28px;
   background:
-<<<<<<< codex/create-ui-mocks-for-pizza-delivery-app
     linear-gradient(90deg, rgba(34, 197, 94, 0.18) 1px, transparent 1px),
     linear-gradient(rgba(34, 197, 94, 0.18) 1px, transparent 1px),
     #ecfdf5;
-=======
-    linear-gradient(90deg, rgba(239, 68, 68, 0.18) 1px, transparent 1px),
-    linear-gradient(rgba(239, 68, 68, 0.18) 1px, transparent 1px),
-    #fff7ed;
->>>>>>> main
   background-size: 44px 44px;
   font-size: 34px;
 }
@@ -749,11 +725,7 @@ h3 {
   width: 100%;
   height: 8px;
   border-radius: 999px;
-<<<<<<< codex/create-ui-mocks-for-pizza-delivery-app
   background: #bbf7d0;
-=======
-  background: #fed7aa;
->>>>>>> main
 }
 
 .progress-line span {
@@ -761,11 +733,7 @@ h3 {
   width: 62%;
   height: 100%;
   border-radius: inherit;
-<<<<<<< codex/create-ui-mocks-for-pizza-delivery-app
   background: #22c55e;
-=======
-  background: #ef4444;
->>>>>>> main
 }
 
 .roadmap-grid,
@@ -788,11 +756,7 @@ h3 {
   display: grid;
   place-items: center;
   border-radius: 24px;
-<<<<<<< codex/create-ui-mocks-for-pizza-delivery-app
   background: rgba(34, 197, 94, 0.14);
-=======
-  background: rgba(239, 68, 68, 0.14);
->>>>>>> main
 }
 
 .roadmap-icon {
@@ -841,11 +805,7 @@ h3 {
   height: 38px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
-<<<<<<< codex/create-ui-mocks-for-pizza-delivery-app
   color: #d1fae5;
-=======
-  color: #fecaca;
->>>>>>> main
   font-size: 20px;
 }
 
@@ -893,11 +853,7 @@ h3 {
   width: 34px;
   height: 34px;
   border-radius: 999px;
-<<<<<<< codex/create-ui-mocks-for-pizza-delivery-app
   background: #22c55e;
-=======
-  background: #ef4444;
->>>>>>> main
   color: #fff;
   font-weight: 800;
 }
