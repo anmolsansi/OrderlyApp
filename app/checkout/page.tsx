@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { MarketplaceNav } from '@/app/components/MarketplaceNav';
-import { getCartSubtotal, getMenuItem, getRestaurant } from '@/lib/marketplace';
+import { calculateCartTotals } from '@/lib/mock-data';
+import { getMenuItem, getRestaurant } from '@/lib/marketplace';
 import type { CartItem } from '@/lib/types';
 import { formatMoney } from '@/lib/types';
 
@@ -19,12 +20,9 @@ export default function CheckoutPage() {
   const router = useRouter();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [mounted, setMounted] = useState(false);
-  const subtotal = useMemo(() => getCartSubtotal(cart), [cart]);
-  const deliveryFee = cart.length > 0 ? 199 : 0;
-  const serviceFee = cart.length > 0 ? 235 : 0;
-  const promo = cart.length > 0 ? 500 : 0;
-  const total = Math.max(0, subtotal + deliveryFee + serviceFee - promo);
   const restaurant = cart[0] ? getRestaurant(cart[0].restaurantId) : undefined;
+  const totals = useMemo(() => calculateCartTotals(cart, restaurant?.id, cart.length > 0 ? 500 : 0), [cart, restaurant?.id]);
+  const { subtotalCents: subtotal, deliveryFeeCents: deliveryFee, serviceFeeCents: serviceFee, discountCents: promo, taxCents: tax, totalCents: total } = totals;
 
   useEffect(() => {
     const stored = window.localStorage.getItem(CART_STORAGE_KEY);
@@ -100,6 +98,7 @@ export default function CheckoutPage() {
             <div className="cart-total"><span>Subtotal</span><strong>{formatMoney(subtotal)}</strong></div>
             <div className="cart-total"><span>Delivery fee</span><strong>{formatMoney(deliveryFee)}</strong></div>
             <div className="cart-total"><span>Service fee</span><strong>{formatMoney(serviceFee)}</strong></div>
+            <div className="cart-total"><span>Estimated tax</span><strong>{formatMoney(tax)}</strong></div>
             <div className="cart-total discount-row"><span>Promo</span><strong>-{formatMoney(promo)}</strong></div>
             <div className="cart-total grand-total"><span>Total</span><strong>{formatMoney(total)}</strong></div>
           </article>

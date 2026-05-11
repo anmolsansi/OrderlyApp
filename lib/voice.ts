@@ -100,7 +100,10 @@ export function findRestaurantFromText(text: string): Restaurant | undefined {
 export function findMenuItemFromText(text: string): { restaurant: Restaurant; item: MenuItem } | undefined {
   const normalized = normalize(text);
 
-  if (normalized.includes('bbq') || normalized.includes('chicken')) {
+  if (normalized.includes('bbq')) {
+    return getFirstItemContaining('bbq');
+  }
+  if (normalized.includes('chicken')) {
     return getFirstItemContaining('chicken');
   }
   if (normalized.includes('pepperoni')) {

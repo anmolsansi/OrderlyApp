@@ -10,7 +10,7 @@ interface RestaurantsPageProps {
 export default async function RestaurantsPage({ searchParams }: RestaurantsPageProps) {
   const params = await searchParams;
   const query = params.query ?? '';
-  const activeFilter = params.filter ?? 'All pizza';
+  const activeFilter = params.filter ?? 'All restaurants';
   const matchingRestaurants = filterRestaurants(query, activeFilter);
 
   return (
@@ -21,7 +21,7 @@ export default async function RestaurantsPage({ searchParams }: RestaurantsPageP
         <section className="results-layout">
           <aside className="card filters-panel">
             <span className="kicker">Filters</span>
-            <h2>Refine pizza</h2>
+            <h2>Refine restaurants</h2>
             <div className="filter-stack">
               {quickFilters.map(filter => (
                 <Link className={`filter-chip ${activeFilter === filter ? 'active' : ''}`} href={`/restaurants?query=${encodeURIComponent(query)}&filter=${encodeURIComponent(filter)}`} key={filter}>
@@ -35,11 +35,11 @@ export default async function RestaurantsPage({ searchParams }: RestaurantsPageP
             <div className="section-heading compact-heading">
               <div>
                 <span className="kicker">Restaurant list</span>
-                <h1>{query ? `Search results for “${query}”` : 'Pizza restaurants near you'}</h1>
+                <h1>{query ? `Search results for “${query}”` : 'Restaurants near you'}</h1>
                 <p>{matchingRestaurants.length} matching restaurants · sorted by recommended</p>
               </div>
               <form className="search-panel compact-search" action="/restaurants" role="search">
-                <input aria-label="Search pizza restaurants and menu items" type="search" name="query" placeholder="Search again" defaultValue={query} />
+                <input aria-label="Search pizza restaurants and menu items" type="search" name="query" placeholder="Search restaurants or dishes" defaultValue={query} />
                 <button type="submit">Search</button>
               </form>
             </div>
@@ -50,7 +50,8 @@ export default async function RestaurantsPage({ searchParams }: RestaurantsPageP
                   <span className="restaurant-emoji">{restaurant.imageEmoji}</span>
                   <div>
                     <h2>{restaurant.name}</h2>
-                    <p>{restaurant.cuisine} · ⭐ {restaurant.rating} · {restaurant.deliveryMinutes}</p>
+                    <p>{restaurant.cuisine} · ⭐ {restaurant.rating || 'New'} · {restaurant.deliveryMinutes} · {restaurant.distanceMiles} mi</p>
+                    <p>{restaurant.isOpen ? 'Open now' : 'Closed'} · {restaurant.menuCategories.length} menu sections</p>
                     <p>Delivery {formatMoney(restaurant.deliveryFeeCents)}</p>
                     <div className="tag-row">
                       {restaurant.tags.map(tag => <span className="tag" key={tag}>{tag}</span>)}

@@ -13,8 +13,6 @@ export default async function RestaurantMenuPage({ params }: RestaurantMenuPageP
   const restaurant = getRestaurant(restaurantId);
   if (!restaurant) notFound();
 
-  const categories = ['Popular', 'Pizza', 'Sides', 'Drinks', 'Dessert'];
-
   return (
     <main className="marketplace-page">
       <div className="container">
@@ -25,7 +23,7 @@ export default async function RestaurantMenuPage({ params }: RestaurantMenuPageP
           <div>
             <span className="kicker">Restaurant menu</span>
             <h1>{restaurant.name}</h1>
-            <p>{restaurant.cuisine} · ⭐ {restaurant.rating} · {restaurant.deliveryMinutes} · Delivery {formatMoney(restaurant.deliveryFeeCents)}</p>
+            <p>{restaurant.cuisine} · ⭐ {restaurant.rating || 'New'} · {restaurant.deliveryMinutes} · {restaurant.distanceMiles} mi · Delivery {formatMoney(restaurant.deliveryFeeCents)} · {restaurant.isOpen ? 'Open now' : 'Closed'}</p>
             <div className="tag-row">
               {restaurant.tags.map(tag => <span className="tag" key={tag}>{tag}</span>)}
             </div>
@@ -34,30 +32,40 @@ export default async function RestaurantMenuPage({ params }: RestaurantMenuPageP
         </section>
 
         <nav className="category-tabs" aria-label="Menu categories">
-          {categories.map((category, index) => <a className={index === 0 ? 'active' : ''} href="#menu-items" key={category}>{category}</a>)}
+          {restaurant.menuCategories.map((category, index) => <a className={index === 0 ? 'active' : ''} href={`#${category.id}`} key={category.id}>{category.name}</a>)}
         </nav>
 
         <section className="section-heading" id="menu-items">
           <div>
             <span className="kicker">Menu</span>
-            <h2>Popular items</h2>
+            <h2>{restaurant.menuCategories.length > 0 ? 'Menu sections' : 'Menu coming soon'}</h2>
           </div>
           <span className="pill">{restaurant.menu.length} items</span>
         </section>
 
-        <section className="menu-page-grid">
-          {restaurant.menu.map(item => (
-            <Link className="card menu-page-card" href={`/restaurants/${restaurant.id}/items/${item.id}`} key={item.id}>
-              <span className="menu-emoji">{item.imageEmoji}</span>
+        {restaurant.menuCategories.map(category => (
+          <section className="menu-page-grid" id={category.id} key={category.id}>
+            <div className="section-heading compact-heading">
               <div>
-                <h3>{item.name}</h3>
-                <p>{item.description}</p>
-                <strong>{formatMoney(item.priceCents)}</strong>
+                <span className="kicker">{category.items.length} items</span>
+                <h2>{category.name}</h2>
+                {category.description && <p>{category.description}</p>}
               </div>
-              {item.popular && <span className="tag">Popular</span>}
-            </Link>
-          ))}
-        </section>
+            </div>
+            {category.items.map(item => (
+              <Link className={`card menu-page-card ${item.available === false || !restaurant.isOpen ? 'disabled-card' : ''}`} href={`/restaurants/${restaurant.id}/items/${item.id}`} key={item.id}>
+                <span className="menu-emoji">{item.imageEmoji}</span>
+                <div>
+                  <h3>{item.name}</h3>
+                  <p>{item.description}</p>
+                  <strong>{formatMoney(item.priceCents)}</strong>
+                </div>
+                {item.popular && <span className="tag">Popular</span>}
+                {item.available === false && <span className="tag">Unavailable</span>}
+              </Link>
+            ))}
+          </section>
+        ))}
       </div>
     </main>
   );

@@ -1,5 +1,5 @@
-import { restaurants as fallbackRestaurants } from './mock-data';
-import type { CartItem, MenuItem, ModifierGroup, Order, Restaurant } from './types';
+import { calculateCartTotals, mockUserProfile, restaurants as fallbackRestaurants } from './mock-data';
+import type { CartItem, MenuCategory, MenuItem, ModifierGroup, Order, Restaurant } from './types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
 const API_TIMEOUT_MS = 1_500;
@@ -43,8 +43,16 @@ interface ApiMenuItem {
   image_emoji?: string;
   imageEmoji?: string;
   popular?: boolean;
+  available?: boolean;
   modifier_groups?: ApiModifierGroup[];
   modifierGroups?: ApiModifierGroup[];
+}
+
+interface ApiMenuCategory {
+  id: string;
+  name: string;
+  description?: string;
+  items: ApiMenuItem[];
 }
 
 interface ApiRestaurant {
@@ -56,10 +64,20 @@ interface ApiRestaurant {
   deliveryMinutes?: string;
   delivery_fee_cents?: number;
   deliveryFeeCents?: number;
+  service_fee_cents?: number;
+  serviceFeeCents?: number;
+  distance_miles?: number;
+  distanceMiles?: number;
   image_emoji?: string;
   imageEmoji?: string;
+  image_alt?: string;
+  imageAlt?: string;
+  is_open?: boolean;
+  isOpen?: boolean;
   tags: string[];
   menu: ApiMenuItem[];
+  menu_categories?: ApiMenuCategory[];
+  menuCategories?: ApiMenuCategory[];
 }
 
 interface ApiCartItemModifier {
@@ -191,6 +209,8 @@ export async function fetchOrder(orderId: string): Promise<Order | undefined> {
 }
 
 function normalizeRestaurant(input: ApiRestaurant): Restaurant {
+  const menuCategories = (input.menuCategories ?? input.menu_categories)?.map(normalizeMenuCategory)
+    ?? [{ id: 'menu', name: 'Menu', items: (input.menu ?? []).map(normalizeMenuItem) }];
   return {
     id: input.id,
     name: input.name,
@@ -198,9 +218,23 @@ function normalizeRestaurant(input: ApiRestaurant): Restaurant {
     rating: input.rating,
     deliveryMinutes: input.deliveryMinutes ?? input.delivery_minutes ?? '20–30 min',
     deliveryFeeCents: input.deliveryFeeCents ?? input.delivery_fee_cents ?? 0,
+    serviceFeeCents: input.serviceFeeCents ?? input.service_fee_cents,
+    distanceMiles: input.distanceMiles ?? input.distance_miles ?? 0,
     imageEmoji: input.imageEmoji ?? input.image_emoji ?? '🍽️',
+    imageAlt: input.imageAlt ?? input.image_alt ?? `${input.name} restaurant image`,
+    isOpen: input.isOpen ?? input.is_open ?? true,
     tags: input.tags ?? [],
-    menu: (input.menu ?? []).map(normalizeMenuItem),
+    menuCategories,
+    menu: menuCategories.flatMap(category => category.items),
+  };
+}
+
+function normalizeMenuCategory(input: ApiMenuCategory): MenuCategory {
+  return {
+    id: input.id,
+    name: input.name,
+    description: input.description,
+    items: input.items.map(normalizeMenuItem),
   };
 }
 
@@ -212,6 +246,7 @@ function normalizeMenuItem(input: ApiMenuItem): MenuItem {
     priceCents: input.priceCents ?? input.price_cents ?? 0,
     imageEmoji: input.imageEmoji ?? input.image_emoji ?? '🍽️',
     popular: input.popular ?? false,
+    available: input.available ?? true,
     modifierGroups: (input.modifierGroups ?? input.modifier_groups ?? []).map(normalizeModifierGroup),
   };
 }
@@ -263,11 +298,21 @@ function toApiCartItem(input: CartItem): ApiCartItem {
 }
 
 function normalizeOrder(input: ApiOrder): Order {
+  const cartItems = input.cart_items.map(normalizeCartItem);
+  const restaurantId = cartItems[0]?.restaurantId ?? fallbackRestaurants[0].id;
+  const totals = calculateCartTotals(cartItems, restaurantId);
+  const createdAt = new Date(input.created_at);
   return {
     id: input.id,
-    cartItems: input.cart_items.map(normalizeCartItem),
+    userId: mockUserProfile.id,
+    restaurantId,
+    cartItems,
+    totals: { ...totals, subtotalCents: input.subtotal_cents },
     subtotalCents: input.subtotal_cents,
     status: input.status,
-    createdAt: input.created_at,
+    createdAt: createdAt.toISOString(),
+    updatedAt: createdAt.toISOString(),
+    deliveryAddressId: mockUserProfile.defaultAddressId,
+    estimatedDeliveryAt: new Date(createdAt.getTime() + 35 * 60 * 1000).toISOString(),
   };
 }
