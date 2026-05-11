@@ -77,6 +77,7 @@ export default function ItemCustomizationPage() {
             <span className="item-preview-emoji">{item.imageEmoji}</span>
             <span className="kicker">Customize item</span>
             <h1>{item.name}</h1>
+            {(item.available === false || !restaurant.isOpen) && <span className="tag">Currently unavailable</span>}
             <p>{item.description}</p>
             <p>{restaurant.name} · {restaurant.deliveryMinutes}</p>
             <div className="quantity-controls item-quantity">
@@ -84,7 +85,7 @@ export default function ItemCustomizationPage() {
               <span>{quantity}</span>
               <button type="button" onClick={() => setQuantity(previous => previous + 1)}>+</button>
             </div>
-            <button className="checkout-button" type="button" onClick={addToCart}>Add to cart · {formatMoney(itemTotal)}</button>
+            <button className="checkout-button" type="button" disabled={item.available === false || !restaurant.isOpen} onClick={addToCart}>Add to cart · {formatMoney(itemTotal)}</button>
           </article>
 
           <aside className="card modifier-panel">

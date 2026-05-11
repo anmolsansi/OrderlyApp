@@ -1,4 +1,12 @@
-import { restaurants } from './mock-data';
+import {
+  calculateCartSubtotal,
+  calculateItemTotal,
+  findMenuItem,
+  findRestaurant,
+  getDefaultModifiers as getSeedDefaultModifiers,
+  mockUserProfile,
+  restaurants,
+} from './mock-data';
 import type { CartItem, CartItemModifier, MenuItem, Restaurant } from './types';
 
 export const quickFilters = ['All pizza', 'Fast delivery', 'Top rated', 'Wood fired', 'Open late', 'Open now'];
@@ -43,25 +51,26 @@ export const themeOptions = [
   { name: 'Fresh Mozzarella', swatch: '#fff7ed', accent: '#16a34a', mood: 'Light, family-friendly grocery-and-food style with clean cards and green trust signals.' },
 ];
 
-export const favoriteRestaurantIds = ['marios-pizza', 'neapolitan-nova'];
+export const favoriteRestaurantIds = mockUserProfile.favoriteRestaurantIds;
 
 export function getRestaurant(restaurantId: string): Restaurant | undefined {
-  return restaurants.find(restaurant => restaurant.id === restaurantId);
+  return findRestaurant(restaurantId);
 }
 
 export function getMenuItem(restaurantId: string, itemId: string): MenuItem | undefined {
-  return getRestaurant(restaurantId)?.menu.find(item => item.id === itemId);
+  return findMenuItem(restaurantId, itemId);
 }
 
-export function filterRestaurants(query = '', filter = 'All pizza'): Restaurant[] {
+export function filterRestaurants(query = '', filter = 'All restaurants'): Restaurant[] {
   const normalizedQuery = query.trim().toLowerCase();
   return restaurants.filter(restaurant => {
     const matchesSearch = normalizedQuery.length === 0
       || restaurant.name.toLowerCase().includes(normalizedQuery)
       || restaurant.cuisine.toLowerCase().includes(normalizedQuery)
       || restaurant.tags.some(tag => tag.toLowerCase().includes(normalizedQuery))
+      || restaurant.menuCategories.some(category => category.name.toLowerCase().includes(normalizedQuery))
       || restaurant.menu.some(item => item.name.toLowerCase().includes(normalizedQuery));
-    const matchesFilter = filter === 'All pizza'
+    const matchesFilter = filter === 'All restaurants'
       || (filter === 'Fast delivery' && Number.parseInt(restaurant.deliveryMinutes, 10) <= 20)
       || (filter === 'Top rated' && restaurant.rating >= 4.8)
       || (filter === 'Open now' && restaurant.status !== 'closed')
@@ -72,28 +81,13 @@ export function filterRestaurants(query = '', filter = 'All pizza'): Restaurant[
 }
 
 export function getDefaultModifiers(item: MenuItem): CartItemModifier[] {
-  return item.modifierGroups.map(group => ({
-    groupId: group.id,
-    optionIds: group.type === 'single' && group.options[0] ? [group.options[0].id] : [],
-  }));
+  return getSeedDefaultModifiers(item);
 }
 
 export function getItemTotal(item: MenuItem, modifiers: CartItemModifier[]): number {
-  const modifierTotal = modifiers.reduce((sum, modifier) => {
-    const group = item.modifierGroups.find(candidate => candidate.id === modifier.groupId);
-    if (!group) return sum;
-    return sum + group.options
-      .filter(option => modifier.optionIds.includes(option.id))
-      .reduce((optionSum, option) => optionSum + option.priceDeltaCents, 0);
-  }, 0);
-
-  return item.priceCents + modifierTotal;
+  return calculateItemTotal(item, modifiers);
 }
 
 export function getCartSubtotal(cartItems: CartItem[]): number {
-  return cartItems.reduce((sum, cartItem) => {
-    const item = getMenuItem(cartItem.restaurantId, cartItem.menuItemId);
-    if (!item) return sum + cartItem.basePriceCents * cartItem.quantity;
-    return sum + getItemTotal(item, cartItem.modifiers) * cartItem.quantity;
-  }, 0);
+  return calculateCartSubtotal(cartItems);
 }

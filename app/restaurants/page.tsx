@@ -130,7 +130,8 @@ export default async function RestaurantsPage({ searchParams }: RestaurantsPageP
                   <span className="restaurant-emoji">{restaurant.imageEmoji}</span>
                   <div>
                     <h2>{restaurant.name}</h2>
-                    <p>{restaurant.cuisine} · ⭐ {restaurant.rating} · {restaurant.deliveryMinutes}</p>
+                    <p>{restaurant.cuisine} · ⭐ {restaurant.rating || 'New'} · {restaurant.deliveryMinutes} · {restaurant.distanceMiles} mi</p>
+                    <p>{restaurant.isOpen ? 'Open now' : 'Closed'} · {restaurant.menuCategories.length} menu sections</p>
                     <p>Delivery {formatMoney(restaurant.deliveryFeeCents)}</p>
                     <div className="tag-row">
                       {restaurant.tags.map(tag => <span className="tag" key={tag}>{tag}</span>)}

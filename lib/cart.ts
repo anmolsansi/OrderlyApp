@@ -1,4 +1,4 @@
-import { restaurants } from './mock-data';
+import { calculateCartSubtotal, calculateItemTotal, createMockOrderId as createSeededMockOrderId, findMenuItem } from './mock-data';
 import type { CartItem, CartItemModifier, MenuItem } from './types';
 
 export interface CartValidationResult {
@@ -7,20 +7,11 @@ export interface CartValidationResult {
 }
 
 export function findCartMenuItem(cartItem: CartItem): MenuItem | undefined {
-  const restaurant = restaurants.find(candidate => candidate.id === cartItem.restaurantId);
-  return restaurant?.menu.find(item => item.id === cartItem.menuItemId);
+  return findMenuItem(cartItem.restaurantId, cartItem.menuItemId);
 }
 
 export function getItemTotal(item: MenuItem, modifiers: CartItemModifier[]): number {
-  const modifierTotal = modifiers.reduce((sum, modifier) => {
-    const group = item.modifierGroups.find(candidate => candidate.id === modifier.groupId);
-    if (!group) return sum;
-    return sum + group.options
-      .filter(option => modifier.optionIds.includes(option.id))
-      .reduce((optionSum, option) => optionSum + option.priceDeltaCents, 0);
-  }, 0);
-
-  return item.priceCents + modifierTotal;
+  return calculateItemTotal(item, modifiers);
 }
 
 export function getCartLineTotal(cartItem: CartItem): number {
@@ -30,7 +21,7 @@ export function getCartLineTotal(cartItem: CartItem): number {
 }
 
 export function getCartSubtotal(cartItems: CartItem[]): number {
-  return cartItems.reduce((sum, item) => sum + getCartLineTotal(item), 0);
+  return calculateCartSubtotal(cartItems);
 }
 
 export function validateCartItem(item: MenuItem, modifiers: CartItemModifier[]): CartValidationResult {
@@ -69,7 +60,7 @@ export function validateCart(cartItems: CartItem[]): CartValidationResult {
       errors.push(`${cartItem.name} quantity must be at least 1.`);
     }
     const item = findCartMenuItem(cartItem);
-    if (!item) {
+    if (!item || item.available === false) {
       errors.push(`${cartItem.name} is no longer available.`);
       continue;
     }
@@ -80,5 +71,5 @@ export function validateCart(cartItems: CartItem[]): CartValidationResult {
 }
 
 export function createMockOrderId(seed = Math.random().toString(36)): string {
-  return `ORD-${seed.replace(/[^a-z0-9]/gi, '').slice(0, 7).toUpperCase().padEnd(7, '0')}`;
+  return createSeededMockOrderId(seed);
 }
