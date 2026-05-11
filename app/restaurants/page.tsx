@@ -1,11 +1,7 @@
 import Link from 'next/link';
 import { MarketplaceNav } from '@/app/components/MarketplaceNav';
-import {
-  discoveryCuisineFilters,
-  discoveryMockStates,
-  filterRestaurants,
-  quickFilters,
-} from '@/lib/marketplace';
+import { filterRestaurants, quickFilters } from '@/lib/marketplace';
+import { routes } from '@/lib/routes';
 import { formatMoney } from '@/lib/types';
 
 interface RestaurantsPageProps {
@@ -99,7 +95,7 @@ export default async function RestaurantsPage({ searchParams }: RestaurantsPageP
             <h2>Visible on desktop</h2>
             <div className="filter-stack">
               {quickFilters.map(filter => (
-                <Link className={`filter-chip ${activeFilter === filter ? 'active' : ''}`} href={`/restaurants?query=${encodeURIComponent(query)}&filter=${encodeURIComponent(filter)}&mode=${activeMode}`} key={filter}>
+                <Link className={`filter-chip ${activeFilter === filter ? 'active' : ''}`} href={routes.restaurants({ query, filter })} key={filter}>
                   {filter}
                 </Link>
               ))}
@@ -122,77 +118,28 @@ export default async function RestaurantsPage({ searchParams }: RestaurantsPageP
                 <Link className={activeState === 'empty' ? 'pill active-state' : 'pill'} href={`/restaurants?state=empty&query=nope&filter=${encodeURIComponent(activeFilter)}&mode=${activeMode}`}>Empty</Link>
                 <Link className={activeState === 'error' ? 'pill active-state' : 'pill'} href={`/restaurants?state=error&query=${encodeURIComponent(query)}&filter=${encodeURIComponent(activeFilter)}&mode=${activeMode}`}>Error</Link>
               </div>
+              <form className="search-panel compact-search" action={routes.restaurants()} role="search">
+                <input aria-label="Search pizza restaurants and menu items" type="search" name="query" placeholder="Search again" defaultValue={query} />
+                <button type="submit">Search</button>
+              </form>
             </div>
 
-            {showMockError ? (
-              <article className="card discovery-state-card error-state" aria-live="polite">
-                <span aria-hidden="true">⚠️</span>
-                <div>
-                  <h3>We could not load restaurants</h3>
-                  <p>Mock API timeout. Keep the retry action visible and preserve selected filters when trying again.</p>
-                  <Link className="checkout-button inline-action" href="/restaurants">Retry discovery</Link>
-                </div>
-              </article>
-            ) : matchingRestaurants.length === 0 ? (
-              <article className="card discovery-state-card no-results-state" aria-live="polite">
-                <span aria-hidden="true">🧭</span>
-                <div>
-                  <h3>No restaurants match these filters</h3>
-                  <p>Try clearing search, switching cuisine chips, or browsing all pizza restaurants in the seeded catalog.</p>
-                  <Link className="checkout-button inline-action" href="/restaurants">Clear filters</Link>
-                </div>
-              </article>
-            ) : (
-              <div className="restaurant-discovery-grid">
-                {matchingRestaurants.map(restaurant => {
-                  const isUnavailable = restaurant.status !== 'open' || restaurant.outsideDeliveryRange;
-                  return (
-                    <Link
-                      className={`card discovery-restaurant-card ${isUnavailable ? 'is-deprioritized' : ''}`}
-                      href={`/restaurants/${restaurant.id}`}
-                      key={restaurant.id}
-                      aria-label={`${restaurant.name}, ${restaurant.status === 'open' ? 'open' : 'closed'}, ${restaurant.deliveryMinutes}`}
-                    >
-                      <div className="restaurant-image-block" aria-hidden="true">
-                        {restaurant.imageAvailable === false ? <span className="missing-image">No image</span> : <span>{restaurant.imageEmoji}</span>}
-                        {restaurant.promotion ? <em>{restaurant.promotion}</em> : null}
-                      </div>
-                      <div className="restaurant-card-copy">
-                        <div className="restaurant-card-title-row">
-                          <div>
-                            <h3>{restaurant.name}</h3>
-                            <p>{restaurant.cuisine}</p>
-                          </div>
-                          <span className={`status-badge ${restaurant.status === 'open' ? 'open' : 'closed'}`}>{restaurant.status === 'open' ? 'Open' : 'Closed'}</span>
-                        </div>
-                        <p className="restaurant-summary">⭐ {restaurant.rating} · {restaurant.deliveryMinutes} · {formatDeliveryFee(restaurant.deliveryFeeCents)}</p>
-                        <p className="restaurant-summary">{restaurant.distanceMiles?.toFixed(1) ?? '1.0'} mi away{restaurant.outsideDeliveryRange ? ' · Outside delivery range' : ''}</p>
-                        <div className="tag-row compact-tags">
-                          {restaurant.tags.slice(0, 4).map(tag => <span className="tag" key={tag}>{tag}</span>)}
-                        </div>
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-
-            <section className="state-preview-grid" aria-label="Static discovery states">
-              <article className="card loading-preview-card">
-                <span className="kicker">Loading state</span>
-                {discoveryMockStates.loadingRows.map(row => <span className="skeleton-line" style={{ width: row.width }} key={row.id} />)}
-              </article>
-              <article className="card discovery-state-mini">
-                <span className="kicker">No search matches</span>
-                <h3>{discoveryMockStates.empty.title}</h3>
-                <p>{discoveryMockStates.empty.description}</p>
-              </article>
-              <article className="card discovery-state-mini error-state-mini">
-                <span className="kicker">Error + retry</span>
-                <h3>{discoveryMockStates.error.title}</h3>
-                <p>{discoveryMockStates.error.description}</p>
-              </article>
-            </section>
+            <div className="restaurant-results-list">
+              {matchingRestaurants.map(restaurant => (
+                <Link className="card restaurant-result-card" href={routes.restaurant(restaurant.id)} key={restaurant.id}>
+                  <span className="restaurant-emoji">{restaurant.imageEmoji}</span>
+                  <div>
+                    <h2>{restaurant.name}</h2>
+                    <p>{restaurant.cuisine} · ⭐ {restaurant.rating} · {restaurant.deliveryMinutes}</p>
+                    <p>Delivery {formatMoney(restaurant.deliveryFeeCents)}</p>
+                    <div className="tag-row">
+                      {restaurant.tags.map(tag => <span className="tag" key={tag}>{tag}</span>)}
+                    </div>
+                  </div>
+                  <strong>View menu →</strong>
+                </Link>
+              ))}
+            </div>
           </section>
         </section>
       </div>

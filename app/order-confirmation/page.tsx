@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { MarketplaceNav } from '@/app/components/MarketplaceNav';
 import { orderStatusSteps } from '@/lib/mock-data';
+import { routes } from '@/lib/routes';
 import { formatMoney } from '@/lib/types';
 
 const ORDER_STORAGE_KEY = 'orderlyapp.marketplace.order.v1';
@@ -51,8 +52,8 @@ export default function OrderConfirmationPage() {
         </section>
 
         <section className="confirmation-actions">
-          <Link className="ghost-button" href="/restaurants">Browse more restaurants</Link>
-          <Link className="checkout-button inline-action" href="/restaurants/marios-pizza">Reorder pizza</Link>
+          <Link className="ghost-button" href={routes.restaurants()}>Browse more restaurants</Link>
+          <Link className="checkout-button inline-action" href={routes.restaurant('marios-pizza')}>Reorder pizza</Link>
         </section>
       </div>
     </main>
