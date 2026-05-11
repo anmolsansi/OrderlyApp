@@ -27,15 +27,50 @@ MVP phases 0–10 are complete for the local portfolio demo. v0.2.0 production-d
 - Automated tests and quality docs
 
 ## Local development
-```bash
-npm install
-npm run dev
-npm run test
-npm run build
-npm run lint
-```
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+2. Create local environment values from the checked-in template:
+   ```bash
+   cp .env.example .env.local
+   ```
+3. Start the Next.js app:
+   ```bash
+   npm run dev
+   ```
 
 Open `http://localhost:3000` for `npm run dev`, or `http://localhost:3100` for Docker Compose.
+
+## Environment configuration
+Environment files stay at the repository root because Next.js loads `.env*` from the project root. The committed `.env.example` contains only safe placeholders; use `.env.local` for local overrides and never commit real secrets.
+
+| Variable | Required for local dev | Production guidance |
+| --- | --- | --- |
+| `NEXT_PUBLIC_APP_URL` | Yes; `http://localhost:3000` for `npm run dev` | Set to the deployed frontend URL. |
+| `NEXT_PUBLIC_API_BASE_URL` | Yes; `http://localhost:8000` when the FastAPI backend runs locally | Set to the deployed backend URL with no trailing slash preferred. |
+| `NEXT_PUBLIC_VOICE_MODE` | Optional; defaults to `browser` | Use `browser` for real browser speech support or `mock` for deterministic demos. |
+| `NEXT_PUBLIC_CHECKOUT_MODE` | Optional; defaults to `mock` | Keep `mock` for portfolio/demo checkout or `disabled` to block checkout. Real payments are not implemented. |
+| `NEXT_PUBLIC_AUTH_PROVIDER` | Optional; defaults to `none` | Placeholder for future auth providers (`none`, `mock`, `clerk`, or `auth0`). |
+| `AUTH_SECRET` | No; leave empty for demo mode | Server-only placeholder for future auth integrations. Do not expose it with `NEXT_PUBLIC_`. |
+| `DATABASE_URL` | Only when running FastAPI directly with Postgres | Set to the managed Postgres connection string. |
+| `REDIS_URL` | Only when running FastAPI directly with Redis | Set to the managed Redis connection string. |
+| `ORDERLY_FORCE_JSON_STORE` | Optional; `0` by default | Set to `1` only to force JSON fallback persistence. |
+| `ORDERLY_CORS_ORIGINS` | Yes for backend/API calls | Set to the comma-separated deployed frontend origins. |
+| `ORDERLY_COMPOSE_APP_URL` | Only for Docker Compose local frontend builds | Defaults to `http://localhost:3100` so copied Docker env values match the exposed Compose port. |
+| `ORDERLY_COMPOSE_DATABASE_URL` / `ORDERLY_COMPOSE_REDIS_URL` | Only for Docker Compose overrides | Usually keep the Compose-internal defaults. |
+| `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` | Only for Docker Compose local database | Use non-demo credentials outside local development. |
+
+## Validation commands
+Use these scripts before opening a PR:
+```bash
+npm run typecheck
+npm run lint
+npm run test
+npm run build
+```
+
+`npm run lint` currently delegates to the TypeScript typecheck until a dedicated linter is added, so `typecheck` is the canonical no-emit TypeScript validation command.
 
 ## Backend
 ```bash

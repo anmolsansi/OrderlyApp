@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { MarketplaceNav } from '@/app/components/MarketplaceNav';
+import { env } from '@/lib/env';
 import { getCartSubtotal, getMenuItem, getRestaurant } from '@/lib/marketplace';
 import type { CartItem } from '@/lib/types';
 import { formatMoney } from '@/lib/types';
@@ -44,6 +45,7 @@ export default function CheckoutPage() {
   }
 
   function placeOrder(): void {
+    if (env.checkoutMode !== 'mock') return;
     const order = {
       id: makeOrderId(),
       total,
@@ -110,10 +112,10 @@ export default function CheckoutPage() {
             <div className="payment-breakdown">
               <div><span>Delivery address</span><strong>123 Demo Street</strong></div>
               <div><span>Drop-off</span><strong>Leave at door</strong></div>
-              <div><span>Payment</span><strong>Mock Visa •••• 4242</strong></div>
+              <div><span>Payment</span><strong>{env.checkoutMode === 'mock' ? 'Mock Visa •••• 4242' : 'Checkout disabled'}</strong></div>
               <div><span>Delivery window</span><strong>{restaurant?.deliveryMinutes ?? '28–35 min'}</strong></div>
             </div>
-            <button className="checkout-button" type="button" disabled={cart.length === 0} onClick={placeOrder}>Place order</button>
+            <button className="checkout-button" type="button" disabled={cart.length === 0 || env.checkoutMode !== 'mock'} onClick={placeOrder}>{env.checkoutMode === 'mock' ? 'Place order' : 'Checkout disabled'}</button>
           </aside>
         </section>
       </div>
