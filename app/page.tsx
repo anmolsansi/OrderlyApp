@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react';
 import { MarketplaceNav } from '@/app/components/MarketplaceNav';
 import { restaurants } from '@/lib/mock-data';
 import { cuisineRoadmap, favoriteRestaurantIds, featureSteps, quickFilters, themeOptions } from '@/lib/marketplace';
+import { routes } from '@/lib/routes';
 import { formatMoney } from '@/lib/types';
 
 export default function HomePage() {
@@ -21,7 +22,7 @@ export default function HomePage() {
             <p className="lead">
               A DoorDash-style marketplace homepage that starts with pizza and expands into searchable restaurant rails, favorites, menus, item customization, checkout, and order tracking.
             </p>
-            <form className="search-panel" action="/restaurants" role="search">
+            <form className="search-panel" action={routes.restaurants()} role="search">
               <span aria-hidden="true">🔎</span>
               <input
                 aria-label="Search pizza restaurants and menu items"
@@ -33,7 +34,7 @@ export default function HomePage() {
             </form>
             <div className="filter-row" aria-label="Pizza filters">
               {quickFilters.map(filter => (
-                <Link className={`filter-chip ${filter === 'All pizza' ? 'active' : ''}`} href={`/restaurants?filter=${encodeURIComponent(filter)}`} key={filter}>
+                <Link className={`filter-chip ${filter === 'All pizza' ? 'active' : ''}`} href={routes.restaurants({ filter })} key={filter}>
                   {filter}
                 </Link>
               ))}
@@ -69,12 +70,12 @@ export default function HomePage() {
             <span className="kicker">Homepage</span>
             <h2>Famous near you</h2>
           </div>
-          <Link className="pill" href="/restaurants">View all restaurants</Link>
+          <Link className="pill" href={routes.restaurants()}>View all restaurants</Link>
         </section>
 
         <section className="horizontal-rail" aria-label="Famous pizza restaurants">
           {famousRestaurants.map(restaurant => (
-            <Link className="card feature-restaurant restaurant-tile-button" href={`/restaurants/${restaurant.id}`} key={restaurant.id}>
+            <Link className="card feature-restaurant restaurant-tile-button" href={routes.restaurant(restaurant.id)} key={restaurant.id}>
               <span className="favorite-button" aria-hidden="true">♥</span>
               <span className="hero-emoji">{restaurant.imageEmoji}</span>
               <h3>{restaurant.name}</h3>
@@ -94,7 +95,7 @@ export default function HomePage() {
 
         <section className="favorite-strip" aria-label="Favorite restaurants">
           {favoriteRestaurants.map(restaurant => (
-            <Link className="favorite-card" href={`/restaurants/${restaurant.id}`} key={restaurant.id}>
+            <Link className="favorite-card" href={routes.restaurant(restaurant.id)} key={restaurant.id}>
               <span>{restaurant.imageEmoji}</span>
               <strong>{restaurant.name}</strong>
               <em>{restaurant.deliveryMinutes}</em>

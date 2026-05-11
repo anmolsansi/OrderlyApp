@@ -69,7 +69,7 @@ Try these in the typed command box or browser speech mode:
 - `PRODUCT_CHARTER.md` — product promise, non-goals, success criteria
 - `PROJECT_PLAN.md` — restart plan
 - `docs/TASKS.md` — completed checklist
-- `docs/PRODUCT_FLOWS.md` — MVP user flows and accessibility requirements
+- `docs/PRODUCT_FLOWS.md` — product scope, route map, primary/secondary flows, domain entities, edge cases, and accessibility requirements
 - `docs/GIT_WORKFLOW.md` — branch/commit/PR rules
 - `docs/ARCHITECTURE.md` — architecture overview
 - `docs/INFRASTRUCTURE.md` — database/infrastructure plan

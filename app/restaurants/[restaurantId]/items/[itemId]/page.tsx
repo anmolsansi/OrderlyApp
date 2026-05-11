@@ -6,6 +6,7 @@ import { useMemo, useState } from 'react';
 import { MarketplaceNav } from '@/app/components/MarketplaceNav';
 import { getDefaultModifiers, getItemTotal, getMenuItem, getRestaurant } from '@/lib/marketplace';
 import type { CartItem, CartItemModifier } from '@/lib/types';
+import { routes } from '@/lib/routes';
 import { formatMoney } from '@/lib/types';
 
 const CART_STORAGE_KEY = 'orderlyapp.marketplace.cart.v1';
@@ -27,7 +28,7 @@ export default function ItemCustomizationPage() {
 
   if (!restaurant || !item) {
     return (
-      <main className="marketplace-page"><div className="container"><MarketplaceNav active="Menu" /><section className="card"><h1>Item not found</h1><Link className="pill" href="/restaurants">Back to restaurants</Link></section></div></main>
+      <main className="marketplace-page"><div className="container"><MarketplaceNav active="Menu" /><section className="card"><h1>Item not found</h1><Link className="pill" href={routes.restaurants()}>Back to restaurants</Link></section></div></main>
     );
   }
 
@@ -63,7 +64,7 @@ export default function ItemCustomizationPage() {
     const currentCart = stored ? JSON.parse(stored) as CartItem[] : [];
     window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify([...currentCart, cartItem]));
     window.localStorage.setItem('orderlyapp.marketplace.note.v1', note);
-    router.push('/checkout');
+    router.push(routes.checkout);
   }
 
   return (
