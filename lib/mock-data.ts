@@ -82,6 +82,9 @@ export const restaurants: Restaurant[] = [
     deliveryMinutes: "20–30 min",
     deliveryFeeCents: 199,
     imageEmoji: "🍕",
+    distanceMiles: 0.8,
+    promotion: "$5 off $25",
+    status: "open",
     tags: ["Popular", "Thin crust", "Open late"],
     menu: [
       pizzaItem({
@@ -124,6 +127,9 @@ export const restaurants: Restaurant[] = [
     deliveryMinutes: "15–25 min",
     deliveryFeeCents: 249,
     imageEmoji: "🚉",
+    distanceMiles: 1.2,
+    promotion: "Free garlic knots",
+    status: "open",
     tags: ["Fast", "NY style"],
     menu: [
       pizzaItem({
@@ -166,6 +172,9 @@ export const restaurants: Restaurant[] = [
     deliveryMinutes: "25–35 min",
     deliveryFeeCents: 99,
     imageEmoji: "🔥",
+    distanceMiles: 2.4,
+    promotion: "0% delivery fee",
+    status: "open",
     tags: ["Wood fired", "Best value"],
     menu: [
       pizzaItem({
@@ -208,6 +217,9 @@ export const restaurants: Restaurant[] = [
     deliveryMinutes: "30–40 min",
     deliveryFeeCents: 299,
     imageEmoji: "🇮🇹",
+    distanceMiles: 3.1,
+    promotion: "Chef pick",
+    status: "open",
     tags: ["Neapolitan", "Wood fired", "Premium"],
     menu: [
       pizzaItem({
@@ -249,6 +261,9 @@ export const restaurants: Restaurant[] = [
     deliveryMinutes: "25–35 min",
     deliveryFeeCents: 199,
     imageEmoji: "🧱",
+    distanceMiles: 1.8,
+    promotion: "Buy 1, get 1",
+    status: "open",
     tags: ["Detroit style", "Crispy edges"],
     menu: [
       pizzaItem({
@@ -291,6 +306,9 @@ export const restaurants: Restaurant[] = [
     deliveryMinutes: "20–30 min",
     deliveryFeeCents: 149,
     imageEmoji: "🎵",
+    distanceMiles: 2.9,
+    promotion: "Plant deal",
+    status: "open",
     tags: ["Vegan", "Plant-based"],
     menu: [
       pizzaItem({
@@ -332,6 +350,9 @@ export const restaurants: Restaurant[] = [
     deliveryMinutes: "35–45 min",
     deliveryFeeCents: 299,
     imageEmoji: "🏙️",
+    distanceMiles: 5.6,
+    status: "closed",
+    outsideDeliveryRange: true,
     tags: ["Tavern style", "Square cut"],
     menu: [
       pizzaItem({
@@ -373,7 +394,10 @@ export const restaurants: Restaurant[] = [
     deliveryMinutes: "20–30 min",
     deliveryFeeCents: 199,
     imageEmoji: "🌴",
-    tags: ["Fresh", "California"],
+    distanceMiles: 1.6,
+    promotion: "Fresh lunch combo",
+    status: "open",
+    tags: ["Fresh", "California", "Seasonal", "Gluten-free friendly", "Avocado", "Salads", "Family meals", "Catering"],
     menu: [
       pizzaItem({
         id: "avocado-ranch",
@@ -414,6 +438,9 @@ export const restaurants: Restaurant[] = [
     deliveryMinutes: "25–40 min",
     deliveryFeeCents: 349,
     imageEmoji: "🌙",
+    distanceMiles: 3.8,
+    promotion: "Open until 2 AM",
+    status: "open",
     tags: ["Late night", "Spicy"],
     menu: [
       pizzaItem({
@@ -455,6 +482,8 @@ export const restaurants: Restaurant[] = [
     deliveryMinutes: "20–35 min",
     deliveryFeeCents: 249,
     imageEmoji: "🌉",
+    distanceMiles: 2.1,
+    status: "closed",
     tags: ["Artisan", "Brooklyn style"],
     menu: [
       pizzaItem({
@@ -497,6 +526,10 @@ export const restaurants: Restaurant[] = [
     deliveryMinutes: "30–45 min",
     deliveryFeeCents: 199,
     imageEmoji: "🏔️",
+    distanceMiles: 6.3,
+    imageAvailable: false,
+    outsideDeliveryRange: true,
+    status: "open",
     tags: ["Hearty", "Lodge style"],
     menu: [
       pizzaItem({
@@ -538,6 +571,9 @@ export const restaurants: Restaurant[] = [
     deliveryMinutes: "25–35 min",
     deliveryFeeCents: 199,
     imageEmoji: "🛺",
+    distanceMiles: 2.7,
+    promotion: "New on Orderly",
+    status: "open",
     tags: ["Bold flavors", "Fusion"],
     menu: [
       pizzaItem({

@@ -26,6 +26,8 @@ export interface MenuItem {
   modifierGroups: ModifierGroup[];
 }
 
+export type RestaurantStatus = 'open' | 'closed';
+
 export interface Restaurant {
   id: string;
   name: string;
@@ -36,6 +38,11 @@ export interface Restaurant {
   imageEmoji: string;
   tags: string[];
   menu: MenuItem[];
+  distanceMiles?: number;
+  promotion?: string;
+  status?: RestaurantStatus;
+  imageAvailable?: boolean;
+  outsideDeliveryRange?: boolean;
 }
 
 export interface CartItemModifier {
