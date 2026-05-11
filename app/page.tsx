@@ -30,6 +30,30 @@ declare global {
   }
 }
 
+
+const quickFilters = ['All pizza', 'Fast delivery', 'Top rated', 'Wood fired', 'Open late'];
+
+const cuisineRoadmap = [
+  { label: 'V1 Pizza', icon: '🍕', description: 'Pizza-only discovery, menus, crust/topping modifiers, cart, checkout, and live order status.' },
+  { label: 'V2 All food', icon: '🍜', description: 'Reusable cuisine rails for burgers, sushi, tacos, dessert, groceries, and local favorites.' },
+  { label: 'Marketplace', icon: '🛵', description: 'Personalized feeds, loyalty, bundles, group orders, scheduled delivery, and driver tracking.' },
+];
+
+const featureSteps = [
+  { title: 'Home', detail: 'Hero search, cuisine chips, famous restaurants, favorites, offers, and reorder prompts.' },
+  { title: 'Restaurant list', detail: 'Filter by rating, speed, style, tags, delivery fee, and availability.' },
+  { title: 'Menu', detail: 'Category sections, popular items, item cards, and upsell bundles.' },
+  { title: 'Customize', detail: 'Reusable modifier groups for pizza toppings now and any cuisine later.' },
+  { title: 'Checkout', detail: 'Cart review, address, fees, payment method, promo codes, and order notes.' },
+  { title: 'Order placed', detail: 'Confirmation, progress timeline, ETA, receipt, and reorder CTA.' },
+];
+
+const themeOptions = [
+  { name: 'Crimson Slice', swatch: '#ef4444', accent: '#f97316', mood: 'High-energy pizza brand with tomato, flame, and late-night delivery cues.' },
+  { name: 'Midnight Market', swatch: '#111827', accent: '#22c55e', mood: 'Premium dark marketplace that can expand beyond pizza without changing layout.' },
+  { name: 'Fresh Mozzarella', swatch: '#fff7ed', accent: '#16a34a', mood: 'Light, family-friendly grocery-and-food style with clean cards and green trust signals.' },
+];
+
 function makeCartItemId(): string {
   return `cart-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -171,6 +195,9 @@ export default function HomePage() {
   const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
   const [currentStatus, setCurrentStatus] = useState<OrderStatus>('Placed');
   const [cartSyncStatus, setCartSyncStatus] = useState<'local' | 'synced' | 'fallback'>('local');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeFilter, setActiveFilter] = useState(quickFilters[0]);
+  const [favoriteRestaurantIds, setFavoriteRestaurantIds] = useState<string[]>(['marios-pizza', 'neapolitan-nova']);
 
   useEffect(() => {
     let active = true;
@@ -260,6 +287,31 @@ export default function HomePage() {
     [cart, restaurantCatalog],
   );
 
+  const filteredRestaurants = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    return restaurantCatalog.filter(restaurant => {
+      const matchesSearch = normalizedQuery.length === 0
+        || restaurant.name.toLowerCase().includes(normalizedQuery)
+        || restaurant.tags.some(tag => tag.toLowerCase().includes(normalizedQuery))
+        || restaurant.menu.some(item => item.name.toLowerCase().includes(normalizedQuery));
+      const matchesFilter = activeFilter === 'All pizza'
+        || (activeFilter === 'Fast delivery' && Number.parseInt(restaurant.deliveryMinutes, 10) <= 20)
+        || (activeFilter === 'Top rated' && restaurant.rating >= 4.8)
+        || restaurant.tags.some(tag => tag.toLowerCase() === activeFilter.toLowerCase());
+      return matchesSearch && matchesFilter;
+    });
+  }, [activeFilter, restaurantCatalog, searchQuery]);
+
+  const favoriteRestaurants = useMemo(
+    () => restaurantCatalog.filter(restaurant => favoriteRestaurantIds.includes(restaurant.id)),
+    [favoriteRestaurantIds, restaurantCatalog],
+  );
+
+  const famousRestaurants = useMemo(
+    () => [...restaurantCatalog].sort((left, right) => right.rating - left.rating).slice(0, 3),
+    [restaurantCatalog],
+  );
+
   function showToast(message: string): void {
     setToast(message);
   }
@@ -285,6 +337,12 @@ export default function HomePage() {
     setSelectedModifiers(getDefaultModifiers(item));
     setAssistantMessage(`Selected ${item.name}. Choose a size and toppings.`);
     showToast(`Item selected: ${item.name}`);
+  }
+
+  function toggleFavorite(restaurantId: string): void {
+    setFavoriteRestaurantIds(previous => previous.includes(restaurantId)
+      ? previous.filter(id => id !== restaurantId)
+      : [...previous, restaurantId]);
   }
 
   function updateSingleModifier(groupId: string, optionId: string): void {
@@ -489,9 +547,14 @@ export default function HomePage() {
       {checkoutOpen && (
         <div className="modal-backdrop" role="presentation">
           <section className="checkout-modal card" role="dialog" aria-modal="true" aria-labelledby="checkout-title">
-            <span className="kicker">Mock checkout</span>
-            <h2 id="checkout-title">Confirm your order</h2>
+            <span className="kicker">Payment review</span>
+            <h2 id="checkout-title">Confirm delivery and payment</h2>
             <p>This is a portfolio demo checkout. No real payment will be charged.</p>
+            <div className="payment-breakdown">
+              <div><span>Delivery address</span><strong>123 Demo Street</strong></div>
+              <div><span>Payment</span><strong>Mock Visa •••• 4242</strong></div>
+              <div><span>Delivery window</span><strong>{selectedRestaurant.deliveryMinutes}</strong></div>
+            </div>
             <div className="cart-lines">
               {cart.map(cartItem => (
                 <div className="cart-line" key={cartItem.id}>
@@ -512,24 +575,157 @@ export default function HomePage() {
         </div>
       )}
       <div className="container">
-        <section className="hero two-column">
-          <div>
-            <span className="kicker">OrderlyApp · v0.2.0 API integration</span>
-            <h1>Order pizza with your voice.</h1>
+        <nav className="top-nav" aria-label="Primary navigation">
+          <div className="brand-lockup"><span>🍕</span><strong>OrderlyApp</strong></div>
+          <div className="nav-links">
+            <a href="#restaurants">Restaurants</a>
+            <a href="#menu">Menu</a>
+            <a href="#checkout">Checkout</a>
+          </div>
+          <button className="nav-cart" type="button" onClick={openCheckout}>Cart · {cart.length}</button>
+        </nav>
+
+        <section className="hero marketplace-hero">
+          <div className="hero-copy">
+            <span className="kicker">DoorDash-style marketplace mock · pizza-first v1</span>
+            <h1>Pizza discovery today. Every cuisine tomorrow.</h1>
             <p className="lead">
-              Browse restaurants from FastAPI when available, customize pizza, use voice or typed commands, validate your cart, place a mock order, and watch status updates.
+              A homepage-led food ordering experience with famous restaurants, favorites, smart search, restaurant lists, menus, item customizations, checkout, payment review, and finalized order tracking.
             </p>
-            <div className="command-box">
-              <span className="dot" />
-              <p>“Add a large pepperoni pizza with jalapeños and extra cheese.”</p>
+            <div className="search-panel" role="search">
+              <span aria-hidden="true">🔎</span>
+              <input
+                aria-label="Search pizza restaurants and menu items"
+                value={searchQuery}
+                onChange={event => setSearchQuery(event.target.value)}
+                placeholder="Search pizza, pepperoni, wood fired, open late..."
+              />
+              <button type="button" onClick={() => setActiveFilter('Top rated')}>Top rated</button>
+            </div>
+            <div className="filter-row" aria-label="Pizza filters">
+              {quickFilters.map(filter => (
+                <button
+                  className={`filter-chip ${activeFilter === filter ? 'active' : ''}`}
+                  type="button"
+                  key={filter}
+                  onClick={() => setActiveFilter(filter)}
+                >
+                  {filter}
+                </button>
+              ))}
             </div>
           </div>
-          <aside className="voice-panel card">
+          <aside className="delivery-preview card">
+            <div className="phone-frame">
+              <div className="phone-topline"><span>Now</span><strong>28 min</strong></div>
+              <div className="phone-map"><span>🏠</span><span>🛵</span><span>🍕</span></div>
+              <div className="phone-card">
+                <strong>{selectedRestaurant.name}</strong>
+                <p>{selectedItem.name} · {formatMoney(selectedItemTotal)}</p>
+                <div className="progress-line"><span /></div>
+              </div>
+            </div>
+          </aside>
+        </section>
+
+        <section className="roadmap-grid" aria-label="Product version roadmap">
+          {cuisineRoadmap.map(item => (
+            <article className="card roadmap-card" key={item.label}>
+              <span className="roadmap-icon">{item.icon}</span>
+              <div>
+                <h3>{item.label}</h3>
+                <p>{item.description}</p>
+              </div>
+            </article>
+          ))}
+        </section>
+
+        <section className="section-heading">
+          <div>
+            <span className="kicker">Homepage mocks</span>
+            <h2>Famous near you</h2>
+          </div>
+          <span className="pill">Expandable restaurant rail</span>
+        </section>
+
+        <section className="horizontal-rail" aria-label="Famous pizza restaurants">
+          {famousRestaurants.map(restaurant => (
+            <article className="card feature-restaurant" key={restaurant.id}>
+              <button className="favorite-button" type="button" onClick={() => toggleFavorite(restaurant.id)} aria-label={`Favorite ${restaurant.name}`}>
+                {favoriteRestaurantIds.includes(restaurant.id) ? '♥' : '♡'}
+              </button>
+              <button className="restaurant-tile-button" type="button" onClick={() => selectRestaurant(restaurant)}>
+                <span className="hero-emoji">{restaurant.imageEmoji}</span>
+                <h3>{restaurant.name}</h3>
+                <p>{restaurant.cuisine} · ⭐ {restaurant.rating} · {restaurant.deliveryMinutes}</p>
+              </button>
+            </article>
+          ))}
+        </section>
+
+        <section className="section-heading">
+          <div>
+            <span className="kicker">Personalized</span>
+            <h2>Your favorites</h2>
+          </div>
+          <span className="pill">{favoriteRestaurants.length} saved</span>
+        </section>
+
+        <section className="favorite-strip" aria-label="Favorite restaurants">
+          {favoriteRestaurants.length === 0 ? (
+            <p className="empty-state">Tap the heart on a restaurant to save it here for quick reorders.</p>
+          ) : favoriteRestaurants.map(restaurant => (
+            <button className="favorite-card" type="button" key={restaurant.id} onClick={() => selectRestaurant(restaurant)}>
+              <span>{restaurant.imageEmoji}</span>
+              <strong>{restaurant.name}</strong>
+              <em>{restaurant.deliveryMinutes}</em>
+            </button>
+          ))}
+        </section>
+
+        <section className="section-heading">
+          <div>
+            <span className="kicker">End-to-end flow</span>
+            <h2>Screens to build from this mock</h2>
+          </div>
+          <span className="pill">Home → confirmation</span>
+        </section>
+
+        <section className="flow-grid">
+          {featureSteps.map((step, index) => (
+            <article className="flow-card" key={step.title}>
+              <span>{index + 1}</span>
+              <h3>{step.title}</h3>
+              <p>{step.detail}</p>
+            </article>
+          ))}
+        </section>
+
+        <section className="section-heading">
+          <div>
+            <span className="kicker">Theme directions</span>
+            <h2>Visual systems that scale past pizza</h2>
+          </div>
+          <span className="pill">Pick one for v1 branding</span>
+        </section>
+
+        <section className="theme-grid">
+          {themeOptions.map(theme => (
+            <article className="card theme-card" key={theme.name}>
+              <div className="theme-swatch" style={{ '--swatch': theme.swatch, '--theme-accent': theme.accent } as React.CSSProperties} />
+              <h3>{theme.name}</h3>
+              <p>{theme.mood}</p>
+            </article>
+          ))}
+        </section>
+
+        <section className="assistant-band card">
+          <div>
             <span className="kicker">Assistant transcript</span>
             <p className="transcript">{assistantMessage}</p>
-            <p className="assistant-reply">
-              Current selection: {selectedItem.name} · {formatMoney(selectedItemTotal)}.
-            </p>
+            <p className="assistant-reply">Current selection: {selectedItem.name} · {formatMoney(selectedItemTotal)}.</p>
+          </div>
+          <div>
             <label className="voice-input-label" htmlFor="voice-command">Try a command</label>
             <div className="voice-input-row">
               <input
@@ -548,7 +744,7 @@ export default function HomePage() {
                 {lastIntent.clarification && <span>{lastIntent.clarification}</span>}
               </div>
             )}
-          </aside>
+          </div>
         </section>
 
         <section className="api-status card full-width">
@@ -556,16 +752,16 @@ export default function HomePage() {
           <p>{apiLoading ? 'Loading restaurants from API…' : apiSource === 'api' ? `Connected to FastAPI · session ${sessionId} · cart ${cartSyncStatus}` : `Using local fallback data${apiError ? ` · ${apiError}` : ''} · cart ${cartSyncStatus}`}</p>
         </section>
 
-        <section className="section-heading">
+        <section className="section-heading" id="restaurants">
           <div>
-            <span className="kicker">Restaurants</span>
-            <h2>Pizza places ready for the MVP</h2>
+            <span className="kicker">Restaurant list</span>
+            <h2>Pizza places ready for v1</h2>
           </div>
-          <span className="pill">{restaurantCatalog.length} restaurants seeded</span>
+          <span className="pill">{filteredRestaurants.length} matching · {restaurantCatalog.length} seeded</span>
         </section>
 
         <section className="grid restaurant-grid">
-          {restaurantCatalog.map(restaurant => (
+          {filteredRestaurants.map(restaurant => (
             <button
               type="button"
               className={`card restaurant-card selectable ${restaurant.id === selectedRestaurant.id ? 'selected' : ''}`}
@@ -585,7 +781,7 @@ export default function HomePage() {
           ))}
         </section>
 
-        <section className="card full-width restaurant-detail-card">
+        <section className="card full-width restaurant-detail-card" id="menu">
           <span className="kicker">Restaurant detail</span>
           <h2>{selectedRestaurant.name}</h2>
           <p>{selectedRestaurant.cuisine} · {selectedRestaurant.deliveryMinutes} · Delivery {formatMoney(selectedRestaurant.deliveryFeeCents)}</p>
@@ -666,11 +862,11 @@ export default function HomePage() {
           </aside>
         </section>
 
-        <section className="card cart-card full-width">
+        <section className="card cart-card full-width" id="checkout">
           <div className="cart-header">
             <div>
               <span className="kicker">Cart</span>
-              <h2>Current order</h2>
+              <h2>Checkout cart</h2>
             </div>
             {cart.length > 0 && <button className="ghost-button" type="button" onClick={clearCart}>Clear cart</button>}
           </div>
@@ -708,7 +904,7 @@ export default function HomePage() {
             <strong>{formatMoney(subtotal)}</strong>
           </div>
           <button className="checkout-button" type="button" disabled={cart.length === 0 || !cartValidation.ok} onClick={openCheckout}>
-            Continue to mock checkout
+            Continue to payment review
           </button>
         </section>
 
@@ -737,7 +933,7 @@ export default function HomePage() {
         </section>
 
         <p className="footer">
-          MVP demo complete: browse, customize, voice-command, validate, mock checkout, and track status.
+          Mock suite complete: homepage, search, famous restaurants, favorites, restaurant list, menu, customization, checkout cart, payment review, and finalized order status.
         </p>
       </div>
     </main>
