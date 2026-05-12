@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 from .database import get_connection, postgres_available
-from .models import Cart, CartItem, MenuItem, Order, Restaurant
+from .models import Cart, CartItem, CartPricingResponse, MenuItem, Order, Restaurant
 from .redis_store import cart_key, redis_client
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
@@ -75,8 +75,94 @@ def list_restaurants() -> List[Restaurant]:
     return [Restaurant(**item) for item in read_json(RESTAURANTS_FILE, [])]
 
 
+def search_restaurants(query: str = "", cuisine: str = "", sort: str = "recommended", open_now: bool = False) -> List[Restaurant]:
+    normalized_query = query.strip().lower()
+    normalized_cuisine = cuisine.strip().lower()
+
+    def matches(restaurant: Restaurant) -> bool:
+        menu_match = any(normalized_query in item.name.lower() or normalized_query in item.description.lower() for item in restaurant.menu)
+        query_match = not normalized_query or normalized_query in restaurant.name.lower() or normalized_query in restaurant.cuisine.lower() or menu_match
+        cuisine_match = not normalized_cuisine or normalized_cuisine in {"all", "all pizza", "all restaurants"} or restaurant.cuisine.lower() == normalized_cuisine or normalized_cuisine in [tag.lower() for tag in restaurant.tags]
+        open_match = not open_now or len(restaurant.menu) > 0
+        return query_match and cuisine_match and open_match
+
+    filtered = [restaurant for restaurant in list_restaurants() if matches(restaurant)]
+    if sort == "rating":
+        return sorted(filtered, key=lambda restaurant: restaurant.rating, reverse=True)
+    if sort == "fee":
+        return sorted(filtered, key=lambda restaurant: restaurant.delivery_fee_cents)
+    return filtered
+
+
 def get_restaurant(restaurant_id: str) -> Optional[Restaurant]:
     return next((restaurant for restaurant in list_restaurants() if restaurant.id == restaurant_id), None)
+
+
+def get_menu_item(restaurant_id: str, menu_item_id: str) -> Optional[MenuItem]:
+    restaurant = get_restaurant(restaurant_id)
+    if not restaurant:
+        return None
+    return next((item for item in restaurant.menu if item.id == menu_item_id), None)
+
+
+def calculate_item_total(item: MenuItem, cart_item: CartItem) -> int:
+    modifier_total = 0
+    for modifier in cart_item.modifiers:
+        group = next((candidate for candidate in item.modifier_groups if candidate.id == modifier.group_id), None)
+        if not group:
+            continue
+        modifier_total += sum(option.price_delta_cents for option in group.options if option.id in modifier.option_ids)
+    return item.price_cents + modifier_total
+
+
+def validate_cart_items(cart_items: List[CartItem]) -> List[str]:
+    errors: List[str] = []
+    restaurant_ids = {item.restaurant_id for item in cart_items}
+    if len(restaurant_ids) > 1:
+        errors.append("Cart can only contain items from one restaurant.")
+
+    for cart_item in cart_items:
+        item = get_menu_item(cart_item.restaurant_id, cart_item.menu_item_id)
+        if not item:
+            errors.append(f"{cart_item.name} is no longer available.")
+            continue
+        for group in item.modifier_groups:
+            selected = next((modifier.option_ids for modifier in cart_item.modifiers if modifier.group_id == group.id), [])
+            if group.required and len(selected) == 0:
+                errors.append(f"{item.name} needs a {group.name.lower()} selection.")
+            if group.min_selected is not None and len(selected) < group.min_selected:
+                errors.append(f"{item.name} needs at least {group.min_selected} {group.name.lower()} option.")
+            if group.max_selected is not None and len(selected) > group.max_selected:
+                errors.append(f"{item.name} allows at most {group.max_selected} {group.name.lower()} options.")
+            valid_option_ids = {option.id for option in group.options}
+            invalid = [option_id for option_id in selected if option_id not in valid_option_ids]
+            if invalid:
+                errors.append(f"{item.name} has invalid {group.name.lower()} options: {', '.join(invalid)}.")
+    return errors
+
+
+def calculate_cart_pricing(cart_items: List[CartItem], restaurant_id: Optional[str] = None, discount_cents: int = 0, tip_cents: int = 0) -> CartPricingResponse:
+    subtotal_cents = 0
+    for cart_item in cart_items:
+        item = get_menu_item(cart_item.restaurant_id, cart_item.menu_item_id)
+        line_unit = calculate_item_total(item, cart_item) if item else cart_item.base_price_cents
+        subtotal_cents += line_unit * cart_item.quantity
+
+    restaurant = get_restaurant(restaurant_id or (cart_items[0].restaurant_id if cart_items else ""))
+    delivery_fee_cents = restaurant.delivery_fee_cents if restaurant and subtotal_cents > 0 else 0
+    service_fee_cents = 249 if subtotal_cents > 0 else 0
+    taxable_cents = max(subtotal_cents - discount_cents, 0)
+    tax_cents = round(taxable_cents * 0.0875)
+    total_cents = taxable_cents + delivery_fee_cents + service_fee_cents + tax_cents + tip_cents
+    return CartPricingResponse(
+        subtotal_cents=subtotal_cents,
+        discount_cents=discount_cents,
+        delivery_fee_cents=delivery_fee_cents,
+        service_fee_cents=service_fee_cents,
+        tax_cents=tax_cents,
+        tip_cents=tip_cents,
+        total_cents=total_cents,
+    )
 
 
 def write_restaurants(restaurants: List[Restaurant]) -> None:

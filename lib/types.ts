@@ -84,8 +84,23 @@ export interface CartTotals {
   discountCents: number;
   deliveryFeeCents: number;
   serviceFeeCents: number;
+  tipCents?: number;
   taxCents: number;
   totalCents: number;
+}
+
+export interface CheckoutDetails {
+  name: string;
+  phone: string;
+  email: string;
+  street: string;
+  apartment?: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  deliveryInstructions?: string;
+  paymentMethod: string;
+  tipCents: number;
 }
 
 export interface UserProfile {
@@ -130,6 +145,7 @@ export interface Order {
   updatedAt: string;
   deliveryAddressId: string;
   estimatedDeliveryAt: string;
+  checkoutDetails?: CheckoutDetails;
 }
 
 export type VoiceIntentType = 'add_to_cart' | 'select_restaurant' | 'view_cart' | 'remove_item' | 'clear_cart' | 'unknown';

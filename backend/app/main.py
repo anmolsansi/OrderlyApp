@@ -3,13 +3,15 @@ from __future__ import annotations
 import os
 from typing import List
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from .database import database_url, get_connection
-from .models import Cart, CartUpsertRequest, HealthResponse, Order, OrderCreateRequest, Restaurant
+from .models import Cart, CartPricingRequest, CartPricingResponse, CartUpsertRequest, HealthResponse, Order, OrderCreateRequest, Restaurant
 from .redis_store import redis_client, redis_url
-from .store import clear_cart, create_order, get_cart, get_order, get_restaurant, list_orders, list_restaurants, write_cart
+from .store import calculate_cart_pricing, clear_cart, create_order, get_cart, get_order, get_restaurant, list_orders, search_restaurants, validate_cart_items, write_cart
 
 app = FastAPI(title="OrderlyApp API", version="0.2.0")
 
@@ -27,6 +29,19 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(HTTPException)
+def http_exception_handler(_request: Request, exc: HTTPException) -> JSONResponse:
+    message = exc.detail if isinstance(exc.detail, str) else "Request failed"
+    code = "not_found" if exc.status_code == 404 else "bad_request"
+    return JSONResponse(status_code=exc.status_code, content={"error": {"code": code, "message": message}})
+
+
+@app.exception_handler(RequestValidationError)
+def validation_exception_handler(_request: Request, exc: RequestValidationError) -> JSONResponse:
+    fields = {".".join(str(part) for part in error["loc"]): error["msg"] for error in exc.errors()}
+    return JSONResponse(status_code=422, content={"error": {"code": "validation_error", "message": "Invalid request payload", "fields": fields}})
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -48,8 +63,13 @@ def health() -> HealthResponse:
 
 
 @app.get("/restaurants", response_model=List[Restaurant])
-def restaurants_index() -> List[Restaurant]:
-    return list_restaurants()
+def restaurants_index(
+    query: str = "",
+    cuisine: str = "",
+    sort: str = Query(default="recommended", pattern="^(recommended|rating|fee)$"),
+    open_now: bool = False,
+) -> List[Restaurant]:
+    return search_restaurants(query=query, cuisine=cuisine, sort=sort, open_now=open_now)
 
 
 @app.get("/restaurants/{restaurant_id}", response_model=Restaurant)
@@ -67,6 +87,9 @@ def carts_show(session_id: str) -> Cart:
 
 @app.put("/sessions/{session_id}/cart", response_model=Cart)
 def carts_upsert(session_id: str, request: CartUpsertRequest) -> Cart:
+    errors = validate_cart_items(request.items)
+    if errors:
+        raise HTTPException(status_code=400, detail="; ".join(errors))
     return write_cart(session_id, request.items)
 
 
@@ -79,7 +102,21 @@ def carts_clear(session_id: str) -> Cart:
 def orders_create(request: OrderCreateRequest) -> Order:
     if not request.cart_items:
         raise HTTPException(status_code=400, detail="Cannot create order from an empty cart")
+    errors = validate_cart_items(request.cart_items)
+    if errors:
+        raise HTTPException(status_code=400, detail="; ".join(errors))
+    pricing = calculate_cart_pricing(request.cart_items, discount_cents=0, tip_cents=request.tip_cents)
+    if pricing.subtotal_cents != request.subtotal_cents:
+        raise HTTPException(status_code=400, detail="Submitted subtotal does not match authoritative pricing")
     return create_order(request.session_id, request.cart_items, request.subtotal_cents)
+
+
+@app.post("/cart/pricing", response_model=CartPricingResponse)
+def cart_pricing(request: CartPricingRequest) -> CartPricingResponse:
+    errors = validate_cart_items(request.cart_items)
+    if errors:
+        raise HTTPException(status_code=400, detail="; ".join(errors))
+    return calculate_cart_pricing(request.cart_items, request.restaurant_id, request.discount_cents, request.tip_cents)
 
 
 @app.get("/orders", response_model=List[Order])

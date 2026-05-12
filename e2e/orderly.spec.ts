@@ -20,11 +20,16 @@ test('customizes an item, reviews payment, and places order', async ({ page }) =
   await page.getByLabel(/large/i).check();
   await page.getByLabel(/jalapeños/i).check();
   await page.getByRole('button', { name: /add to cart/i }).click();
-  await expect(page).toHaveURL(/\/checkout/);
+  await expect(page).toHaveURL(/\/cart/);
   await expect(page.getByRole('heading', { name: /your cart/i })).toBeVisible();
+  await page.getByRole('link', { name: /continue to checkout/i }).click();
+  await expect(page).toHaveURL(/\/checkout/);
   await expect(page.getByText(/mock visa/i)).toBeVisible();
+  await page.getByRole('link', { name: /sign in/i }).click();
+  await page.getByRole('button', { name: /continue as jamie demo/i }).click();
+  await expect(page).toHaveURL(/\/checkout/);
   await page.getByRole('button', { name: /place order/i }).click();
-  await expect(page).toHaveURL(/\/order-confirmation/);
+  await expect(page).toHaveURL(/\/order-confirmation\?orderId=/);
   await expect(page.getByRole('heading', { name: /order placed/i })).toBeVisible();
   await expect(page.getByRole('heading', { name: /mock receipt details/i })).toBeVisible();
 });

@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { routes } from '@/lib/routes';
 
 interface MarketplaceNavProps {
-  active?: 'Home' | 'Search' | 'Menu' | 'Cart' | 'Orders';
+  active?: 'Home' | 'Search' | 'Menu' | 'Cart' | 'Checkout' | 'Orders' | 'Account';
 }
 
 export function MarketplaceNav({ active = 'Home' }: MarketplaceNavProps) {
@@ -10,8 +10,8 @@ export function MarketplaceNav({ active = 'Home' }: MarketplaceNavProps) {
     { label: 'Home', href: routes.home },
     { label: 'Search', href: routes.restaurants() },
     { label: 'Menu', href: routes.restaurant('marios-pizza') },
-    { label: 'Cart', href: routes.checkout },
-    { label: 'Orders', href: routes.orderConfirmation() },
+    { label: 'Cart', href: routes.cart },
+    { label: 'Orders', href: routes.orderHistory },
   ];
 
   return (
@@ -33,8 +33,8 @@ export function MarketplaceNav({ active = 'Home' }: MarketplaceNavProps) {
           ))}
         </div>
         <div className="nav-actions">
-          <Link className="account-link" href={routes.home}>Account</Link>
-          <Link className="nav-cart" href={routes.checkout}>Cart</Link>
+          <Link className={active === 'Account' ? 'account-link active' : 'account-link'} href={routes.account}>Account</Link>
+          <Link className="nav-cart" href={routes.cart}>Cart</Link>
         </div>
       </nav>
       <nav className="mobile-bottom-nav" aria-label="Mobile navigation">

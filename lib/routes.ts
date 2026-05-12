@@ -3,9 +3,12 @@ export type AppRouteKey =
   | 'restaurants'
   | 'restaurantMenu'
   | 'itemCustomization'
+  | 'cart'
   | 'checkout'
   | 'orderConfirmation'
-  | 'orderHistory';
+  | 'orderHistory'
+  | 'signIn'
+  | 'account';
 
 export interface AppRouteDefinition {
   key: AppRouteKey;
@@ -49,6 +52,13 @@ export const appRoutes: AppRouteDefinition[] = [
     navigation: 'Successful add writes a cart item to local storage and advances to /checkout; invalid params show an item-not-found recovery state.',
   },
   {
+    key: 'cart',
+    path: '/cart',
+    responsibility: 'Review cart contents, edit quantities, remove items, clear cart, and continue to checkout.',
+    layout: ['Global marketplace nav', 'Cart item list', 'Totals summary', 'Checkout call to action'],
+    navigation: 'Cart actions update local cart state; checkout CTA links to /checkout when the cart is valid.',
+  },
+  {
     key: 'checkout',
     path: '/checkout',
     responsibility: 'Review cart contents, update quantities, clear cart, choose mock address/payment details, and submit a mock order.',
@@ -70,6 +80,21 @@ export const appRoutes: AppRouteDefinition[] = [
     layout: ['Global marketplace nav', 'Order list', 'Reorder actions', 'Empty history state'],
     navigation: 'Primary nav Orders links to confirmation for the current MVP; /orders is reserved for the authenticated history flow.',
   },
+  {
+    key: 'signIn',
+    path: '/sign-in?next=:next',
+    params: ['next'],
+    responsibility: 'Mock sign-in, sign-up, and sign-out entry point for protected ordering flows.',
+    layout: ['Global marketplace nav', 'Auth form', 'Session status panel'],
+    navigation: 'Successful mock sign-in stores a local session and returns to the requested destination.',
+  },
+  {
+    key: 'account',
+    path: '/account',
+    responsibility: 'Mock customer profile, saved addresses, and sign-out controls.',
+    layout: ['Global marketplace nav', 'Profile card', 'Saved addresses', 'Address form'],
+    navigation: 'Account requires a mock session and links to sign-in when absent.',
+  },
 ];
 
 export const routes = {
@@ -83,7 +108,10 @@ export const routes = {
   },
   restaurant: (restaurantId: string) => `/restaurants/${restaurantId}`,
   item: (restaurantId: string, itemId: string) => `/restaurants/${restaurantId}/items/${itemId}`,
+  cart: '/cart',
   checkout: '/checkout',
   orderConfirmation: (orderId?: string) => orderId ? `/order-confirmation?orderId=${encodeURIComponent(orderId)}` : '/order-confirmation',
   orderHistory: '/orders',
+  signIn: (next?: string) => next ? `/sign-in?next=${encodeURIComponent(next)}` : '/sign-in',
+  account: '/account',
 } as const;

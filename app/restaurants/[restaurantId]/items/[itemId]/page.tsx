@@ -4,13 +4,11 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { MarketplaceNav } from '@/app/components/MarketplaceNav';
-import { validateCartItem } from '@/lib/cart';
+import { canAddItemToCart, CART_STORAGE_KEY, validateCartItem } from '@/lib/cart';
 import { getDefaultModifiers, getItemTotal, getMenuItem, getRestaurant } from '@/lib/marketplace';
 import type { CartItem, CartItemModifier } from '@/lib/types';
 import { routes } from '@/lib/routes';
 import { formatMoney } from '@/lib/types';
-
-const CART_STORAGE_KEY = 'orderlyapp.marketplace.cart.v1';
 
 function makeCartItemId(): string {
   return `cart-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -77,9 +75,14 @@ export default function ItemCustomizationPage() {
     };
     const stored = window.localStorage.getItem(CART_STORAGE_KEY);
     const currentCart = stored ? JSON.parse(stored) as CartItem[] : [];
+    const cartCompatibility = canAddItemToCart(currentCart, currentRestaurant.id);
+    if (!cartCompatibility.ok) {
+      setErrors(cartCompatibility.errors);
+      return;
+    }
     window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify([...currentCart, cartItem]));
     window.localStorage.setItem('orderlyapp.marketplace.note.v1', note);
-    router.push(routes.checkout);
+    router.push(routes.cart);
   }
 
   return (

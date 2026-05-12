@@ -60,6 +60,7 @@ class CartItem(BaseModel):
     quantity: int = Field(ge=1)
     base_price_cents: int = Field(gt=0)
     modifiers: List[CartItemModifier]
+    special_instructions: Optional[str] = None
 
 
 class Cart(BaseModel):
@@ -76,6 +77,28 @@ class OrderCreateRequest(BaseModel):
     session_id: str
     cart_items: List[CartItem]
     subtotal_cents: int = Field(ge=0)
+    delivery_address: Optional[str] = None
+    customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
+    customer_email: Optional[str] = None
+    tip_cents: int = Field(default=0, ge=0)
+
+
+class CartPricingRequest(BaseModel):
+    cart_items: List[CartItem]
+    restaurant_id: Optional[str] = None
+    discount_cents: int = Field(default=0, ge=0)
+    tip_cents: int = Field(default=0, ge=0)
+
+
+class CartPricingResponse(BaseModel):
+    subtotal_cents: int = Field(ge=0)
+    discount_cents: int = Field(ge=0)
+    delivery_fee_cents: int = Field(ge=0)
+    service_fee_cents: int = Field(ge=0)
+    tax_cents: int = Field(ge=0)
+    tip_cents: int = Field(ge=0)
+    total_cents: int = Field(ge=0)
 
 
 class Order(BaseModel):
@@ -92,3 +115,13 @@ class HealthResponse(BaseModel):
     service: str
     version: str
     dependencies: Dict[str, str] = Field(default_factory=dict)
+
+
+class ErrorBody(BaseModel):
+    code: str
+    message: str
+    fields: Optional[Dict[str, str]] = None
+
+
+class ErrorResponse(BaseModel):
+    error: ErrorBody
