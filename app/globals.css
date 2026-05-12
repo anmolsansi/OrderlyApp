@@ -27,6 +27,15 @@ a {
   text-decoration: none;
 }
 
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid rgba(34, 197, 94, 0.88);
+  outline-offset: 3px;
+}
+
 button {
   font: inherit;
 }
@@ -575,6 +584,7 @@ h3 {
 
 .brand-lockup,
 .nav-links,
+.nav-actions,
 .filter-row,
 .favorite-strip {
   display: flex;
@@ -594,6 +604,32 @@ h3 {
 .nav-links a {
   color: var(--muted);
   font-size: 14px;
+}
+
+.location-chip,
+.account-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.045);
+  font-size: 13px;
+}
+
+.location-chip strong {
+  max-width: 150px;
+  overflow: hidden;
+  color: #e4e4e7;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-link {
+  text-decoration: none;
 }
 
 .nav-cart,
@@ -880,6 +916,7 @@ h3 {
 @media (max-width: 860px) {
   .top-nav,
   .nav-links,
+  .nav-actions,
   .phone-topline,
   .phone-card,
   .flow-card,
@@ -896,8 +933,14 @@ h3 {
 
   .marketplace-hero,
   .assistant-band,
-  .search-panel {
+  .search-panel,
+  .sort-form {
     grid-template-columns: 1fr;
+  }
+
+  .location-chip,
+  .account-link {
+    display: none;
   }
 
   .delivery-preview {
@@ -909,6 +952,41 @@ h3 {
   display: grid;
   gap: 10px;
   margin: 14px 0;
+}
+
+.checkout-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.checkout-form-grid label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.checkout-form-grid input,
+.checkout-form-grid textarea {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 10px 12px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.045);
+  font: inherit;
+}
+
+.checkout-form-grid textarea {
+  min-height: 82px;
+  resize: vertical;
+}
+
+.full-field {
+  grid-column: 1 / -1;
 }
 
 .payment-breakdown div {
@@ -942,6 +1020,37 @@ h3 {
 
 .nav-links a.active {
   color: #d1fae5;
+}
+
+.mobile-bottom-nav {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  left: 14px;
+  z-index: 20;
+  display: none;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 22px;
+  background: rgba(9, 9, 11, 0.9);
+  backdrop-filter: blur(18px);
+}
+
+.mobile-bottom-nav a {
+  display: grid;
+  place-items: center;
+  min-height: 42px;
+  border-radius: 16px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.mobile-bottom-nav a.active {
+  color: #03140f;
+  background: #22c55e;
+  font-weight: 800;
 }
 
 .results-layout,
@@ -1268,6 +1377,12 @@ h3 {
   font: inherit;
 }
 
+.sort-form {
+  display: flex;
+  align-items: end;
+  gap: 10px;
+}
+
 .discovery-filter-row {
   grid-column: 1 / -1;
   margin-top: 0;
@@ -1318,6 +1433,50 @@ h3 {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 16px;
+}
+
+.active-filter-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.disabled-card {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.menu-category-heading {
+  align-self: stretch;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.menu-availability-alert,
+.validation-panel {
+  border-color: rgba(248, 113, 113, 0.42);
+  background: rgba(127, 29, 29, 0.18);
+}
+
+.menu-availability-alert p,
+.validation-panel p {
+  margin: 6px 0 0;
+}
+
+.validation-panel {
+  padding: 12px 14px;
+  border: 1px solid rgba(248, 113, 113, 0.42);
+  border-radius: 16px;
+  color: #fecaca;
 }
 
 .discovery-restaurant-card {
@@ -1506,6 +1665,10 @@ h3 {
     grid-template-columns: 1fr;
   }
 
+  .checkout-form-grid {
+    grid-template-columns: 1fr;
+  }
+
   .discovery-search button,
   .filter-chip,
   .segmented-control a,
@@ -1515,5 +1678,18 @@ h3 {
 
   .discovery-restaurant-card {
     min-height: auto;
+  }
+
+  main {
+    padding-bottom: 92px;
+  }
+
+  .mobile-bottom-nav {
+    display: grid;
+  }
+
+  .active-filter-summary {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }

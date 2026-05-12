@@ -76,6 +76,7 @@ export interface CartItem {
   quantity: number;
   basePriceCents: number;
   modifiers: CartItemModifier[];
+  specialInstructions?: string;
 }
 
 export interface CartTotals {

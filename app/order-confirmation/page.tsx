@@ -51,6 +51,20 @@ export default function OrderConfirmationPage() {
           </div>
         </section>
 
+        {order && (
+          <section className="card full-width receipt-card">
+            <span className="kicker">Receipt</span>
+            <h2>Mock receipt details</h2>
+            <div className="payment-breakdown">
+              <div><span>Order number</span><strong>{order.id}</strong></div>
+              <div><span>Restaurant</span><strong>{order.restaurantName}</strong></div>
+              <div><span>Items</span><strong>{order.itemCount}</strong></div>
+              <div><span>Total</span><strong>{formatMoney(order.total)}</strong></div>
+              <div><span>Payment</span><strong>Mock Visa •••• 4242</strong></div>
+            </div>
+          </section>
+        )}
+
         <section className="confirmation-actions">
           <Link className="ghost-button" href={routes.restaurants()}>Browse more restaurants</Link>
           <Link className="checkout-button inline-action" href={routes.restaurant('marios-pizza')}>Reorder pizza</Link>
