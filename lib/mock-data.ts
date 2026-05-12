@@ -143,10 +143,50 @@ function drinkItem(input: Omit<MenuItem, 'modifierGroups' | 'available'> & { ava
   return item({ ...input, modifierGroups: drinkModifiers });
 }
 
-function restaurant(input: Omit<Restaurant, 'menu'>): Restaurant {
+type RestaurantSeed = Omit<Restaurant, 'menu' | 'menuCategories' | 'imageAlt' | 'isOpen'> & {
+  imageAlt?: string;
+  isOpen?: boolean;
+  menu?: MenuItem[];
+  menuCategories?: MenuCategory[];
+};
+
+function categorizeMenu(menu: MenuItem[]): MenuCategory[] {
+  if (menu.length === 0) return [];
+  const popularItems = menu.filter(item => item.popular);
+
+  return [
+    {
+      id: 'popular',
+      name: 'Popular',
+      description: 'Customer favorites and signature items.',
+      items: (popularItems.length >= 3 ? popularItems : menu).slice(0, 3),
+    },
+    {
+      id: 'pizzas',
+      name: 'Pizzas',
+      description: 'Main pies and house specialties.',
+      items: menu.slice(0, 3),
+    },
+    {
+      id: 'specials',
+      name: 'Specials',
+      description: 'Additional picks for the table.',
+      items: menu.slice(-3),
+    },
+  ];
+}
+
+function restaurant(input: RestaurantSeed): Restaurant {
+  const menu = input.status === 'closed' && input.menu && !input.menu.some(menuItem => menuItem.available === false)
+    ? input.menu.map((menuItem, index) => index === 0 ? { ...menuItem, available: false } : menuItem)
+    : input.menu;
+  const menuCategories = input.menuCategories ?? categorizeMenu(menu ?? []);
   return {
     ...input,
-    menu: input.menuCategories.flatMap(category => category.items),
+    imageAlt: input.imageAlt ?? `${input.name} restaurant image`,
+    isOpen: input.isOpen ?? input.status !== 'closed',
+    menuCategories,
+    menu: menuCategories.flatMap(category => category.items),
   };
 }
 
@@ -375,8 +415,8 @@ export const restaurants: Restaurant[] = [
         imageEmoji: "🧄",
       }),
     ],
-  },
-  {
+  }),
+  restaurant({
     id: "vegan-vinyl",
     name: "Vegan Vinyl Pizza",
     cuisine: "Vegan Pizza",
@@ -419,8 +459,8 @@ export const restaurants: Restaurant[] = [
         imageEmoji: "🎸",
       }),
     ],
-  },
-  {
+  }),
+  restaurant({
     id: "chicago-square",
     name: "Chicago Square Cut",
     cuisine: "Pizza",
@@ -463,8 +503,8 @@ export const restaurants: Restaurant[] = [
         imageEmoji: "🌊",
       }),
     ],
-  },
-  {
+  }),
+  restaurant({
     id: "california-crust",
     name: "California Crust Co.",
     cuisine: "Pizza",

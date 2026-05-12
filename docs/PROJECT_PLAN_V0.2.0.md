@@ -13,6 +13,17 @@ Turn the completed local MVP (`v0.1.0`) into a production-ish portfolio demo wit
 - PostgreSQL/Redis/Docker infrastructure scaffold
 - Unit tests for core logic
 
+## Current Stabilization Update
+The deployment-prep branch is stabilized after fixture, menu rendering, TypeScript integration, and Playwright reliability fixes. The verified local gate is:
+
+- `npm run typecheck`
+- `npm run test`
+- `npm run build`
+- `PYTHONPYCACHEPREFIX=/private/tmp/orderly-pycache python3 -m py_compile backend/app/*.py backend/scripts/*.py`
+- `npm run test:e2e`
+
+The next product-prototype track should prioritize backend-backed cart, checkout, and order confirmation behavior before adding auth, payments, or broader marketplace features.
+
 ## v0.2.0 Success Criteria
 - Frontend reads restaurants/menu from FastAPI, not only local mock data.
 - Cart and orders persist through backend APIs.
@@ -212,15 +223,11 @@ Cut a clean v0.2.0 release.
 ---
 
 ## Recommended Execution Order
-1. Phase 0 — Branch/setup
-2. Phase 1 — Frontend API integration
-3. Phase 2 — PostgreSQL backend persistence
-4. Phase 3 — Redis cart persistence
-5. Phase 4 — Checkout/backend wiring
-6. Phase 5 — E2E tests
-7. Phase 6 — Deployment readiness
-8. Phase 7 — Portfolio polish
-9. Phase 8 — Release
+1. Deploy the stabilized portfolio demo.
+2. Capture screenshots/video from the deployed app.
+3. Make cart, checkout, and order confirmation backend-backed end to end.
+4. Add API contract coverage for backend cart/order behavior.
+5. Reconcile Linear backlog items as each product-prototype slice lands.
 
 ## Estimated Effort
 - Fast production-ish version: 4–6 focused days

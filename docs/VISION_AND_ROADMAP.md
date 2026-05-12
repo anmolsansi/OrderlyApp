@@ -40,7 +40,18 @@ The MVP demonstrates an end-to-end mock ordering flow:
 ## Completed Foundation
 The project has already covered the initial restart, product design, app shell, mock data, voice parsing, cart logic, checkout/status flow, backend API, database/infrastructure setup, quality checks, and release preparation. Future work should build on this foundation rather than restarting it.
 
+## Current Status
+The app has been stabilized for deployment preparation. The local quality gate passes for TypeScript, unit tests, production build, backend Python compile, and Playwright smoke tests. The current customer-facing flow remains a reliable portfolio demo with local fixture fallback and mock checkout.
+
+The next product-prototype milestone is to make backend APIs the primary source for cart, checkout, and order confirmation behavior while keeping the local fallback path for demo resilience.
+
 ## Future Roadmap
+
+### Product Prototype
+- Use backend-backed session carts as the primary cart source across item customization and checkout.
+- Create orders through the backend API and hydrate confirmation by stable order ID.
+- Keep mock/no-payment checkout copy until real payment support is intentionally scoped.
+- Add API contract coverage for cart, order creation, and order retrieval.
 
 ### Near-Term Polish
 - Improve voice command examples and onboarding so users know what to say.

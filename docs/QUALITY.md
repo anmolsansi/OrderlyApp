@@ -11,6 +11,12 @@ npm run lint
 python3 -m py_compile backend/app/*.py backend/scripts/*.py
 ```
 
+On macOS sandboxed runs, use a writable bytecode cache path for the Python compile check:
+
+```bash
+PYTHONPYCACHEPREFIX=/private/tmp/orderly-pycache python3 -m py_compile backend/app/*.py backend/scripts/*.py
+```
+
 ## Test coverage added in Phase 9
 - Schema/fixture validation via `validateFixtures`
 - Voice parser tests for add/view/remove/clear commands
@@ -18,6 +24,7 @@ python3 -m py_compile backend/app/*.py backend/scripts/*.py
 - Checkout primitive tests for mock order IDs and status timeline
 - Telemetry hook tests
 - Playwright E2E smoke tests for restaurant loading, cart, typed voice command, checkout, and status timeline
+- Playwright runs serially against the local Next.js server to avoid dev-manifest races during smoke validation.
 
 ## Accessibility checklist
 - Voice features must always have typed/manual alternatives.

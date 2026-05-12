@@ -3,7 +3,9 @@
 Voice-first food ordering demo app for browsing pizza restaurants, customizing items, managing a cart, placing a mock checkout, and tracking mock order status.
 
 ## Status
-MVP phases 0–10 are complete for the local portfolio demo. v0.2.0 production-demo release is complete locally on the production-demo branch.
+MVP phases 0–10 are complete for the local portfolio demo. The current main branch has been stabilized for deployment prep: TypeScript, unit tests, production build, backend Python compile, and Playwright smoke tests pass locally.
+
+Next product-prototype work should focus on making cart, checkout, and order confirmation use the backend APIs as the primary path, with local storage kept only as a fallback.
 
 ## Development root
 `~/Documents/Projects/OrderlyApp`
@@ -115,14 +117,14 @@ Try these in the typed command box or browser speech mode:
 - `docs/PROJECT_PLAN_V0.2.0.md` — next production-ish portfolio plan
 
 ## Roadmap
-v0.2.0 production-demo release is complete locally. Recommended next work: deploy the portfolio demo and add real screenshots/video after deployment.
+Immediate next step: deploy the stabilized portfolio demo and capture real screenshots/video after deployment. After that, continue the product-prototype track by making cart and order flows backend-backed end to end.
 
 ## Verification
-Latest release gate:
+Latest stabilization gate:
 - `npm run test`
 - `npm run build`
 - `npm run lint`
-- `python3 -m py_compile backend/app/*.py backend/scripts/*.py`
+- `PYTHONPYCACHEPREFIX=/private/tmp/orderly-pycache python3 -m py_compile backend/app/*.py backend/scripts/*.py`
 - `docker compose config`
 - `docker compose --env-file .env.example config`
 - `npm run test:e2e`

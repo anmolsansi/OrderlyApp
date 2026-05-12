@@ -1,5 +1,22 @@
 # OrderlyApp — Release Notes
 
+## Unreleased — Stabilization for Deployment PR
+
+### Highlights
+- Restored restaurant fixture normalization so seeded restaurants expose consistent menu categories, image alt text, open/closed state, and unavailable item edge cases.
+- Fixed the restaurant menu page rendering regression and removed duplicate menu item links from the smoke path.
+- Repaired TypeScript integration imports for API normalization and checkout totals.
+- Stabilized Playwright by pinning the Turbopack project root and running the smoke suite serially.
+
+### Verification
+```bash
+npm run typecheck
+npm run test
+npm run build
+PYTHONPYCACHEPREFIX=/private/tmp/orderly-pycache python3 -m py_compile backend/app/*.py backend/scripts/*.py
+npm run test:e2e
+```
+
 ## v0.2.0 — Production Demo Release
 
 ### Completed phases

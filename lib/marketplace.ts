@@ -71,6 +71,7 @@ export function filterRestaurants(query = '', filter = 'All restaurants'): Resta
       || restaurant.menuCategories.some(category => category.name.toLowerCase().includes(normalizedQuery))
       || restaurant.menu.some(item => item.name.toLowerCase().includes(normalizedQuery));
     const matchesFilter = filter === 'All restaurants'
+      || filter === 'All pizza'
       || (filter === 'Fast delivery' && Number.parseInt(restaurant.deliveryMinutes, 10) <= 20)
       || (filter === 'Top rated' && restaurant.rating >= 4.8)
       || (filter === 'Open now' && restaurant.status !== 'closed')
