@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { restaurants } from '../lib/mock-data';
-import { getCartSubtotal, getItemTotal, validateCart, validateCartItem } from '../lib/cart';
-import type { CartItem } from '../lib/types';
+import {
+  canAddItemToCart,
+  clampCartQuantity,
+  getCartSubtotal,
+  getItemTotal,
+  updateCartItemQuantity,
+  validateCart,
+  validateCartItem,
+  validateCheckoutDetails,
+} from '../lib/cart';
+import type { CartItem, CheckoutDetails } from '../lib/types';
 
 const item = restaurants[0].menu[1];
 const validModifiers = [
@@ -35,5 +44,42 @@ describe('cart logic', () => {
       { id: '1', restaurantId: restaurants[0].id, menuItemId: item.id, name: item.name, quantity: 2, basePriceCents: item.priceCents, modifiers: validModifiers },
     ];
     expect(getCartSubtotal(cart)).toBe(4848);
+  });
+
+  it('clamps cart item quantities', () => {
+    const cart: CartItem[] = [
+      { id: '1', restaurantId: restaurants[0].id, menuItemId: item.id, name: item.name, quantity: 9, basePriceCents: item.priceCents, modifiers: validModifiers },
+    ];
+
+    expect(clampCartQuantity(99)).toBe(10);
+    expect(updateCartItemQuantity(cart, '1', 5)[0].quantity).toBe(10);
+    expect(updateCartItemQuantity(cart, '1', -20)[0].quantity).toBe(1);
+  });
+
+  it('rejects adding a second restaurant to an active cart', () => {
+    const cart: CartItem[] = [
+      { id: '1', restaurantId: restaurants[0].id, menuItemId: item.id, name: item.name, quantity: 1, basePriceCents: item.priceCents, modifiers: validModifiers },
+    ];
+
+    expect(canAddItemToCart(cart, restaurants[1].id).ok).toBe(false);
+    expect(canAddItemToCart(cart, restaurants[0].id).ok).toBe(true);
+  });
+
+  it('validates checkout details', () => {
+    const details: CheckoutDetails = {
+      name: 'Jamie Demo',
+      phone: '555-0100',
+      email: 'jamie@example.com',
+      street: '123 Demo Street',
+      city: 'San Francisco',
+      state: 'CA',
+      postalCode: '94105',
+      paymentMethod: 'Mock Visa 4242',
+      tipCents: 500,
+    };
+
+    expect(validateCheckoutDetails(details).ok).toBe(true);
+    expect(validateCheckoutDetails({ ...details, email: 'bad-email' }).ok).toBe(false);
+    expect(validateCheckoutDetails({ ...details, postalCode: 'abc' }).ok).toBe(false);
   });
 });
