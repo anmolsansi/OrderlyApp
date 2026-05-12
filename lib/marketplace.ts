@@ -13,6 +13,8 @@ export const quickFilters = ['All pizza', 'Fast delivery', 'Top rated', 'Wood fi
 
 export const discoveryCuisineFilters = ['All pizza', 'Vegan Pizza', 'NY style', 'Detroit style', 'Neapolitan', 'Fusion'];
 
+export type RestaurantSort = 'recommended' | 'rating' | 'eta' | 'fee' | 'distance';
+
 export const discoveryMockStates = {
   loadingRows: [
     { id: 'image', width: '46%' },
@@ -61,9 +63,28 @@ export function getMenuItem(restaurantId: string, itemId: string): MenuItem | un
   return findMenuItem(restaurantId, itemId);
 }
 
-export function filterRestaurants(query = '', filter = 'All restaurants'): Restaurant[] {
+function parseDeliveryMinutes(deliveryMinutes: string): number {
+  const firstNumber = deliveryMinutes.match(/\d+/)?.[0];
+  return firstNumber ? Number.parseInt(firstNumber, 10) : Number.MAX_SAFE_INTEGER;
+}
+
+export function sortRestaurants(restaurantsToSort: Restaurant[], sort: RestaurantSort = 'recommended'): Restaurant[] {
+  const sorted = [...restaurantsToSort];
+
+  if (sort === 'rating') return sorted.sort((left, right) => right.rating - left.rating);
+  if (sort === 'eta') return sorted.sort((left, right) => parseDeliveryMinutes(left.deliveryMinutes) - parseDeliveryMinutes(right.deliveryMinutes));
+  if (sort === 'fee') return sorted.sort((left, right) => left.deliveryFeeCents - right.deliveryFeeCents);
+  if (sort === 'distance') return sorted.sort((left, right) => left.distanceMiles - right.distanceMiles);
+
+  return sorted.sort((left, right) => {
+    if (left.isOpen !== right.isOpen) return left.isOpen ? -1 : 1;
+    return right.rating - left.rating;
+  });
+}
+
+export function filterRestaurants(query = '', filter = 'All restaurants', sort: RestaurantSort = 'recommended'): Restaurant[] {
   const normalizedQuery = query.trim().toLowerCase();
-  return restaurants.filter(restaurant => {
+  const filtered = restaurants.filter(restaurant => {
     const matchesSearch = normalizedQuery.length === 0
       || restaurant.name.toLowerCase().includes(normalizedQuery)
       || restaurant.cuisine.toLowerCase().includes(normalizedQuery)
@@ -79,6 +100,8 @@ export function filterRestaurants(query = '', filter = 'All restaurants'): Resta
       || restaurant.tags.some(tag => tag.toLowerCase() === filter.toLowerCase());
     return matchesSearch && matchesFilter;
   });
+
+  return sortRestaurants(filtered, sort);
 }
 
 export function getDefaultModifiers(item: MenuItem): CartItemModifier[] {

@@ -26,6 +26,7 @@ test('customizes an item, reviews payment, and places order', async ({ page }) =
   await page.getByRole('button', { name: /place order/i }).click();
   await expect(page).toHaveURL(/\/order-confirmation/);
   await expect(page.getByRole('heading', { name: /order placed/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /mock receipt details/i })).toBeVisible();
 });
 
 test('restaurant filters open the list page and checkout is disabled when empty', async ({ page }) => {
@@ -36,4 +37,20 @@ test('restaurant filters open the list page and checkout is disabled when empty'
   await page.goto('/checkout');
   await expect(page.getByText(/your cart is empty/i)).toBeVisible();
   await expect(page.getByRole('button', { name: /place order/i })).toBeDisabled();
+});
+
+test('restaurant discovery shows sort, no-results, and error states', async ({ page }) => {
+  await page.goto('/restaurants');
+  await page.getByLabel(/sort restaurants/i).selectOption('rating');
+  await page.getByRole('button', { name: /apply/i }).click();
+  await expect(page).toHaveURL(/sort=rating/);
+  await expect(page.getByText(/sorted by highest rating/i)).toBeVisible();
+
+  await page.goto('/restaurants?query=no-match&filter=All%20pizza');
+  await expect(page.getByRole('heading', { name: /no restaurants found/i })).toBeVisible();
+  await expect(page.getByRole('link', { name: /clear filters/i })).toBeVisible();
+
+  await page.goto('/restaurants?state=error');
+  await expect(page.locator('.discovery-state-card[role="alert"]')).toContainText(/temporarily unavailable/i);
+  await expect(page.getByRole('link', { name: /retry/i })).toBeVisible();
 });

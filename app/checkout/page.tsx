@@ -86,6 +86,7 @@ export default function CheckoutPage() {
                       <div>
                         <strong>{cartItem.name}</strong>
                         <p>{item?.description}</p>
+                        {cartItem.specialInstructions && <p>Note: {cartItem.specialInstructions}</p>}
                       </div>
                       <div className="quantity-controls">
                         <button type="button" onClick={() => updateQuantity(cartItem.id, -1)}>-</button>
@@ -109,6 +110,24 @@ export default function CheckoutPage() {
           <aside className="card payment-review-panel">
             <span className="kicker">Payment review</span>
             <h2>Confirm delivery and payment</h2>
+            <div className="checkout-form-grid" aria-label="Mock checkout details">
+              <label>
+                <span>Name</span>
+                <input type="text" defaultValue="Jamie Demo" />
+              </label>
+              <label>
+                <span>Phone</span>
+                <input type="tel" defaultValue="555-0100" />
+              </label>
+              <label className="full-field">
+                <span>Delivery address</span>
+                <input type="text" defaultValue="123 Demo Street" />
+              </label>
+              <label className="full-field">
+                <span>Delivery instructions</span>
+                <textarea defaultValue="Leave at door" />
+              </label>
+            </div>
             <div className="payment-breakdown">
               <div><span>Delivery address</span><strong>123 Demo Street</strong></div>
               <div><span>Drop-off</span><strong>Leave at door</strong></div>

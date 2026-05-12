@@ -45,6 +45,24 @@ export default async function RestaurantMenuPage({ params }: RestaurantMenuPageP
           <span className="pill">{restaurant.menu.length} items</span>
         </section>
 
+        {restaurant.menuCategories.length === 0 && (
+          <section className="card discovery-state-card no-results-state">
+            <span aria-hidden="true">0</span>
+            <div>
+              <h2>Menu coming soon</h2>
+              <p>This restaurant is not accepting menu orders yet.</p>
+              <Link className="ghost-button" href={routes.restaurants()}>Back to restaurants</Link>
+            </div>
+          </section>
+        )}
+
+        {!restaurant.isOpen && (
+          <section className="card menu-availability-alert" role="alert">
+            <strong>{restaurant.name} is closed right now.</strong>
+            <p>You can review the menu, but new cart additions are disabled until the restaurant opens.</p>
+          </section>
+        )}
+
         {restaurant.menuCategories.map(category => (
           <section className="menu-page-grid" id={category.id} key={category.id}>
             <div className="menu-category-heading">
@@ -55,21 +73,32 @@ export default async function RestaurantMenuPage({ params }: RestaurantMenuPageP
             {category.items.map(item => {
               if (renderedItemIds.has(item.id)) return null;
               renderedItemIds.add(item.id);
+              const itemUnavailable = item.available === false || !restaurant.isOpen;
 
-              return (
-                <Link
-                  className={`card menu-page-card ${item.available === false || !restaurant.isOpen ? 'disabled-card' : ''}`}
-                  href={routes.item(restaurant.id, item.id)}
-                  key={item.id}
-                >
-                  <span className="menu-emoji">{item.imageEmoji}</span>
+              const cardContent = (
+                <>
+                  <span className="menu-emoji" aria-hidden="true">{item.imageEmoji}</span>
                   <div>
                     <h3>{item.name}</h3>
                     <p>{item.description}</p>
                     <strong>{formatMoney(item.priceCents)}</strong>
                   </div>
                   {item.popular && <span className="tag">Popular</span>}
-                  {item.available === false && <span className="tag">Unavailable</span>}
+                  {itemUnavailable && <span className="tag">Unavailable</span>}
+                </>
+              );
+
+              return itemUnavailable ? (
+                <article className="card menu-page-card disabled-card" aria-disabled="true" key={item.id}>
+                  {cardContent}
+                </article>
+              ) : (
+                <Link
+                  className="card menu-page-card"
+                  href={routes.item(restaurant.id, item.id)}
+                  key={item.id}
+                >
+                  {cardContent}
                 </Link>
               );
             })}

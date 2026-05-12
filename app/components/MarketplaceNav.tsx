@@ -15,19 +15,35 @@ export function MarketplaceNav({ active = 'Home' }: MarketplaceNavProps) {
   ];
 
   return (
-    <nav className="top-nav marketplace-nav" aria-label="Primary navigation">
-      <Link className="brand-lockup" href={routes.home}>
-        <span>O</span>
-        <strong>OrderlyApp</strong>
-      </Link>
-      <div className="nav-links">
-        {navItems.map(item => (
+    <>
+      <nav className="top-nav marketplace-nav" aria-label="Primary navigation">
+        <Link className="brand-lockup" href={routes.home}>
+          <span>O</span>
+          <strong>OrderlyApp</strong>
+        </Link>
+        <div className="location-chip" aria-label="Delivery location">
+          <span aria-hidden="true">⌖</span>
+          <strong>123 Demo Street</strong>
+        </div>
+        <div className="nav-links">
+          {navItems.map(item => (
+            <Link className={active === item.label ? 'active' : ''} href={item.href} key={item.label}>
+              {item.label}
+            </Link>
+          ))}
+        </div>
+        <div className="nav-actions">
+          <Link className="account-link" href={routes.home}>Account</Link>
+          <Link className="nav-cart" href={routes.checkout}>Cart</Link>
+        </div>
+      </nav>
+      <nav className="mobile-bottom-nav" aria-label="Mobile navigation">
+        {navItems.filter(item => item.label !== 'Menu').map(item => (
           <Link className={active === item.label ? 'active' : ''} href={item.href} key={item.label}>
-            {item.label}
+            <span>{item.label}</span>
           </Link>
         ))}
-      </div>
-      <Link className="nav-cart" href={routes.checkout}>Cart</Link>
-    </nav>
+      </nav>
+    </>
   );
 }
