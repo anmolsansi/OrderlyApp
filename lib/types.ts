@@ -57,7 +57,6 @@ export interface Restaurant {
   tags: string[];
   menuCategories: MenuCategory[];
   menu: MenuItem[];
-  distanceMiles?: number;
   promotion?: string;
   status?: RestaurantStatus;
   imageAvailable?: boolean;

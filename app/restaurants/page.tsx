@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { MarketplaceNav } from '@/app/components/MarketplaceNav';
-import { filterRestaurants, quickFilters } from '@/lib/marketplace';
+import { discoveryCuisineFilters, filterRestaurants, quickFilters } from '@/lib/marketplace';
 import { routes } from '@/lib/routes';
 import { formatMoney } from '@/lib/types';
 
@@ -110,7 +110,7 @@ export default async function RestaurantsPage({ searchParams }: RestaurantsPageP
             <div className="section-heading compact-heading discovery-list-heading">
               <div>
                 <span className="kicker">Restaurant list</span>
-                <h2>{query ? `Search results for “${query}”` : 'Restaurants near you'}</h2>
+                <h2>{query ? `Search results for “${query}”` : 'Pizza restaurants near you'}</h2>
                 <p>{showMockError ? 'Mock error state' : `${matchingRestaurants.length} matching restaurants · sorted by recommended`}</p>
               </div>
               <div className="state-toggle-row" aria-label="Preview states">

@@ -1,6 +1,6 @@
 import { env } from './env';
-import { restaurants as fallbackRestaurants } from './mock-data';
-import type { CartItem, MenuItem, ModifierGroup, Order, Restaurant } from './types';
+import { calculateCartTotals, mockUserProfile, restaurants as fallbackRestaurants } from './mock-data';
+import type { CartItem, MenuCategory, MenuItem, ModifierGroup, Order, Restaurant } from './types';
 
 const API_BASE_URL = env.apiBaseUrl;
 const API_TIMEOUT_MS = 1_500;
