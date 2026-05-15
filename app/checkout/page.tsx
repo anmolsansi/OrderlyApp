@@ -4,11 +4,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { MarketplaceNav } from '@/app/components/MarketplaceNav';
+import { clearBackendCart, createBackendOrder, fetchCart, saveCart } from '@/lib/api';
+import { getSessionProfile, isSignedIn } from '@/lib/auth';
 import {
   CART_STORAGE_KEY,
   ORDER_HISTORY_STORAGE_KEY,
   ORDER_STORAGE_KEY,
-  SESSION_STORAGE_KEY,
+  getOrCreateBackendSessionId,
   getSelectedModifierLabels,
   updateCartItemQuantity,
   validateCart,
@@ -52,21 +54,45 @@ export default function CheckoutPage() {
   const { subtotalCents: subtotal, deliveryFeeCents: deliveryFee, serviceFeeCents: serviceFee, discountCents: promo, taxCents: tax, totalCents: total } = totals;
 
   useEffect(() => {
-    const stored = window.localStorage.getItem(CART_STORAGE_KEY);
-    setCart(stored ? JSON.parse(stored) as CartItem[] : []);
-    setSignedIn(window.localStorage.getItem(SESSION_STORAGE_KEY) === 'signed-in');
-    setMounted(true);
+    let active = true;
+    async function loadCart(): Promise<void> {
+      const sessionId = getOrCreateBackendSessionId(window.localStorage);
+      const stored = window.localStorage.getItem(CART_STORAGE_KEY);
+      const fallbackCart = stored ? JSON.parse(stored) as CartItem[] : [];
+      const backendCart = await fetchCart(sessionId);
+      const nextCart = backendCart ?? fallbackCart;
+      if (!active) return;
+      setCart(nextCart);
+      window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(nextCart));
+      setSignedIn(isSignedIn(window.localStorage));
+      const profile = getSessionProfile(window.localStorage);
+      setDetails(previous => ({
+        ...previous,
+        name: profile.name,
+        phone: profile.phone,
+        email: profile.email,
+      }));
+      setMounted(true);
+    }
+    void loadCart();
+    return () => {
+      active = false;
+    };
   }, []);
 
-  function updateQuantity(cartItemId: string, delta: number): void {
+  async function updateQuantity(cartItemId: string, delta: number): Promise<void> {
+    const sessionId = getOrCreateBackendSessionId(window.localStorage);
     const nextCart = updateCartItemQuantity(cart, cartItemId, delta);
     setCart(nextCart);
     window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(nextCart));
+    await saveCart(sessionId, nextCart);
   }
 
-  function clearCart(): void {
+  async function clearCart(): Promise<void> {
+    const sessionId = getOrCreateBackendSessionId(window.localStorage);
     setCart([]);
     window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify([]));
+    await clearBackendCart(sessionId);
   }
 
   function updateDetails(field: keyof CheckoutDetails, value: string): void {
@@ -77,7 +103,7 @@ export default function CheckoutPage() {
     }));
   }
 
-  function placeOrder(): void {
+  async function placeOrder(): Promise<void> {
     if (env.checkoutMode !== 'mock' || submitting) return;
     if (!signedIn) {
       setErrors(['Sign in before placing this order.']);
@@ -92,7 +118,15 @@ export default function CheckoutPage() {
     }
 
     setSubmitting(true);
-    const order: Order = {
+    const sessionId = getOrCreateBackendSessionId(window.localStorage);
+    const backendOrder = await createBackendOrder(sessionId, cart, subtotal, details);
+    const order: Order = backendOrder ? {
+      ...backendOrder,
+      totals,
+      subtotalCents: subtotal,
+      status: backendOrder.status === 'Placed' ? 'Confirmed' : backendOrder.status,
+      checkoutDetails: details,
+    } : {
       ...createMockOrder(cart, restaurant?.id, new Date().toISOString()),
       totals,
       subtotalCents: subtotal,
@@ -104,6 +138,7 @@ export default function CheckoutPage() {
     window.localStorage.setItem(ORDER_STORAGE_KEY, JSON.stringify(order));
     window.localStorage.setItem(ORDER_HISTORY_STORAGE_KEY, JSON.stringify([order, ...history.filter(candidate => candidate.id !== order.id)]));
     window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify([]));
+    if (!backendOrder) await clearBackendCart(sessionId);
     router.push(routes.orderConfirmation(order.id));
   }
 
@@ -119,7 +154,7 @@ export default function CheckoutPage() {
                 <span className="kicker">Checkout</span>
                 <h1>Your cart</h1>
               </div>
-              {cart.length > 0 && <button className="ghost-button" type="button" onClick={clearCart}>Clear cart</button>}
+              {cart.length > 0 && <button className="ghost-button" type="button" onClick={() => void clearCart()}>Clear cart</button>}
             </div>
 
             {!mounted || cart.length === 0 ? (
@@ -140,9 +175,9 @@ export default function CheckoutPage() {
                         {cartItem.specialInstructions && <p>Note: {cartItem.specialInstructions}</p>}
                       </div>
                       <div className="quantity-controls">
-                        <button type="button" onClick={() => updateQuantity(cartItem.id, -1)}>-</button>
+                        <button type="button" onClick={() => void updateQuantity(cartItem.id, -1)}>-</button>
                         <span>{cartItem.quantity}</span>
-                        <button type="button" onClick={() => updateQuantity(cartItem.id, 1)}>+</button>
+                        <button type="button" onClick={() => void updateQuantity(cartItem.id, 1)}>+</button>
                       </div>
                     </div>
                   );
@@ -218,7 +253,7 @@ export default function CheckoutPage() {
               <div><span>Payment</span><strong>{env.checkoutMode === 'mock' ? 'Mock Visa •••• 4242' : 'Checkout disabled'}</strong></div>
               <div><span>Delivery window</span><strong>{restaurant?.deliveryMinutes ?? '28–35 min'}</strong></div>
             </div>
-            <button className="checkout-button" type="button" disabled={cart.length === 0 || env.checkoutMode !== 'mock' || submitting || !cartValidation.ok} onClick={placeOrder}>
+            <button className="checkout-button" type="button" disabled={cart.length === 0 || env.checkoutMode !== 'mock' || submitting || !cartValidation.ok} onClick={() => void placeOrder()}>
               {submitting ? 'Placing order...' : env.checkoutMode === 'mock' ? 'Place order' : 'Checkout disabled'}
             </button>
           </aside>

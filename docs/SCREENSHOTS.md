@@ -8,8 +8,8 @@ Capture these for portfolio materials:
 4. Modifier customization
 5. Cart with validation-ready line items
 6. Voice typed-command panel with parsed intent
-7. Mock checkout confirmation modal
-8. Mock order status timeline
+7. Backend-backed mock checkout review
+8. Backend order confirmation + status timeline
 9. Terminal verification output for tests/build/lint
 
 Suggested filenames:
@@ -17,6 +17,8 @@ Suggested filenames:
 - `restaurants.png`
 - `customize-item.png`
 - `voice-command.png`
-- `mock-checkout.png`
-- `order-status.png`
+- `backend-checkout.png`
+- `order-confirmation.png`
 - `verification.png`
+
+Capture from the hosted demo after deployment when possible. Local screenshots are acceptable for development handoff, but portfolio materials should prefer the deployed frontend/API path so the API source, cart persistence, and order ID behavior match the production-ish story.

@@ -3,9 +3,7 @@
 Voice-first food ordering demo app for browsing pizza restaurants, customizing items, managing a cart, placing a mock checkout, and tracking mock order status.
 
 ## Status
-MVP phases 0–10 are complete for the local portfolio demo. The current main branch has been stabilized for deployment prep: TypeScript, unit tests, production build, backend Python compile, and Playwright smoke tests pass locally.
-
-Next product-prototype work should focus on making cart, checkout, and order confirmation use the backend APIs as the primary path, with local storage kept only as a fallback.
+MVP phases 0–10 are complete for the local portfolio demo. The current main branch has backend-backed restaurant, cart, checkout, and order confirmation paths with local fallback behavior for demo resilience. TypeScript, unit tests, production build, backend Python compile, Docker Compose config, and Playwright smoke tests pass locally.
 
 ## Development root
 `~/Documents/Projects/OrderlyApp`
@@ -15,17 +13,19 @@ Next product-prototype work should focus on making cart, checkout, and order con
 - Restaurant detail section
 - Menu/item detail and modifiers
 - Cart add/update/remove/clear
+- Backend-backed anonymous session carts with local fallback
 - Cart validation and one-restaurant conflict handling
 - Typed command fallback
 - Browser voice command capture where supported
 - Voice intent parsing for add/view/remove/clear cart
 - Mock checkout confirmation with explicit no-payment copy
-- Mock order creation and simulated status timeline
+- Backend order creation with local mock fallback and simulated status timeline
 - FastAPI backend with PostgreSQL primary persistence and JSON fallback
 - Redis-backed session carts with local fallback
 - Dockerized frontend/backend/Postgres/Redis stack
 - Playwright E2E smoke tests
 - Deployment readiness docs for Vercel + Render/Railway + managed Postgres/Redis
+- Portfolio demo checklist and architecture notes
 - Automated tests and quality docs
 
 ## Local development
@@ -102,6 +102,9 @@ Try these in the typed command box or browser speech mode:
 - `remove item`
 - `clear cart`
 
+## Screenshots and demo video
+Portfolio capture guidance lives in `docs/SCREENSHOTS.md`. Recommended captures are the hero, restaurant browsing, item customization, cart, typed voice command, checkout, order confirmation, and terminal verification output.
+
 ## Docs
 - `PRODUCT_CHARTER.md` — product promise, non-goals, success criteria
 - `PROJECT_PLAN.md` — restart plan
@@ -117,7 +120,7 @@ Try these in the typed command box or browser speech mode:
 - `docs/PROJECT_PLAN_V0.2.0.md` — next production-ish portfolio plan
 
 ## Roadmap
-Immediate next step: deploy the stabilized portfolio demo and capture real screenshots/video after deployment. After that, continue the product-prototype track by making cart and order flows backend-backed end to end.
+Immediate next step: deploy the stabilized portfolio demo, run the deployed smoke checklist, and capture real screenshots/video from the hosted app. Product expansion after that should focus on real auth/payments only if the portfolio demo becomes a product prototype.
 
 ## Verification
 Latest stabilization gate:

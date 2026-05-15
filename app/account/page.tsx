@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { MarketplaceNav } from '@/app/components/MarketplaceNav';
-import { ADDRESSES_STORAGE_KEY, PROFILE_STORAGE_KEY, SESSION_STORAGE_KEY } from '@/lib/cart';
+import { getSessionProfile, isSignedIn, signOut as clearAuthSession } from '@/lib/auth';
+import { ADDRESSES_STORAGE_KEY, PROFILE_STORAGE_KEY } from '@/lib/cart';
 import { mockAddresses, mockUserProfile } from '@/lib/mock-data';
 import { routes } from '@/lib/routes';
 import type { Address, UserProfile } from '@/lib/types';
@@ -16,11 +17,10 @@ export default function AccountPage() {
   const [newStreet, setNewStreet] = useState('500 Mission Street');
 
   useEffect(() => {
-    const hasSession = window.localStorage.getItem(SESSION_STORAGE_KEY) === 'signed-in';
+    const hasSession = isSignedIn(window.localStorage);
     setSignedIn(hasSession);
-    const storedProfile = window.localStorage.getItem(PROFILE_STORAGE_KEY);
     const storedAddresses = window.localStorage.getItem(ADDRESSES_STORAGE_KEY);
-    if (storedProfile) setProfile(JSON.parse(storedProfile) as UserProfile);
+    setProfile(getSessionProfile(window.localStorage));
     if (storedAddresses) setAddresses(JSON.parse(storedAddresses) as Address[]);
   }, []);
 
@@ -49,7 +49,7 @@ export default function AccountPage() {
   }
 
   function signOut(): void {
-    window.localStorage.removeItem(SESSION_STORAGE_KEY);
+    clearAuthSession(window.localStorage);
     setSignedIn(false);
   }
 

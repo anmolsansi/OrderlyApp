@@ -1,6 +1,6 @@
 import { env } from './env';
 import { calculateCartTotals, mockUserProfile, restaurants as fallbackRestaurants } from './mock-data';
-import type { CartItem, MenuCategory, MenuItem, ModifierGroup, Order, Restaurant } from './types';
+import type { CartItem, CheckoutDetails, MenuCategory, MenuItem, ModifierGroup, Order, Restaurant } from './types';
 
 const API_BASE_URL = env.apiBaseUrl;
 const API_TIMEOUT_MS = 1_500;
@@ -94,6 +94,7 @@ interface ApiCartItem {
   quantity: number;
   base_price_cents: number;
   modifiers: ApiCartItemModifier[];
+  special_instructions?: string;
 }
 
 interface ApiCart {
@@ -181,7 +182,7 @@ export async function clearBackendCart(sessionId: string): Promise<boolean> {
   }
 }
 
-export async function createBackendOrder(sessionId: string, cartItems: CartItem[], subtotalCents: number): Promise<Order | undefined> {
+export async function createBackendOrder(sessionId: string, cartItems: CartItem[], subtotalCents: number, checkoutDetails?: CheckoutDetails): Promise<Order | undefined> {
   try {
     const response = await fetchApi(`${getApiBaseUrl()}/orders`, {
       method: 'POST',
@@ -190,10 +191,15 @@ export async function createBackendOrder(sessionId: string, cartItems: CartItem[
         session_id: sessionId,
         cart_items: cartItems.map(toApiCartItem),
         subtotal_cents: subtotalCents,
+        delivery_address: checkoutDetails?.street,
+        customer_name: checkoutDetails?.name,
+        customer_phone: checkoutDetails?.phone,
+        customer_email: checkoutDetails?.email,
+        tip_cents: checkoutDetails?.tipCents ?? 0,
       }),
     });
     if (!response.ok) return undefined;
-    return normalizeOrder(await response.json() as ApiOrder);
+    return normalizeOrder(await response.json() as ApiOrder, checkoutDetails);
   } catch {
     return undefined;
   }
@@ -204,6 +210,17 @@ export async function fetchOrder(orderId: string): Promise<Order | undefined> {
     const response = await fetchApi(`${getApiBaseUrl()}/orders/${orderId}`, { cache: 'no-store' });
     if (!response.ok) return undefined;
     return normalizeOrder(await response.json() as ApiOrder);
+  } catch {
+    return undefined;
+  }
+}
+
+export async function fetchOrders(): Promise<Order[] | undefined> {
+  try {
+    const response = await fetchApi(`${getApiBaseUrl()}/orders`, { cache: 'no-store' });
+    if (!response.ok) return undefined;
+    const payload = await response.json() as ApiOrder[];
+    return payload.map(order => normalizeOrder(order));
   } catch {
     return undefined;
   }
@@ -280,6 +297,7 @@ function normalizeCartItem(input: ApiCartItem): CartItem {
       groupId: modifier.group_id,
       optionIds: modifier.option_ids,
     })),
+    specialInstructions: input.special_instructions,
   };
 }
 
@@ -295,25 +313,34 @@ function toApiCartItem(input: CartItem): ApiCartItem {
       group_id: modifier.groupId,
       option_ids: modifier.optionIds,
     })),
+    special_instructions: input.specialInstructions,
   };
 }
 
-function normalizeOrder(input: ApiOrder): Order {
+function normalizeOrder(input: ApiOrder, checkoutDetails?: CheckoutDetails): Order {
   const cartItems = input.cart_items.map(normalizeCartItem);
   const restaurantId = cartItems[0]?.restaurantId ?? fallbackRestaurants[0].id;
   const totals = calculateCartTotals(cartItems, restaurantId);
+  const tipCents = checkoutDetails?.tipCents ?? 0;
+  const totalsWithTip = {
+    ...totals,
+    tipCents,
+    subtotalCents: input.subtotal_cents,
+    totalCents: totals.totalCents + tipCents,
+  };
   const createdAt = new Date(input.created_at);
   return {
     id: input.id,
     userId: mockUserProfile.id,
     restaurantId,
     cartItems,
-    totals: { ...totals, subtotalCents: input.subtotal_cents },
+    totals: totalsWithTip,
     subtotalCents: input.subtotal_cents,
     status: input.status,
     createdAt: createdAt.toISOString(),
     updatedAt: createdAt.toISOString(),
     deliveryAddressId: mockUserProfile.defaultAddressId,
     estimatedDeliveryAt: new Date(createdAt.getTime() + 35 * 60 * 1000).toISOString(),
+    checkoutDetails,
   };
 }

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { MarketplaceNav } from '@/app/components/MarketplaceNav';
+import { fetchOrder } from '@/lib/api';
 import { ORDER_HISTORY_STORAGE_KEY, ORDER_STORAGE_KEY } from '@/lib/cart';
 import { getSelectedModifierLabels } from '@/lib/cart';
 import { getRestaurant } from '@/lib/marketplace';
@@ -19,11 +20,25 @@ function OrderConfirmationContent() {
   const restaurant = useMemo(() => order ? getRestaurant(order.restaurantId) : undefined, [order]);
 
   useEffect(() => {
-    const stored = window.localStorage.getItem(ORDER_STORAGE_KEY);
-    const storedHistory = window.localStorage.getItem(ORDER_HISTORY_STORAGE_KEY);
-    const latestOrder = stored ? JSON.parse(stored) as Order : null;
-    const history = storedHistory ? JSON.parse(storedHistory) as Order[] : [];
-    setOrder(orderId ? history.find(candidate => candidate.id === orderId) ?? latestOrder : latestOrder);
+    let active = true;
+    async function loadOrder(): Promise<void> {
+      const stored = window.localStorage.getItem(ORDER_STORAGE_KEY);
+      const storedHistory = window.localStorage.getItem(ORDER_HISTORY_STORAGE_KEY);
+      const latestOrder = stored ? JSON.parse(stored) as Order : null;
+      const history = storedHistory ? JSON.parse(storedHistory) as Order[] : [];
+      const backendOrder = orderId ? await fetchOrder(orderId) : undefined;
+      const nextOrder = backendOrder ?? (orderId ? history.find(candidate => candidate.id === orderId) ?? latestOrder : latestOrder);
+      if (!active) return;
+      setOrder(nextOrder);
+      if (nextOrder) {
+        window.localStorage.setItem(ORDER_STORAGE_KEY, JSON.stringify(nextOrder));
+        window.localStorage.setItem(ORDER_HISTORY_STORAGE_KEY, JSON.stringify([nextOrder, ...history.filter(candidate => candidate.id !== nextOrder.id)]));
+      }
+    }
+    void loadOrder();
+    return () => {
+      active = false;
+    };
   }, [orderId]);
 
   return (
