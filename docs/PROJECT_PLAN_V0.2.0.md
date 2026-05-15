@@ -22,7 +22,7 @@ The deployment-prep branch is stabilized after fixture, menu rendering, TypeScri
 - `PYTHONPYCACHEPREFIX=/private/tmp/orderly-pycache python3 -m py_compile backend/app/*.py backend/scripts/*.py`
 - `npm run test:e2e`
 
-The next product-prototype track should prioritize backend-backed cart, checkout, and order confirmation behavior before adding auth, payments, or broader marketplace features.
+The completion-hardening track has wired backend-backed cart, checkout, and order confirmation behavior before adding auth, payments, or broader marketplace features. The remaining external step is deployed-demo verification and hosted portfolio capture.
 
 ## v0.2.0 Success Criteria
 - Frontend reads restaurants/menu from FastAPI, not only local mock data.
@@ -183,13 +183,13 @@ Make the project deployable and easy to run externally.
 Make the project look and read like a strong portfolio piece.
 
 ### Tasks
-- [ ] Improve responsive/mobile layout
-- [ ] Add architecture diagram
-- [ ] Add better restaurant/menu fixture content
-- [ ] Add README screenshots section
-- [ ] Record or prepare final demo video script
-- [ ] Add known limitations and next-roadmap section
-- [ ] Tighten copy across UI and docs
+- [x] Improve responsive/mobile layout
+- [x] Add architecture diagram
+- [x] Add better restaurant/menu fixture content
+- [x] Add README screenshots section
+- [x] Record or prepare final demo video script
+- [x] Add known limitations and next-roadmap section
+- [x] Tighten copy across UI and docs
 
 ### Done When
 - README explains product, architecture, demo flow, setup, and roadmap clearly
@@ -224,10 +224,10 @@ Cut a clean v0.2.0 release.
 
 ## Recommended Execution Order
 1. Deploy the stabilized portfolio demo.
-2. Capture screenshots/video from the deployed app.
-3. Make cart, checkout, and order confirmation backend-backed end to end.
-4. Add API contract coverage for backend cart/order behavior.
-5. Reconcile Linear backlog items as each product-prototype slice lands.
+2. Run the deployed health, restaurant, cart, checkout, order confirmation, and CORS smoke checklist.
+3. Capture screenshots/video from the deployed app.
+4. Add real auth/payments only if the portfolio demo becomes a product prototype.
+5. Keep Linear follow-up work in `OrderlyApp v0.2 Completion Hardening`.
 
 ## Estimated Effort
 - Fast production-ish version: 4–6 focused days

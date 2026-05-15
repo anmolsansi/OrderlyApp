@@ -5,6 +5,7 @@ export const CART_STORAGE_KEY = 'orderlyapp.marketplace.cart.v1';
 export const ORDER_STORAGE_KEY = 'orderlyapp.marketplace.order.v1';
 export const ORDER_HISTORY_STORAGE_KEY = 'orderlyapp.marketplace.orders.v1';
 export const SESSION_STORAGE_KEY = 'orderlyapp.marketplace.session.v1';
+export const BACKEND_SESSION_STORAGE_KEY = 'orderlyapp.marketplace.backendSession.v1';
 export const PROFILE_STORAGE_KEY = 'orderlyapp.marketplace.profile.v1';
 export const ADDRESSES_STORAGE_KEY = 'orderlyapp.marketplace.addresses.v1';
 export const MAX_CART_QUANTITY = 10;
@@ -143,4 +144,19 @@ export function getSelectedModifierLabels(cartItem: CartItem): string[] {
 
 export function createMockOrderId(seed = Math.random().toString(36)): string {
   return createSeededMockOrderId(seed);
+}
+
+export function createBackendSessionId(): string {
+  if (globalThis.crypto && 'randomUUID' in globalThis.crypto) {
+    return `session-${globalThis.crypto.randomUUID()}`;
+  }
+  return `session-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+export function getOrCreateBackendSessionId(storage: Storage): string {
+  const existing = storage.getItem(BACKEND_SESSION_STORAGE_KEY);
+  if (existing) return existing;
+  const sessionId = createBackendSessionId();
+  storage.setItem(BACKEND_SESSION_STORAGE_KEY, sessionId);
+  return sessionId;
 }

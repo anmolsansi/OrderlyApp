@@ -3,9 +3,11 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { MarketplaceNav } from '@/app/components/MarketplaceNav';
+import { clearBackendCart, fetchCart, saveCart } from '@/lib/api';
 import {
   CART_STORAGE_KEY,
   getCartLineTotal,
+  getOrCreateBackendSessionId,
   getSelectedModifierLabels,
   removeCartItem,
   updateCartItemQuantity,
@@ -25,14 +27,36 @@ export default function CartPage() {
   const totals = useMemo(() => calculateCartTotals(cart, restaurant?.id), [cart, restaurant?.id]);
 
   useEffect(() => {
-    const stored = window.localStorage.getItem(CART_STORAGE_KEY);
-    setCart(stored ? JSON.parse(stored) as CartItem[] : []);
-    setMounted(true);
+    let active = true;
+    async function loadCart(): Promise<void> {
+      const sessionId = getOrCreateBackendSessionId(window.localStorage);
+      const stored = window.localStorage.getItem(CART_STORAGE_KEY);
+      const fallbackCart = stored ? JSON.parse(stored) as CartItem[] : [];
+      const backendCart = await fetchCart(sessionId);
+      const nextCart = backendCart ?? fallbackCart;
+      if (!active) return;
+      setCart(nextCart);
+      window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(nextCart));
+      setMounted(true);
+    }
+    void loadCart();
+    return () => {
+      active = false;
+    };
   }, []);
 
-  function persist(nextCart: CartItem[]): void {
+  async function persist(nextCart: CartItem[]): Promise<void> {
+    const sessionId = getOrCreateBackendSessionId(window.localStorage);
     setCart(nextCart);
     window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(nextCart));
+    await saveCart(sessionId, nextCart);
+  }
+
+  async function clearCart(): Promise<void> {
+    const sessionId = getOrCreateBackendSessionId(window.localStorage);
+    setCart([]);
+    window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify([]));
+    await clearBackendCart(sessionId);
   }
 
   return (
@@ -48,7 +72,7 @@ export default function CartPage() {
                 <h1>Your cart</h1>
                 {restaurant && <p>{restaurant.name} · {restaurant.deliveryMinutes}</p>}
               </div>
-              {cart.length > 0 && <button className="ghost-button" type="button" onClick={() => persist([])}>Clear cart</button>}
+              {cart.length > 0 && <button className="ghost-button" type="button" onClick={() => void clearCart()}>Clear cart</button>}
             </div>
 
             {!mounted || cart.length === 0 ? (
@@ -70,11 +94,11 @@ export default function CartPage() {
                         <p>{formatMoney(getCartLineTotal(cartItem))}</p>
                       </div>
                       <div className="quantity-controls">
-                        <button type="button" onClick={() => persist(updateCartItemQuantity(cart, cartItem.id, -1))}>-</button>
+                        <button type="button" onClick={() => void persist(updateCartItemQuantity(cart, cartItem.id, -1))}>-</button>
                         <span>{cartItem.quantity}</span>
-                        <button type="button" onClick={() => persist(updateCartItemQuantity(cart, cartItem.id, 1))}>+</button>
+                        <button type="button" onClick={() => void persist(updateCartItemQuantity(cart, cartItem.id, 1))}>+</button>
                       </div>
-                      <button className="ghost-button" type="button" onClick={() => persist(removeCartItem(cart, cartItem.id))}>Remove</button>
+                      <button className="ghost-button" type="button" onClick={() => void persist(removeCartItem(cart, cartItem.id))}>Remove</button>
                     </div>
                   );
                 })}

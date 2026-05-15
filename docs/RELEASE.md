@@ -7,6 +7,9 @@
 - Fixed the restaurant menu page rendering regression and removed duplicate menu item links from the smoke path.
 - Repaired TypeScript integration imports for API normalization and checkout totals.
 - Stabilized Playwright by pinning the Turbopack project root and running the smoke suite serially.
+- Wired item add, cart review, checkout, order confirmation, and order history to backend cart/order APIs as the primary path with local fallback mirrors.
+- Added API client and browser smoke coverage for backend cart persistence, backend order creation, and confirmation refresh by order ID.
+- Reconciled docs around backend-backed behavior, local fallback behavior, and remaining deployed-demo verification work.
 
 ### Verification
 ```bash
@@ -32,6 +35,7 @@ npm run test:e2e
 
 ### Highlights
 - Frontend reads restaurant data from the FastAPI backend with local fallback behavior for demo resilience.
+- Cart, checkout, and order confirmation use backend APIs as the primary path with local fallback behavior for demo resilience.
 - PostgreSQL-backed restaurant/order persistence with repeatable SQL migration runner.
 - Redis-backed session carts with PostgreSQL fallback and JSON emergency fallback.
 - Docker Compose stack for web, API, Postgres, and Redis.

@@ -1,4 +1,8 @@
+'use client';
+
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { isSignedIn } from '@/lib/auth';
 import { routes } from '@/lib/routes';
 
 interface MarketplaceNavProps {
@@ -6,6 +10,12 @@ interface MarketplaceNavProps {
 }
 
 export function MarketplaceNav({ active = 'Home' }: MarketplaceNavProps) {
+  const [signedIn, setSignedIn] = useState(false);
+
+  useEffect(() => {
+    setSignedIn(isSignedIn(window.localStorage));
+  }, []);
+
   const navItems = [
     { label: 'Home', href: routes.home },
     { label: 'Search', href: routes.restaurants() },
@@ -33,7 +43,9 @@ export function MarketplaceNav({ active = 'Home' }: MarketplaceNavProps) {
           ))}
         </div>
         <div className="nav-actions">
-          <Link className={active === 'Account' ? 'account-link active' : 'account-link'} href={routes.account}>Account</Link>
+          <Link className={active === 'Account' ? 'account-link active' : 'account-link'} href={signedIn ? routes.account : routes.signIn(routes.account)}>
+            {signedIn ? 'Account' : 'Sign in'}
+          </Link>
           <Link className="nav-cart" href={routes.cart}>Cart</Link>
         </div>
       </nav>

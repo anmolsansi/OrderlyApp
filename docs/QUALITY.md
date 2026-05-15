@@ -22,8 +22,9 @@ PYTHONPYCACHEPREFIX=/private/tmp/orderly-pycache python3 -m py_compile backend/a
 - Voice parser tests for add/view/remove/clear commands
 - Cart logic tests for totals, required modifiers, and restaurant conflicts
 - Checkout primitive tests for mock order IDs and status timeline
+- Backend API client tests for cart load/save, checkout payloads, order normalization, and fallback behavior
 - Telemetry hook tests
-- Playwright E2E smoke tests for restaurant loading, cart, typed voice command, checkout, and status timeline
+- Playwright E2E smoke tests for restaurant loading, backend-backed cart reload, typed voice command, checkout, confirmation refresh, and status timeline
 - Playwright runs serially against the local Next.js server to avoid dev-manifest races during smoke validation.
 
 ## Accessibility checklist

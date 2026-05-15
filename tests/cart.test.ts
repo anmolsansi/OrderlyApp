@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { restaurants } from '../lib/mock-data';
 import {
+  BACKEND_SESSION_STORAGE_KEY,
   canAddItemToCart,
   clampCartQuantity,
+  createBackendSessionId,
+  getOrCreateBackendSessionId,
   getCartSubtotal,
   getItemTotal,
   updateCartItemQuantity,
@@ -81,5 +84,23 @@ describe('cart logic', () => {
     expect(validateCheckoutDetails(details).ok).toBe(true);
     expect(validateCheckoutDetails({ ...details, email: 'bad-email' }).ok).toBe(false);
     expect(validateCheckoutDetails({ ...details, postalCode: 'abc' }).ok).toBe(false);
+  });
+
+  it('creates and reuses backend cart session ids', () => {
+    const storage = new Map<string, string>();
+    const mockStorage = {
+      get length() { return storage.size; },
+      clear: () => storage.clear(),
+      getItem: (key: string) => storage.get(key) ?? null,
+      key: (index: number) => Array.from(storage.keys())[index] ?? null,
+      removeItem: (key: string) => storage.delete(key),
+      setItem: (key: string, value: string) => { storage.set(key, value); },
+    } as Storage;
+
+    const sessionId = getOrCreateBackendSessionId(mockStorage);
+    expect(sessionId).toMatch(/^session-/);
+    expect(getOrCreateBackendSessionId(mockStorage)).toBe(sessionId);
+    expect(storage.get(BACKEND_SESSION_STORAGE_KEY)).toBe(sessionId);
+    expect(createBackendSessionId()).toMatch(/^session-/);
   });
 });

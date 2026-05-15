@@ -11,6 +11,14 @@ npm run dev
 
 Open `http://localhost:3000`.
 
+For the backend-backed demo path, also run the FastAPI service locally or use Docker Compose:
+
+```bash
+docker compose up --build
+```
+
+Open `http://localhost:3100` for the full web/API/Postgres/Redis stack.
+
 ## Demo flow
 1. Start on the hero section.
    - Say: “OrderlyApp is a voice-first food ordering demo.”
@@ -24,6 +32,7 @@ Open `http://localhost:3000`.
    - Add Jalapeños and Extra cheese.
 5. Add to cart.
    - Show subtotal and item modifiers.
+   - Refresh the cart page to show the backend-backed cart session survives reload.
 6. Demonstrate voice/typed command.
    - Type or say: `add a large pepperoni pizza with jalapeños and extra cheese`.
    - Show parsed intent/confidence and cart update.
@@ -33,12 +42,13 @@ Open `http://localhost:3000`.
 8. Demonstrate mock checkout.
    - Click checkout.
    - Point out no real payment is charged.
-   - Place mock order.
+   - Place mock order and call out the backend-created order ID.
 9. Show order status.
    - Show order summary.
+   - Refresh the confirmation page to show order hydration by ID.
    - Wait for status timeline to progress.
 10. End with technical summary.
-   - Next.js frontend, FastAPI backend scaffold, Postgres/Redis infra, tests passing.
+   - Next.js frontend, FastAPI backend, Redis cart sessions, Postgres order persistence, JSON/local fallback, and tests passing.
 
 ## Recording checklist
 - Browser zoom around 90–100%.
