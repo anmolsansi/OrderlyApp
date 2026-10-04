@@ -2,6 +2,9 @@
   "name": "orderlyapp",
   "private": true,
   "version": "0.2.0",
+  "engines": {
+    "node": ">=20.9.0 <25"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
