@@ -71,3 +71,26 @@ jobs:
         run: python backend/scripts/migrate.py
       - name: Run BACKEND baseline
         run: python -m pytest backend/tests -q
+
+  browser-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Use Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Use reproducible npm resolver
+        run: npm install --global npm@11.20.0
+      - name: Install locked frontend dependencies
+        run: npm ci --ignore-scripts
+      - name: Provision Chromium
+        run: npm run test:e2e:install
+      - name: Launch and close Chromium
+        run: >-
+          node --input-type=module -e "import { chromium } from '@playwright/test';
+          const browser = await chromium.launch({ headless: true });
+          console.log('Chromium launch OK:', await browser.version());
+          await browser.close();"
