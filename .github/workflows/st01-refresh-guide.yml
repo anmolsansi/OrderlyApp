@@ -1,0 +1,59 @@
+name: ST-01 Guide Refresh
+
+on:
+  push:
+    branches:
+      - chore/st-01-baseline-contracts
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out work branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Remove stale pre-ST-01 readiness language
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path("development.md")
+          text = path.read_text(encoding="utf-8")
+          replacements = [
+              (
+                  "**Current execution prerequisites, not unanswered product design:** Obtain working isolated PG/Docker or supported equivalent for ST-01/ST-11, matching browser runtime for real E2E, authorized workflow publication and hosted CI execution access for ST-01, and deployment read access for release proof. The previous audit could not run Docker or browser cases. These are not solved by saving a plan. Public deployment configuration/credentials and existing platform aggregate rate limiting must be verified before exposing checkout; if unavailable, keep public checkout disabled until the supported mechanism is configured. No spending or infrastructure purchase is authorized here.",
+                  "**Current execution prerequisites, not unanswered product design:** ST-01 has now verified isolated PostgreSQL, browser runtime, workflow publication, and hosted CI execution. ST-11 still requires its own isolation proof, and later release work still requires deployment read access. Public deployment configuration/credentials and existing platform aggregate rate limiting must be verified before exposing checkout; if unavailable, keep public checkout disabled until the supported mechanism is configured. No spending or infrastructure purchase is authorized here."
+              ),
+              (
+                  "The guide is a **documented handoff plan**, not executable-ready work already tested. **Execution readiness: NOT READY until ST-01 establishes the environment and provider contracts are frozen at the relevant wave.** This protects the distinction between an implementation plan and completed setup. No issue creation is part of this deliverable.",
+                  "The guide remains a **staged handoff plan**. **Execution readiness: ST-01 is complete; later waves remain gated by their named dependencies and provider conformance/freeze points.** ST-01 now proves the executable baseline, while the remaining stabilization tickets are not complete until their own evidence gates pass."
+              ),
+              (
+                  "| Backend runner and clean-install reproduction | Planned, not verified | ST-01 proves exact pinned commands |",
+                  "| Backend runner and clean-install reproduction | Verified by ST-01 | Preserve the pinned commands and rerun them on each assessed candidate |"
+              ),
+              (
+                  "| True blockers/product ambiguity disclosed | Specified | Runtime/hosted access obtained; product scope already confirmed |",
+                  "| True blockers/product ambiguity disclosed | ST-01 runtime/hosted baseline resolved; later deployment access remains | Product scope is confirmed; satisfy each later ticket's explicit runtime/release prerequisites |"
+              ),
+              (
+                  "| Completion/publishing claims truthful | No implementation/release claimed | Keep all unproved tasks Not completed |",
+                  "| Completion/publishing claims truthful | ST-01 implementation evidence is recorded; no release claimed | Keep ST-02 through ST-13 and release gates incomplete until their own proof passes |"
+              )
+          ]
+          for old, new in replacements:
+              if old not in text:
+                  raise SystemExit(f"Expected guide text not found: {old[:80]}")
+              text = text.replace(old, new, 1)
+          path.write_text(text, encoding="utf-8")
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/st01-refresh-guide.yml
+          git add development.md
+          git commit -m "docs(stabilization): reconcile post-ST-01 readiness [46-47/50] (#20)"
+          git push origin HEAD:${GITHUB_REF_NAME}
