@@ -206,6 +206,28 @@ test('API discovery, customization, add, edit, and reload use canonical prices',
   expect(harness.cart.items[0].quantity).toBe(2);
 });
 
+test('real backend catalog and revisioned cart accept, persist, and edit canonical basket data', async ({ page }) => {
+  await page.goto('/restaurants/marios-pizza');
+  await expect(page.getByRole('heading', { name: /mario's pizza lab/i })).toBeVisible();
+  await page.getByRole('link', { name: /pepperoni feast/i }).click();
+  await page.getByLabel(/large/i).check();
+  await page.getByLabel(/jalapeños/i).check();
+  await page.getByRole('button', { name: /add to cart/i }).click();
+
+  await expect(page).toHaveURL(/\/cart/);
+  const cartLine = page.getByRole('article').filter({ hasText: 'Pepperoni Feast' });
+  await expect(page.getByText(/basket revision 1/i)).toBeVisible();
+  await expect(cartLine.getByText('$21.99', { exact: true })).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByText(/basket revision 1/i)).toBeVisible();
+  await expect(page.getByRole('article').filter({ hasText: 'Pepperoni Feast' }).getByText('$21.99', { exact: true })).toBeVisible();
+
+  await page.getByRole('button', { name: '+', exact: true }).click();
+  await expect(page.getByText(/basket revision 2/i)).toBeVisible();
+  await expect(page.getByRole('article').filter({ hasText: 'Pepperoni Feast' }).getByText('$43.98', { exact: true })).toBeVisible();
+});
+
 test('failed save leaves the last accepted basket visible and keeps intent separately', async ({ page }) => {
   const harness = await installApiHarness(page, initialServerCart());
   harness.failNextSave = true;
