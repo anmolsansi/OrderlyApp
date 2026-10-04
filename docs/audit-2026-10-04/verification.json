@@ -1,0 +1,25 @@
+{
+  "assessed_at": "2026-10-04",
+  "source_sha": "9222c10435e3a96396ab7c1b39e4d6d79d839771",
+  "branch": "main",
+  "remote_main_matches": true,
+  "unit": {
+    "files_passed": 9,
+    "tests_passed": 37
+  },
+  "typecheck": "passed",
+  "build": "passed",
+  "lint": "alias of typecheck; no independent coverage",
+  "e2e": {
+    "status": "blocked",
+    "launch_failures": 5,
+    "completed_product_cases": 0,
+    "reason": "missing chromium_headless_shell-1217 executable after approved loopback retry"
+  },
+  "local_browser": "homepage rendering only",
+  "hosted_browser": "recorded deployment redirected to Vercel sign-in",
+  "full_stack": "not run; Docker daemon absent",
+  "security": "source assessment and npm advisories; formal CSO helper startup failed INVALID_SCHEMA",
+  "source_changes": false,
+  "publication": false
+}

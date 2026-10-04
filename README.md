@@ -1,5 +1,7 @@
 # OrderlyApp
 
+> **Planning update — October 4, 2026:** [development.md](development.md) is the current stabilization plan for a public manual-ordering mock demo; voice is deferred. The [dated audit](docs/audit-2026-10-04/ASSESSMENT.md) qualifies the historical implementation and verification claims below. Stabilization is planned, not implemented or accepted on a public deployment.
+
 Voice-first food ordering demo app for browsing pizza restaurants, customizing items, managing a cart, placing a mock checkout, and tracking mock order status.
 
 ## Status
