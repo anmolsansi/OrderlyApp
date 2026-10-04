@@ -10,10 +10,10 @@ interface MarketplaceNavProps {
 }
 
 export function MarketplaceNav({ active = 'Home' }: MarketplaceNavProps) {
-  const [signedIn, setSignedIn] = useState(false);
+  const [profileSelected, setProfileSelected] = useState(false);
 
   useEffect(() => {
-    setSignedIn(isSignedIn(window.localStorage));
+    setProfileSelected(isSignedIn(window.localStorage));
   }, []);
 
   const navItems = [
@@ -43,8 +43,8 @@ export function MarketplaceNav({ active = 'Home' }: MarketplaceNavProps) {
           ))}
         </div>
         <div className="nav-actions">
-          <Link className={active === 'Account' ? 'account-link active' : 'account-link'} href={signedIn ? routes.account : routes.signIn(routes.account)}>
-            {signedIn ? 'Account' : 'Sign in'}
+          <Link className={active === 'Account' ? 'account-link active' : 'account-link'} href={profileSelected ? routes.account : routes.signIn(routes.account)}>
+            {profileSelected ? 'Profile' : 'Demo profile'}
           </Link>
           <Link className="nav-cart" href={routes.cart}>Cart</Link>
         </div>
