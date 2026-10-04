@@ -1,0 +1,204 @@
+name: ST-01 Baseline
+
+on:
+  push:
+    branches:
+      - chore/st-01-baseline-contracts
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Use Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Use reproducible npm resolver
+        run: npm install --global npm@11.20.0
+      - name: Install locked frontend dependencies
+        run: npm ci --ignore-scripts
+      - name: Fail on high or critical dependency advisories
+        run: npm audit --audit-level=high
+      - name: Validate contract fixtures in TypeScript
+        run: npm run test:contracts
+      - name: Run frontend unit suite
+        run: npm run test
+      - name: Typecheck frontend
+        run: npm run typecheck
+      - name: Build frontend
+        run: npm run build
+
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: orderlyapp_test
+          POSTGRES_USER: orderly
+          POSTGRES_PASSWORD: orderly
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U orderly -d orderlyapp_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://orderly:orderly@127.0.0.1:5432/orderlyapp_test
+      ORDERLY_TEST_DATABASE_URL: postgresql://orderly:orderly@127.0.0.1:5432/orderlyapp_test
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Use Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements-test.lock
+      - name: Install backend runtime and pinned test dependencies
+        run: |
+          python -m pip install -e ./backend
+          python -m pip install -r backend/requirements-test.lock
+      - name: Apply existing database migrations
+        run: python backend/scripts/migrate.py
+      - name: Run BACKEND baseline
+        run: python -m pytest backend/tests -q
+
+  browser-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Use Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Use reproducible npm resolver
+        run: npm install --global npm@11.20.0
+      - name: Install locked frontend dependencies
+        run: npm ci --ignore-scripts
+      - name: Provision Chromium
+        run: npm run test:e2e:install
+      - name: Launch and close Chromium
+        run: >-
+          node --input-type=module -e "import { chromium } from '@playwright/test';
+          const browser = await chromium.launch({ headless: true });
+          console.log('Chromium launch OK:', await browser.version());
+          await browser.close();"
+
+  e2e:
+    needs: browser-runtime
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: orderlyapp_e2e
+          POSTGRES_USER: orderly
+          POSTGRES_PASSWORD: orderly
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U orderly -d orderlyapp_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://orderly:orderly@127.0.0.1:5432/orderlyapp_e2e
+      NEXT_PUBLIC_API_BASE_URL: http://127.0.0.1:8000
+      NEXT_PUBLIC_APP_URL: http://127.0.0.1:3200
+      NEXT_PUBLIC_VOICE_MODE: mock
+      NEXT_PUBLIC_CHECKOUT_MODE: mock
+      NEXT_PUBLIC_AUTH_PROVIDER: none
+      ORDERLY_CORS_ORIGINS: http://127.0.0.1:3200
+      PLAYWRIGHT_BASE_URL: http://127.0.0.1:3200
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Use Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Use reproducible npm resolver
+        run: npm install --global npm@11.20.0
+      - name: Install locked frontend dependencies
+        run: npm ci --ignore-scripts
+      - name: Use Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements-test.lock
+      - name: Install backend runtime
+        run: python -m pip install -e ./backend
+      - name: Prepare API database
+        run: |
+          python backend/scripts/migrate.py
+          python backend/scripts/seed_postgres.py
+      - name: Start API and prove health
+        shell: bash
+        run: |
+          (cd backend && uvicorn app.main:app --host 127.0.0.1 --port 8000 > /tmp/orderly-api.log 2>&1 &)
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8000/health > /tmp/orderly-health.json; then
+              cat /tmp/orderly-health.json
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/orderly-api.log
+          exit 1
+      - name: Provision Chromium
+        run: npm run test:e2e:install
+      - name: Run product E2E baseline
+        run: npm run test:e2e
+      - name: Collect E2E runtime evidence
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          cp /tmp/orderly-api.log artifacts/orderly-api.log 2>/dev/null || true
+          cp /tmp/orderly-health.json artifacts/orderly-health.json 2>/dev/null || true
+      - name: Upload E2E baseline evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: st01-e2e-${{ github.run_id }}
+          path: |
+            artifacts
+            test-results
+          if-no-files-found: ignore
+          retention-days: 14
+
+  baseline-evidence:
+    if: always()
+    needs: [web, backend, browser-runtime, e2e]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Record assessed source and job results
+        shell: bash
+        run: |
+          {
+            echo "## ST-01 baseline evidence"
+            echo "- Source SHA: \`${GITHUB_SHA}\`"
+            echo "- Ref: \`${GITHUB_REF}\`"
+            echo "- Node baseline: 22"
+            echo "- npm resolver: 11.20.0"
+            echo "- Python baseline: 3.12"
+            echo "- WEB: ${{ needs.web.result }}"
+            echo "- BACKEND: ${{ needs.backend.result }}"
+            echo "- Chromium launch: ${{ needs.browser-runtime.result }}"
+            echo "- Product E2E: ${{ needs.e2e.result }}"
+          } >> "$GITHUB_STEP_SUMMARY"

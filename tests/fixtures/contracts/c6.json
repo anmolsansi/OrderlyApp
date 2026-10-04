@@ -1,0 +1,58 @@
+{
+  "contract": "C6",
+  "schema_version": 1,
+  "synthetic": true,
+  "positive": {
+    "idempotency_key": "11111111-1111-4111-8111-111111111111",
+    "first_response": {
+      "status": 201,
+      "receipt": {
+        "schema_version": 1,
+        "id": "fixture-o1",
+        "status": "Placed",
+        "created_at": "2030-01-01T00:00:00Z",
+        "pricing_version": "mock-v1",
+        "totals": {
+          "subtotal_cents": 1000,
+          "discount_cents": 500,
+          "delivery_fee_cents": 199,
+          "service_fee_cents": 249,
+          "tax_cents": 44,
+          "tip_cents": 200,
+          "total_cents": 1192
+        }
+      }
+    },
+    "replay_response": {
+      "status": 200,
+      "receipt": {
+        "schema_version": 1,
+        "id": "fixture-o1",
+        "status": "Placed",
+        "created_at": "2030-01-01T00:00:00Z",
+        "pricing_version": "mock-v1",
+        "totals": {
+          "subtotal_cents": 1000,
+          "discount_cents": 500,
+          "delivery_fee_cents": 199,
+          "service_fee_cents": 249,
+          "tax_cents": 44,
+          "tip_cents": 200,
+          "total_cents": 1192
+        }
+      }
+    }
+  },
+  "negative": [
+    {
+      "name": "idempotency_conflict",
+      "status": 409,
+      "error": {
+        "code": "idempotency_conflict",
+        "message": "Idempotency key was reused with a different payload",
+        "request_id": "synthetic-request-1",
+        "fields": []
+      }
+    }
+  ]
+}

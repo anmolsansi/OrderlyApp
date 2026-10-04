@@ -1,0 +1,47 @@
+{
+  "contract": "C3",
+  "schema_version": 1,
+  "synthetic": true,
+  "positive": {
+    "schema_version": 1,
+    "restaurants": [
+      {
+        "id": "fixture-r1",
+        "name": "Fixture cafe",
+        "is_open": true,
+        "delivery_fee_cents": 199,
+        "menu": [
+          {
+            "id": "fixture-i1",
+            "name": "Fixture meal",
+            "price_cents": 1000,
+            "available": true,
+            "modifier_groups": []
+          }
+        ]
+      }
+    ]
+  },
+  "negative": [
+    {
+      "name": "restaurant_not_found",
+      "status": 404,
+      "error": {
+        "code": "restaurant_not_found",
+        "message": "Restaurant was not found",
+        "request_id": "synthetic-request-1",
+        "fields": []
+      }
+    },
+    {
+      "name": "invalid_cart",
+      "status": 422,
+      "error": {
+        "code": "invalid_cart",
+        "message": "Cart contains invalid catalog choices",
+        "request_id": "synthetic-request-2",
+        "fields": ["items.0.menu_item_id"]
+      }
+    }
+  ]
+}

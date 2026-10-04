@@ -2,6 +2,9 @@
   "name": "orderlyapp",
   "private": true,
   "version": "0.2.0",
+  "engines": {
+    "node": ">=20.9.0 <25"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -9,11 +12,15 @@
     "lint": "npm run typecheck",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:web": "npm run test && npm run typecheck && npm run build",
+    "test:contracts": "vitest run tests/contract-fixtures.test.ts",
+    "test:backend": "python -m pytest backend/tests",
     "test:e2e": "playwright test",
-    "test:e2e:list": "playwright test --list"
+    "test:e2e:list": "playwright test --list",
+    "test:e2e:install": "playwright install --with-deps chromium"
   },
   "dependencies": {
-    "next": "16.2.2",
+    "next": "16.3.8",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
@@ -23,6 +30,6 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "typescript": "^5",
-    "vitest": "^4.1.5"
+    "vitest": "4.1.11"
   }
 }

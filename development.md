@@ -2,7 +2,7 @@
 
 Revision: 2 • Updated: 2026-10-04 • Assessed source: `9222c10435e3a96396ab7c1b39e4d6d79d839771` on `main` • Release status: **Not completed**.
 
-This is the single execution guide for taking the existing application to a stable **public mock demo**. It contains planned engineering tickets, not completed implementation. Saving this guide changes no application code. All implementation tickets and integration/release gates below are **Not completed**. No Linear issues, implementation threads, commits, or deployments are created by this document.
+This is the single execution guide for taking the existing application to a stable **public mock demo**. **ST-01 is now implemented and verified.** ST-02 through ST-13 and the integration/release gates remain **Not completed**. This guide began as planning-only documentation; the dated ST-01 evidence below records the authorized implementation that followed. No later ticket is implied complete by ST-01.
 
 Think of the app as a shop made from Lego. The screens already look like a shop, but some connections behind them can lose a basket, show another visitor's receipt, or pretend an order succeeded when the server failed. First we strengthen those connections. Then we add more Lego.
 
@@ -63,7 +63,7 @@ Frontend baseline: Next 16.2.2, React 19.2.4, TypeScript, Vitest and Playwright.
 
 **Evidence limits:** Full-stack tests were not run because Docker was unavailable. Matching Playwright Chromium was missing. The recorded Vercel deployment redirected to developer sign-in; other deployments were not thereby proven inaccessible. Formal CSO startup failed, so no formal CSO pass is claimed. Dependency advisory counts in the saved audit are historical and must be refreshed. The knowledge graph is discovery assistance, not execution evidence; remote indexing previously failed approval and was not bypassed.
 
-**Command vocabulary used by tickets:** `WEB` = `npm run test && npm run typecheck && npm run build` from repository root; `E2E` = `npm run test:e2e` from root. These are existing scripts, not new commands. `BACKEND` is a proposed command established and proven in ST-01: `python -m pytest backend/tests` using its pinned environment. Until ST-01 proves it, this is a **planned interface**, not a verified working runner. For browser provisioning ST-01 will verify `npx playwright install chromium`; Linux CI may require the documented dependency-install variant. Install/build commands belong to implementation, not this save operation.
+**Command vocabulary used by tickets:** `WEB` = `npm run test:web`; `CONTRACTS-TS` = `npm run test:contracts`; `BACKEND` = `python -m pytest backend/tests -q`; `E2E-INSTALL` = `npm run test:e2e:install`; `E2E` = `npm run test:e2e`. ST-01 verified these interfaces on hosted Node 22 / Python 3.12 with PostgreSQL 16 and Playwright Chromium. Exact clean-install commands and resolver details are recorded in `docs/runbooks/ci.md`.
 
 ## 3. Architecture Decision Register
 
@@ -129,7 +129,7 @@ flowchart LR
 
 A contract is a promise between two parts of the program. For example: “give me a valid basket revision and I either save the whole change or explain why I rejected it.” A consumer should need this promise and examples, not private database implementation details.
 
-All records below are **design-complete / implementation-unfrozen**. ST-01 turns inline examples into executable fixtures before dependent work starts. Provider tests must pass before freeze. One source-of-truth owner is named for each contract; ST-01 owns initial fixture scaffolding, then the provider owns changes. No contract is falsely labelled already frozen.
+The contract designs below remain authoritative. **C0 is frozen by completed ST-01 at schema version 1. C1–C8 now have executable synthetic version-1 scaffolds but remain implementation-unfrozen until their named provider tickets pass provider conformance.** One source-of-truth owner is named for each contract; after the ST-01 scaffold handoff, the provider owns changes.
 
 **Shared HTTP rules:** JSON envelope has `schema_version: 1`. API base is `/api/orderly/v1`; backend routes mirror `/v1`. Protected routes use the verified guest cookie, never a request `session_id` or `owner_id`. Error response is `{ "error": { "code": "cart_conflict", "message": "Basket changed in another tab", "request_id": "synthetic-request-1", "fields": [] } }`, with optional `current_cart` on cart conflicts. No tracebacks, tokens or DB URLs are returned. Reject unknown write fields. Limit request body to 64 KiB; notes 500 chars, address instructions 500 chars; max 50 lines, quantities 1–10, no duplicate group/option IDs. Strict money integers; invalid floats/negative amounts are rejected. Same-origin unsafe requests require exact allowed Origin; proxy forwards cookies and Set-Cookie safely, strips spoofable internal identity headers and never redirects to arbitrary targets.
 
@@ -362,7 +362,7 @@ flowchart TD
 
 ### Machine-readable edge table
 
-Each row is a directed edge. `fixture` means provider-design schema plus executable ST-01 synthetic fixture; provider freeze/conformance is mandatory before merge. `released` means previous shared-file writer finished its reviewed diff. None of these states is already achieved.
+Each row is a directed edge. `fixture` means provider-design schema plus executable ST-01 synthetic fixture; provider freeze/conformance is mandatory before merge. `released` means previous shared-file writer finished its reviewed diff. **ST-01 C0/fixture handoff is achieved; later provider freeze/release states are not.**
 
 | From | To | Contract / gate | Start dependency | Merge dependency | Runtime dependency | Verification |
 |---|---|---|---|---|---|---|
@@ -410,12 +410,12 @@ Consumers may prepare read-only designs after W0 fixtures; implementation starts
 
 ## 9. Task index and remaining work
 
-All tasks are **Not completed**. Effort is an estimate for one engineer familiar with the stack, excluding queue time and unavailable infrastructure. Split a ticket before starting if its concrete diff will exceed three engineer-days; preserve its contract seam, owned files and acceptance tests.
+**ST-01 is Completed.** ST-02 through ST-13, INT-01, INT-02, and RELEASE-GATE remain **Not completed**. Effort is an estimate for one engineer familiar with the stack, excluding queue time and unavailable infrastructure. Split a ticket before starting if its concrete diff will exceed three engineer-days; preserve its contract seam, owned files and acceptance tests.
 
 | Ticket / outcome / status | Wave | Dependencies | Effort | Critical path |
 |---|---|---|---|---|
 
-| [ST-01 — Reproduce the baseline and publish executable contracts](#st-01) — **Not completed** | W0 | None | 3d | Yes |
+| [ST-01 — Reproduce the baseline and publish executable contracts](#st-01) — **Completed** | W0 | None | 3d | Yes |
 
 | [ST-02 — Give each visitor a private server-issued guest session](#st-02) — **Not completed** | W1 | ST-01 via C0 | 3d | Yes |
 
@@ -451,7 +451,7 @@ P0: ownership/password removal, truthful checkout, canonical money/validation, d
 
 ## 10. Full implementation packets
 
-**Common execution rule:** Each behavior ticket adds its required automated checks to the ST-01 CI workflow as it lands; serialize workflow edits and hand off the resulting job inventory to ST-12. This shared workflow permission does not authorize unrelated dependency or deployment changes. These packets are implementation instructions for a future authorized coding run. Do not execute them merely because this guide is saved. Verify candidate branch/SHA and changed paths before starting. Read relevant contracts above; contract fixtures are delivered by ST-01. Use isolated synthetic databases. Every behavior ticket owns its tests now, rather than deferring tests to ST-12.
+**Common execution rule:** Each behavior ticket adds its required automated checks to the ST-01 CI workflow as it lands; serialize workflow edits and hand off the resulting job inventory to ST-12. This shared workflow permission does not authorize unrelated dependency or deployment changes. **ST-01 has been authorized and executed; all later packets still require their own authorized coding run.** Verify candidate branch/SHA and changed paths before starting. Read relevant contracts above; contract fixtures are delivered by ST-01. Use isolated synthetic databases. Every behavior ticket owns its tests now, rather than deferring tests to ST-12.
 
 **Shared completion evidence form:** Record ticket, criterion number, exact SHA/build and uncommitted diff if applicable; environment/runtime; starting fixture/actions; expected result; observed result; passed/failed/blocked/not-run; timestamp+timezone; report/trace/screenshot links; coverage limits and reviewer. Attach migration/rollback proof when applicable. Downstream handoff carries schema/fixtures/error examples, not private implementation assumptions.
 
@@ -459,7 +459,7 @@ P0: ownership/password removal, truthful checkout, canonical money/validation, d
 
 ### ST-01 — Reproduce the baseline and publish executable contracts
 
-**Status:** Not completed. **Execution owner:** Unassigned. **Objective:** A clean environment can install pinned test dependencies and run WEB and BACKEND; results identify source SHA.
+**Status:** Completed. **Execution owner:** Anmol Sansi. **Objective:** A clean environment can install pinned test dependencies and run WEB and BACKEND; results identify source SHA.
 
 **Why this task exists:** We cannot repair a journey we cannot run. Historical unit success did not exercise a browser or durable backend. This ticket establishes a reproducible environment and hosted baseline checks before behavior changes, and identifies prerequisite dependency upgrades before they cause late rework.
 
@@ -502,19 +502,19 @@ P0: ownership/password removal, truthful checkout, canonical money/validation, d
 
 **Implementation steps / TODOs:**
 
-- [ ] **ST-01.01** — Record current SHA, uncommitted changes, supported Python/Node versions and baseline command results; do not call historical results current.
+- [x] **ST-01.01** — Record current SHA, uncommitted changes, supported Python/Node versions and baseline command results; do not call historical results current.
 
-- [ ] **ST-01.02** — Pin a backend test environment with pytest and HTTP client compatible with installed FastAPI; create isolated DB fixtures with synthetic data and cleanup. Record exact clean-install instructions and prove BACKEND command.
+- [x] **ST-01.02** — Pin a backend test environment with pytest and HTTP client compatible with installed FastAPI; create isolated DB fixtures with synthetic data and cleanup. Record exact clean-install instructions and prove BACKEND command.
 
-- [ ] **ST-01.03** — Materialize every C0–C8 inline positive example and negative envelopes; add schema/assertion helpers without implementing product behavior. Make fixture IDs internally consistent and assert the 1192-cent example.
+- [x] **ST-01.03** — Materialize every C0–C8 inline positive example and negative envelopes; add schema/assertion helpers without implementing product behavior. Make fixture IDs internally consistent and assert the 1192-cent example.
 
-- [ ] **ST-01.04** — Provision matching Playwright Chromium in development/test runtime; retain launch failure separately from product failures. Establish API-backed E2E environment with isolated Postgres and gateway env, using actual existing e2e files.
+- [x] **ST-01.04** — Provision matching Playwright Chromium in development/test runtime; retain launch failure separately from product failures. Establish API-backed E2E environment with isolated Postgres and gateway env, using actual existing e2e files.
 
-- [ ] **ST-01.05** — Keep existing behavior tests; record expected current failures as defects, not green assertions for unsafe behavior. Update this guide with verified runner/config details.
+- [x] **ST-01.05** — Keep existing behavior tests; record expected current failures as defects, not green assertions for unsafe behavior. Update this guide with verified runner/config details.
 
-- [ ] **ST-01.06** — Assess current frontend/backend dependencies against official advisories and runtime compatibility. Record exposure, prerequisite upgrades and release blockers. Apply compatible prerequisite lock/config upgrades now; if source compatibility fixes are necessary, split out a bounded prerequisite with explicit file ownership before W1. Do not defer a known foundational upgrade until ST-12 or silently expand ST-01 into product implementation.
+- [x] **ST-01.06** — Assess current frontend/backend dependencies against official advisories and runtime compatibility. Record exposure, prerequisite upgrades and release blockers. Apply compatible prerequisite lock/config upgrades now; if source compatibility fixes are necessary, split out a bounded prerequisite with explicit file ownership before W1. Do not defer a known foundational upgrade until ST-12 or silently expand ST-01 into product implementation.
 
-- [ ] **ST-01.07** — Establish clean-install hosted baseline CI for unit tests, typecheck/build, backend harness/contracts and Chromium product assertions. Record known baseline product failures explicitly: failing cases remain visible and cannot be relabelled successful or silently skipped. Baseline readiness means the environment/jobs execute reproducibly, not that the unsafe application passes acceptance. Each later behavior ticket adds its tests to this workflow when implemented; ST-12 completes the release matrix and genuine lint coverage.
+- [x] **ST-01.07** — Establish clean-install hosted baseline CI for unit tests, typecheck/build, backend harness/contracts and Chromium product assertions. Record known baseline product failures explicitly: failing cases remain visible and cannot be relabelled successful or silently skipped. Baseline readiness means the environment/jobs execute reproducibly, not that the unsafe application passes acceptance. Each later behavior ticket adds its tests to this workflow when implemented; ST-12 completes the release matrix and genuine lint coverage.
 
 **Invariants affected:** INV-12; acceptance/tests below are enforcement proof.
 
@@ -528,19 +528,19 @@ P0: ownership/password removal, truthful checkout, canonical money/validation, d
 
 **Required tests:** Unit: fixture schema, money example and environment validation. Integration: isolated FastAPI test request and real PG connection. Contract: positive/negative fixtures parse consistently in Python/TS. E2E: browser launches and runs a product assertion, with current defects recorded. Regression: existing WEB results are captured unchanged.
 
-**Verification commands:** Existing `WEB`, `npm run test:e2e:list`, `E2E`; establish and prove planned `BACKEND` and browser provisioning as documented in reconnaissance. Initial missing-runtime result is blocked, not pass. Existing scripts are verified by package configuration; historical pass results are in section2. New backend commands remain conditional until ST-01. Record focused test selectors actually created rather than inventing existing file names or passing counts.
+**Verification commands:** `WEB`, `CONTRACTS-TS`, `BACKEND`, `E2E-INSTALL`, and `E2E` are verified ST-01 interfaces. Hosted evidence uses Node 22, npm 11.20.0, Python 3.12, PostgreSQL 16, and Playwright Chromium; exact reproduction commands are in `docs/runbooks/ci.md`. Missing runtime remains blocked, never pass.
 
 **Acceptance criteria / completion proof:**
 
-1. **ST-01-AC1 — PASS/FAIL:** A clean environment can install pinned test dependencies and run WEB and BACKEND; results identify source SHA. Attach the shared evidence form.
+1. **ST-01-AC1 — PASS:** A clean environment can install pinned test dependencies and run WEB and BACKEND; results identify source SHA. Attach the shared evidence form.
 
-2. **ST-01-AC2 — PASS/FAIL:** All C0–C8 fixture files exist, validate, contain synthetic data and are consumable without provider internals. Attach the shared evidence form.
+2. **ST-01-AC2 — PASS:** All C0–C8 fixture files exist, validate, contain synthetic data and are consumable without provider internals. Attach the shared evidence form.
 
-3. **ST-01-AC3 — PASS/FAIL:** E2E launches a browser; any failing product assertion has a reproduction and is not called launch success. Attach the shared evidence form.
+3. **ST-01-AC3 — PASS:** E2E launches a browser; any failing product assertion has a reproduction and is not called launch success. Attach the shared evidence form.
 
-4. **ST-01-AC4 — PASS/FAIL:** Hosted baseline CI runs on the identified SHA with pinned dependencies and real PG/browser provisioning; all failing product cases have visible results and assigned owning tickets. Baseline defects remain open and release stays Not completed; missing infrastructure is not an accepted product failure. Attach the shared evidence form.
+4. **ST-01-AC4 — PASS:** Hosted baseline CI runs on the identified SHA with pinned dependencies and real PG/browser provisioning; all failing product cases have visible results and assigned owning tickets. Baseline defects remain open and release stays Not completed; missing infrastructure is not an accepted product failure. Attach the shared evidence form.
 
-5. **ST-01-AC5 — PASS/FAIL:** Current dependency assessment is recorded; prerequisite upgrades and their compatibility checks are complete before W1, and remaining release blockers have explicit owners. Attach the shared evidence form.
+5. **ST-01-AC5 — PASS:** Current dependency assessment is recorded; prerequisite upgrades and their compatibility checks are complete before W1, and remaining release blockers have explicit owners. Attach the shared evidence form.
 
 **Rollback / recovery:** Revert test/config scaffolding if needed; preserve evidence and original lockfiles; remove only isolated test records, never production data.
 
@@ -1599,7 +1599,7 @@ Summed implementation estimates are 35 engineer-days; integration/release verifi
 
 ## 15. Risks and true blockers
 
-**Current execution prerequisites, not unanswered product design:** Obtain working isolated PG/Docker or supported equivalent for ST-01/ST-11, matching browser runtime for real E2E, authorized workflow publication and hosted CI execution access for ST-01, and deployment read access for release proof. The previous audit could not run Docker or browser cases. These are not solved by saving a plan. Public deployment configuration/credentials and existing platform aggregate rate limiting must be verified before exposing checkout; if unavailable, keep public checkout disabled until the supported mechanism is configured. No spending or infrastructure purchase is authorized here.
+**Current execution prerequisites, not unanswered product design:** ST-01 has now verified isolated PostgreSQL, browser runtime, workflow publication, and hosted CI execution. ST-11 still requires its own isolation proof, and later release work still requires deployment read access. Public deployment configuration/credentials and existing platform aggregate rate limiting must be verified before exposing checkout; if unavailable, keep public checkout disabled until the supported mechanism is configured. No spending or infrastructure purchase is authorized here.
 
 **Data compatibility risk:** Legacy carts/orders have insufficient verified ownership and incomplete receipt fields. Preserve them offline and explicitly classify legacy data; do not migrate guesses into a new guest. For a demo this is a defensible reset of reachable data, but backups still matter.
 
@@ -1613,7 +1613,7 @@ No additional user product decision blocks this document: audience, profiles and
 
 ## 16. Delegation readiness report
 
-The guide is a **documented handoff plan**, not executable-ready work already tested. **Execution readiness: NOT READY until ST-01 establishes the environment and provider contracts are frozen at the relevant wave.** This protects the distinction between an implementation plan and completed setup. No issue creation is part of this deliverable.
+The guide remains a **staged handoff plan**. **Execution readiness: ST-01 is complete; later waves remain gated by their named dependencies and provider conformance/freeze points.** ST-01 now proves the executable baseline, while the remaining stabilization tickets are not complete until their own evidence gates pass.
 
 | Readiness check | Document state | Execution condition |
 |---|---|---|
@@ -1625,11 +1625,44 @@ The guide is a **documented handoff plan**, not executable-ready work already te
 | Retry, order, money, identity and retention semantics | Specified | Negative/concurrency/lifecycle tests pass |
 | DAG, start/merge/runtime semantics and shared-file release gates | Specified | Enforce wave ownership and documented handoff |
 | Every invariant and named defect has verification route | Specified in test matrix | Tests run on same candidate |
-| Backend runner and clean-install reproduction | Planned, not verified | ST-01 proves exact pinned commands |
+| Backend runner and clean-install reproduction | Verified by ST-01 | Preserve the pinned commands and rerun them on each assessed candidate |
 | Cross-component integration and public release proof | Planned, not verified | INT-01, INT-02, ST-13 and RELEASE-GATE pass |
-| True blockers/product ambiguity disclosed | Specified | Runtime/hosted access obtained; product scope already confirmed |
-| Completion/publishing claims truthful | No implementation/release claimed | Keep all unproved tasks Not completed |
+| True blockers/product ambiguity disclosed | ST-01 runtime/hosted baseline resolved; later deployment access remains | Product scope is confirmed; satisfy each later ticket's explicit runtime/release prerequisites |
+| Completion/publishing claims truthful | ST-01 implementation evidence is recorded; no release claimed | Keep ST-02 through ST-13 and release gates incomplete until their own proof passes |
 
 **Provider→consumer test:** Section6 records schema, positive/negative errors, fixtures, retry/security/lifecycle and conformance for every named interface. Section7 records each consumer gate. Consumers do not need private SQL or pricing code; they need the public contracts and executable fixtures ST-01 supplies. A provider may not freeze incomplete examples and ask the consumer to guess missing fields. If fixture/conformance fails, repair it in the provider before releasing the dependent wave.
 
 **Maintenance rules:** Update only the affected packet/contract/DAG rows when discoveries change the plan; preserve dated evidence and failed runs. Any new task gets an ID, explicit ownership and acceptance proof. No unchecked release blocker disappears merely because an engineer wrote the code.
+
+## ST-01 implementation evidence — 2026-10-04
+
+This section records the executed foundation evidence for **ST-01 — Reproduce the baseline and publish executable contracts**. It does not mark ST-02 through ST-13 complete and does not claim the current product is production-ready.
+
+### Verified source and runners
+
+- Starting `main` SHA: `78b8fa6a7d6a779a8985d34413d81d8b23673403`.
+- Work branch: `chore/st-01-baseline-contracts`.
+- Frontend runtime: Node 22; supported range in `package.json` is `>=20.9.0 <25`.
+- Lock resolver used for ST-01 evidence: npm `11.20.0`.
+- Backend hosted runtime: Python `3.12`; application metadata remains `>=3.9`.
+- Database baseline: PostgreSQL `16`.
+- Browser baseline: Playwright Chromium installed with `playwright install --with-deps chromium`.
+- WEB verification: `npm run test`, `npm run typecheck`, `npm run build`, plus `npm audit --audit-level=high`.
+- CONTRACTS-TS verification: `npm run test:contracts`.
+- BACKEND verification: `python -m pytest backend/tests -q` after applying repository migrations against real Postgres.
+- E2E verification: the existing Playwright product suite with a seeded real Postgres backend and live FastAPI health check.
+
+Hosted run `37199252860`, assessed at SHA `ca097fe195f30fbab198e3b635a72b6d47788d41`, passed WEB, BACKEND/Postgres, standalone Chromium launch, API-backed product E2E, and the baseline evidence summary. C0–C8 executable fixtures live under `tests/fixtures/contracts/` and are consumed by both Python and TypeScript conformance tests.
+
+### Dependency assessment and decisions
+
+- Next.js moved from `16.2.2` to `16.3.8`, the available non-major fix path identified by the repository's current advisory evidence.
+- Vitest moved from the earlier `4.1.x` range to `4.1.11`, outside the recorded affected range.
+- The regenerated lockfile is committed and hosted WEB evidence passes `npm audit --audit-level=high`.
+- npm `10.9.9` crashed inside Arborist with `Cannot read properties of null (reading 'edgesOut')` while reconciling the old lockfile. ST-01 regenerated the lock with npm `11.20.0` instead of hand-editing it.
+- The earlier missing Chromium runtime is resolved by explicit provisioning and a separate browser-launch gate. Browser infrastructure failure is now distinct from product assertion failure.
+
+### Contract freeze status
+
+C0 is frozen by ST-01 at schema version `1`, including the explicit runner and mode/reproducibility fixture. C1–C8 are executable version-1 scaffolds only. Their named provider tickets remain responsible for provider conformance and their later freeze points exactly as defined in the contract registry above.
+

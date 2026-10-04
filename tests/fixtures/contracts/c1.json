@@ -1,0 +1,48 @@
+{
+  "contract": "C1",
+  "schema_version": 1,
+  "synthetic": true,
+  "positive": {
+    "schema_version": 1,
+    "expires_at": "2030-01-31T00:00:00Z",
+    "cookie": {
+      "http_only": true,
+      "secure_on_https": true,
+      "same_site": "Lax",
+      "path": "/api/orderly"
+    },
+    "fixture_jars": ["guest-A", "guest-B"]
+  },
+  "negative": [
+    {
+      "name": "missing_session",
+      "status": 401,
+      "error": {
+        "code": "session_required",
+        "message": "Guest session is required",
+        "request_id": "synthetic-request-1",
+        "fields": []
+      }
+    },
+    {
+      "name": "expired_session",
+      "status": 401,
+      "error": {
+        "code": "session_expired",
+        "message": "Guest session has expired",
+        "request_id": "synthetic-request-2",
+        "fields": []
+      }
+    },
+    {
+      "name": "forbidden_origin",
+      "status": 403,
+      "error": {
+        "code": "origin_forbidden",
+        "message": "Request origin is not allowed",
+        "request_id": "synthetic-request-3",
+        "fields": []
+      }
+    }
+  ]
+}

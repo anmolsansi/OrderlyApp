@@ -1,0 +1,43 @@
+{
+  "contract": "C7",
+  "schema_version": 1,
+  "synthetic": true,
+  "positive": {
+    "ok": true,
+    "data": {
+      "schema_version": 1,
+      "revision": 1,
+      "items": []
+    }
+  },
+  "negative": [
+    {
+      "name": "cart_conflict",
+      "ok": false,
+      "kind": "conflict",
+      "error": {
+        "code": "cart_conflict",
+        "message": "Basket changed",
+        "request_id": "synthetic-request-1",
+        "fields": [],
+        "currentCart": {
+          "schema_version": 1,
+          "revision": 2,
+          "items": []
+        }
+      }
+    },
+    {
+      "name": "network_uncertain_after_submit",
+      "ok": false,
+      "kind": "network",
+      "checkout_state": "uncertain",
+      "error": {
+        "code": "network_error",
+        "message": "Order result is uncertain; retry with the same key",
+        "request_id": "synthetic-request-2",
+        "fields": []
+      }
+    }
+  ]
+}

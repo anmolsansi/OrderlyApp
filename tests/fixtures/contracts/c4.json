@@ -1,0 +1,47 @@
+{
+  "contract": "C4",
+  "schema_version": 1,
+  "synthetic": true,
+  "positive": {
+    "schema_version": 1,
+    "revision": 1,
+    "items": [
+      {
+        "id": "line-1",
+        "restaurant_id": "fixture-r1",
+        "menu_item_id": "fixture-i1",
+        "name": "Fixture meal",
+        "base_price_cents": 1000,
+        "quantity": 1,
+        "modifiers": []
+      }
+    ]
+  },
+  "negative": [
+    {
+      "name": "cart_conflict",
+      "status": 409,
+      "error": {
+        "code": "cart_conflict",
+        "message": "Basket changed in another tab",
+        "request_id": "synthetic-request-1",
+        "fields": []
+      },
+      "current_cart": {
+        "schema_version": 1,
+        "revision": 2,
+        "items": []
+      }
+    },
+    {
+      "name": "storage_unavailable",
+      "status": 503,
+      "error": {
+        "code": "storage_unavailable",
+        "message": "Cart storage is unavailable",
+        "request_id": "synthetic-request-2",
+        "fields": []
+      }
+    }
+  ]
+}
