@@ -1,0 +1,83 @@
+{
+  "contract": "C5",
+  "schema_version": 1,
+  "synthetic": true,
+  "positive": {
+    "quote": {
+      "schema_version": 1,
+      "cart_revision": 1,
+      "catalog_fingerprint": "fixture-catalog-v1",
+      "totals": {
+        "subtotal_cents": 1000,
+        "discount_cents": 500,
+        "delivery_fee_cents": 199,
+        "service_fee_cents": 249,
+        "tax_cents": 44,
+        "tip_cents": 200,
+        "total_cents": 1192
+      }
+    },
+    "receipt": {
+      "schema_version": 1,
+      "id": "fixture-o1",
+      "status": "Placed",
+      "created_at": "2030-01-01T00:00:00Z",
+      "items": [
+        {
+          "id": "line-1",
+          "restaurant_id": "fixture-r1",
+          "menu_item_id": "fixture-i1",
+          "name": "Fixture meal",
+          "unit_price_cents": 1000,
+          "quantity": 1,
+          "line_total_cents": 1000,
+          "modifiers": []
+        }
+      ],
+      "checkout": {
+        "name": "Demo Visitor",
+        "phone": "+1-555-0100",
+        "email": "demo@example.test",
+        "street": "100 Demo Street",
+        "city": "Demo City",
+        "state": "CA",
+        "postal_code": "94105",
+        "delivery_instructions": "Synthetic fixture only",
+        "payment_method": "mock",
+        "tip_cents": 200
+      },
+      "totals": {
+        "subtotal_cents": 1000,
+        "discount_cents": 500,
+        "delivery_fee_cents": 199,
+        "service_fee_cents": 249,
+        "tax_cents": 44,
+        "tip_cents": 200,
+        "total_cents": 1192
+      },
+      "pricing_version": "mock-v1"
+    }
+  },
+  "negative": [
+    {
+      "name": "catalog_changed",
+      "status": 409,
+      "error": {
+        "code": "catalog_changed",
+        "message": "Catalog changed after the quote",
+        "request_id": "synthetic-request-1",
+        "fields": []
+      }
+    },
+    {
+      "name": "invalid_checkout",
+      "status": 422,
+      "error": {
+        "code": "invalid_checkout",
+        "message": "Checkout details are invalid",
+        "request_id": "synthetic-request-2",
+        "fields": ["checkout.postal_code"]
+      }
+    }
+  ]
+}
