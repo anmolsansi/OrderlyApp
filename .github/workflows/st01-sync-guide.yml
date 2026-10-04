@@ -20,49 +20,16 @@ jobs:
         shell: bash
         run: |
           python - <<'PY'
+          import base64
           from pathlib import Path
-
           path = Path("development.md")
           marker = "## ST-01 implementation evidence — 2026-10-04"
           text = path.read_text(encoding="utf-8")
+          encoded = "CgojIyBTVC0wMSBpbXBsZW1lbnRhdGlvbiBldmlkZW5jZSDigJQgMjAyNi0xMC0wNAoKVGhpcyBzZWN0aW9uIHJlY29yZHMgdGhlIGV4ZWN1dGVkIGZvdW5kYXRpb24gZXZpZGVuY2UgZm9yICoqU1QtMDEg4oCUIFJlcHJvZHVjZSB0aGUgYmFzZWxpbmUgYW5kIHB1Ymxpc2ggZXhlY3V0YWJsZSBjb250cmFjdHMqKi4gSXQgZG9lcyBub3QgbWFyayBTVC0wMiB0aHJvdWdoIFNULTEzIGNvbXBsZXRlIGFuZCBkb2VzIG5vdCBjbGFpbSB0aGUgY3VycmVudCBwcm9kdWN0IGlzIHByb2R1Y3Rpb24tcmVhZHkuCgojIyMgVmVyaWZpZWQgc291cmNlIGFuZCBydW5uZXJzCgotIFN0YXJ0aW5nIGBtYWluYCBTSEE6IGA3OGI4ZmE2YTdkNmE3NzlhODk4NWQzNDQxM2Q4MWQ4YjIzNjczNDAzYC4KLSBXb3JrIGJyYW5jaDogYGNob3JlL3N0LTAxLWJhc2VsaW5lLWNvbnRyYWN0c2AuCi0gRnJvbnRlbmQgcnVudGltZTogTm9kZSAyMjsgc3VwcG9ydGVkIHJhbmdlIGluIGBwYWNrYWdlLmpzb25gIGlzIGA+PTIwLjkuMCA8MjVgLgotIExvY2sgcmVzb2x2ZXIgdXNlZCBmb3IgU1QtMDEgZXZpZGVuY2U6IG5wbSBgMTEuMjAuMGAuCi0gQmFja2VuZCBob3N0ZWQgcnVudGltZTogUHl0aG9uIGAzLjEyYDsgYXBwbGljYXRpb24gbWV0YWRhdGEgcmVtYWlucyBgPj0zLjlgLgotIERhdGFiYXNlIGJhc2VsaW5lOiBQb3N0Z3JlU1FMIGAxNmAuCi0gQnJvd3NlciBiYXNlbGluZTogUGxheXdyaWdodCBDaHJvbWl1bSBpbnN0YWxsZWQgd2l0aCBgcGxheXdyaWdodCBpbnN0YWxsIC0td2l0aC1kZXBzIGNocm9taXVtYC4KLSBXRUIgdmVyaWZpY2F0aW9uOiBgbnBtIHJ1biB0ZXN0YCwgYG5wbSBydW4gdHlwZWNoZWNrYCwgYG5wbSBydW4gYnVpbGRgLCBwbHVzIGBucG0gYXVkaXQgLS1hdWRpdC1sZXZlbD1oaWdoYC4KLSBDT05UUkFDVFMtVFMgdmVyaWZpY2F0aW9uOiBgbnBtIHJ1biB0ZXN0OmNvbnRyYWN0c2AuCi0gQkFDS0VORCB2ZXJpZmljYXRpb246IGBweXRob24gLW0gcHl0ZXN0IGJhY2tlbmQvdGVzdHMgLXFgIGFmdGVyIGFwcGx5aW5nIHJlcG9zaXRvcnkgbWlncmF0aW9ucyBhZ2FpbnN0IHJlYWwgUG9zdGdyZXMuCi0gRTJFIHZlcmlmaWNhdGlvbjogdGhlIGV4aXN0aW5nIFBsYXl3cmlnaHQgcHJvZHVjdCBzdWl0ZSB3aXRoIGEgc2VlZGVkIHJlYWwgUG9zdGdyZXMgYmFja2VuZCBhbmQgbGl2ZSBGYXN0QVBJIGhlYWx0aCBjaGVjay4KCkhvc3RlZCBydW4gYDM3MTk5MjUyODYwYCwgYXNzZXNzZWQgYXQgU0hBIGBjYTA5N2ZlMTk1ZjMwZmJhYjE5OGUzYjYzNWE3MmI2ZDQ3Nzg4ZDQxYCwgcGFzc2VkIFdFQiwgQkFDS0VORC9Qb3N0Z3Jlcywgc3RhbmRhbG9uZSBDaHJvbWl1bSBsYXVuY2gsIEFQSS1iYWNrZWQgcHJvZHVjdCBFMkUsIGFuZCB0aGUgYmFzZWxpbmUgZXZpZGVuY2Ugc3VtbWFyeS4gQzDigJNDOCBleGVjdXRhYmxlIGZpeHR1cmVzIGxpdmUgdW5kZXIgYHRlc3RzL2ZpeHR1cmVzL2NvbnRyYWN0cy9gIGFuZCBhcmUgY29uc3VtZWQgYnkgYm90aCBQeXRob24gYW5kIFR5cGVTY3JpcHQgY29uZm9ybWFuY2UgdGVzdHMuCgojIyMgRGVwZW5kZW5jeSBhc3Nlc3NtZW50IGFuZCBkZWNpc2lvbnMKCi0gTmV4dC5qcyBtb3ZlZCBmcm9tIGAxNi4yLjJgIHRvIGAxNi4zLjhgLCB0aGUgYXZhaWxhYmxlIG5vbi1tYWpvciBmaXggcGF0aCBpZGVudGlmaWVkIGJ5IHRoZSByZXBvc2l0b3J5J3MgY3VycmVudCBhZHZpc29yeSBldmlkZW5jZS4KLSBWaXRlc3QgbW92ZWQgZnJvbSB0aGUgZWFybGllciBgNC4xLnhgIHJhbmdlIHRvIGA0LjEuMTFgLCBvdXRzaWRlIHRoZSByZWNvcmRlZCBhZmZlY3RlZCByYW5nZS4KLSBUaGUgcmVnZW5lcmF0ZWQgbG9ja2ZpbGUgaXMgY29tbWl0dGVkIGFuZCBob3N0ZWQgV0VCIGV2aWRlbmNlIHBhc3NlcyBgbnBtIGF1ZGl0IC0tYXVkaXQtbGV2ZWw9aGlnaGAuCi0gbnBtIGAxMC45LjlgIGNyYXNoZWQgaW5zaWRlIEFyYm9yaXN0IHdpdGggYENhbm5vdCByZWFkIHByb3BlcnRpZXMgb2YgbnVsbCAocmVhZGluZyAnZWRnZXNPdXQnKWAgd2hpbGUgcmVjb25jaWxpbmcgdGhlIG9sZCBsb2NrZmlsZS4gU1QtMDEgcmVnZW5lcmF0ZWQgdGhlIGxvY2sgd2l0aCBucG0gYDExLjIwLjBgIGluc3RlYWQgb2YgaGFuZC1lZGl0aW5nIGl0LgotIFRoZSBlYXJsaWVyIG1pc3NpbmcgQ2hyb21pdW0gcnVudGltZSBpcyByZXNvbHZlZCBieSBleHBsaWNpdCBwcm92aXNpb25pbmcgYW5kIGEgc2VwYXJhdGUgYnJvd3Nlci1sYXVuY2ggZ2F0ZS4gQnJvd3NlciBpbmZyYXN0cnVjdHVyZSBmYWlsdXJlIGlzIG5vdyBkaXN0aW5jdCBmcm9tIHByb2R1Y3QgYXNzZXJ0aW9uIGZhaWx1cmUuCgojIyMgQ29udHJhY3QgZnJlZXplIHN0YXR1cwoKQzAgaXMgZnJvemVuIGJ5IFNULTAxIGF0IHNjaGVtYSB2ZXJzaW9uIGAxYCwgaW5jbHVkaW5nIHRoZSBleHBsaWNpdCBydW5uZXIgYW5kIG1vZGUvcmVwcm9kdWNpYmlsaXR5IGZpeHR1cmUuIEMx4oCTQzggYXJlIGV4ZWN1dGFibGUgdmVyc2lvbi0xIHNjYWZmb2xkcyBvbmx5LiBUaGVpciBuYW1lZCBwcm92aWRlciB0aWNrZXRzIHJlbWFpbiByZXNwb25zaWJsZSBmb3IgcHJvdmlkZXIgY29uZm9ybWFuY2UgYW5kIHRoZWlyIGxhdGVyIGZyZWV6ZSBwb2ludHMgZXhhY3RseSBhcyBkZWZpbmVkIGluIHRoZSBjb250cmFjdCByZWdpc3RyeSBhYm92ZS4K"
           if marker not in text:
-              block = """
-
-## ST-01 implementation evidence — 2026-10-04
-
-This section records the executed foundation evidence for **ST-01 — Reproduce the baseline and publish executable contracts**. It does not mark ST-02 through ST-13 complete and does not claim the current product is production-ready.
-
-### Verified source and runners
-
-- Starting `main` SHA: `78b8fa6a7d6a779a8985d34413d81d8b23673403`.
-- Work branch: `chore/st-01-baseline-contracts`.
-- Frontend runtime: Node 22; supported range in `package.json` is `>=20.9.0 <25`.
-- Lock resolver used for ST-01 evidence: npm `11.20.0`.
-- Backend hosted runtime: Python `3.12`; application metadata remains `>=3.9`.
-- Database baseline: PostgreSQL `16`.
-- Browser baseline: Playwright Chromium installed with `playwright install --with-deps chromium`.
-- WEB verification: `npm run test`, `npm run typecheck`, `npm run build`, plus `npm audit --audit-level=high`.
-- CONTRACTS-TS verification: `npm run test:contracts`.
-- BACKEND verification: `python -m pytest backend/tests -q` after applying repository migrations against real Postgres.
-- E2E verification: the existing Playwright product suite with a seeded real Postgres backend and live FastAPI health check.
-
-Hosted run `37199252860`, assessed at SHA `ca097fe195f30fbab198e3b635a72b6d47788d41`, passed WEB, BACKEND/Postgres, standalone Chromium launch, API-backed product E2E, and the baseline evidence summary. C0–C8 executable fixtures live under `tests/fixtures/contracts/` and are consumed by both Python and TypeScript conformance tests.
-
-### Dependency assessment and decisions
-
-- Next.js moved from `16.2.2` to `16.3.8`, the available non-major fix path identified by the repository's current advisory evidence.
-- Vitest moved from the earlier `4.1.x` range to `4.1.11`, outside the recorded affected range.
-- The regenerated lockfile is committed and hosted WEB evidence passes `npm audit --audit-level=high`.
-- npm `10.9.9` crashed inside Arborist with `Cannot read properties of null (reading 'edgesOut')` while reconciling the old lockfile. ST-01 regenerated the lock with npm `11.20.0` instead of hand-editing it.
-- The earlier missing Chromium runtime is resolved by explicit provisioning and a separate browser-launch gate. Browser infrastructure failure is now distinct from product assertion failure.
-
-### Contract freeze status
-
-C0 is frozen by ST-01 at schema version `1`, including the explicit runner and mode/reproducibility fixture. C1–C8 are executable version-1 scaffolds only. Their named provider tickets remain responsible for provider conformance and their later freeze points exactly as defined in the contract registry above.
-"""
+              block = base64.b64decode(encoded).decode("utf-8")
               path.write_text(text.rstrip() + block + "\n", encoding="utf-8")
           PY
-
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git rm .github/workflows/st01-sync-guide.yml
