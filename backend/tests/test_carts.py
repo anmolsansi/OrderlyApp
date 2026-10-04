@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 from typing import Iterator
 from uuid import uuid4
 
@@ -10,7 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from app import redis_store
+from app import cart_service, redis_store, store
 from app.cart_service import (
     CartConflictError,
     CartStorageUnavailableError,
@@ -21,7 +20,7 @@ from app.cart_service import (
 )
 from app.identity import VerifiedGuest, verify_request_guest
 from app.main import app
-from app.models import CartItemInput, CartUpsertRequest
+from app.models import CartDeleteRequest, CartItemInput, CartUpsertRequest
 
 
 TEST_ORIGIN = "https://orderly.test"
@@ -103,16 +102,21 @@ def line(context: dict[str, str], *, line_id: str = "line-1") -> CartItemInput:
 def test_expected_revision_is_required_strict_and_nonnegative(cart_environment: dict[str, str]) -> None:
     payload = {"expected_revision": 0, "items": [line(cart_environment).model_dump(mode="json")]}
     assert CartUpsertRequest.model_validate(payload).expected_revision == 0
+    assert CartDeleteRequest.model_validate({"expected_revision": 0}).expected_revision == 0
 
     for invalid in (-1, 1.5, True, "0"):
         invalid_payload = dict(payload)
         invalid_payload["expected_revision"] = invalid
         with pytest.raises(ValidationError):
             CartUpsertRequest.model_validate(invalid_payload)
+        with pytest.raises(ValidationError):
+            CartDeleteRequest.model_validate({"expected_revision": invalid})
 
     missing = {"items": payload["items"]}
     with pytest.raises(ValidationError):
         CartUpsertRequest.model_validate(missing)
+    with pytest.raises(ValidationError):
+        CartDeleteRequest.model_validate({})
 
 
 def test_cart_write_input_rejects_client_name_and_price(cart_environment: dict[str, str]) -> None:
@@ -139,6 +143,7 @@ def test_put_and_delete_increment_once_and_persist_canonical_output(cart_environ
     assert saved.items[0].name == cart_environment["canonical_name"]
     assert saved.items[0].base_price_cents == 1000
 
+    # A new connection on the next service call sees the same durable row.
     reloaded = get_cart(cart_environment["owner_id"])
     assert reloaded.model_dump(mode="json") == saved.model_dump(mode="json")
 
@@ -223,27 +228,57 @@ def test_redis_failure_does_not_change_postgres_cart_authority(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("REDIS_URL", "redis://127.0.0.1:1/0")
-    monkeypatch.setattr(redis_store, "redis_client", lambda: (_ for _ in ()).throw(RuntimeError("redis called")))
+    monkeypatch.setattr(
+        redis_store,
+        "redis_client",
+        lambda: (_ for _ in ()).throw(AssertionError("C4 cart path consulted Redis")),
+    )
 
     saved = put_cart(cart_environment["owner_id"], 0, [line(cart_environment)])
     assert saved.revision == 1
     assert get_cart(cart_environment["owner_id"]).items[0].id == "line-1"
 
 
-def test_missing_postgres_configuration_fails_closed_without_json_fallback(
+def test_missing_postgres_configuration_fails_closed_without_fallback(
     monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
 ) -> None:
     monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.setenv("ORDERLY_DATA_MODE", "api")
     monkeypatch.setenv("ORDERLY_FORCE_JSON_STORE", "1")
-    monkeypatch.setenv("ORDERLY_SESSION_SECRET", TEST_SECRET)
-    monkeypatch.setenv("ORDERLY_ALLOWED_ORIGINS", TEST_ORIGIN)
+    monkeypatch.setattr(
+        store,
+        "write_json",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("C4 cart path wrote JSON")),
+    )
+    monkeypatch.setattr(
+        redis_store,
+        "redis_client",
+        lambda: (_ for _ in ()).throw(AssertionError("C4 cart path consulted Redis")),
+    )
 
     with pytest.raises(CartStorageUnavailableError):
         get_cart("guest-no-postgres")
 
-    assert not (tmp_path / "carts.json").exists()
+
+def test_configured_postgres_connection_failure_maps_to_storage_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("DATABASE_URL", "postgresql://configured-but-unavailable/orderly")
+    monkeypatch.delenv("ORDERLY_FORCE_JSON_STORE", raising=False)
+
+    def fail_connection():
+        raise RuntimeError("synthetic database outage")
+
+    monkeypatch.setattr(cart_service, "get_connection", fail_connection)
+
+    with pytest.raises(CartStorageUnavailableError):
+        get_cart("guest-db-outage")
+
+
+def test_unauthenticated_cart_read_is_rejected(cart_environment: dict[str, str]) -> None:
+    response = TestClient(app, base_url=TEST_ORIGIN).get("/v1/cart")
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "session_required"
 
 
 def test_http_conflict_contains_current_cart_and_storage_failure_is_typed(
@@ -273,7 +308,18 @@ def test_http_conflict_contains_current_cart_and_storage_failure_is_typed(
 
     missing_revision = client.request("DELETE", "/v1/cart", headers={"Origin": TEST_ORIGIN}, json={})
     assert missing_revision.status_code == 422
+    assert missing_revision.json()["error"]["code"] == "invalid_cart"
     assert missing_revision.json()["error"]["fields"] == ["expected_revision"]
+
+    wrong_type = client.request(
+        "DELETE",
+        "/v1/cart",
+        headers={"Origin": TEST_ORIGIN},
+        json={"expected_revision": "1"},
+    )
+    assert wrong_type.status_code == 422
+    assert wrong_type.json()["error"]["code"] == "invalid_cart"
+    assert wrong_type.json()["error"]["fields"] == ["expected_revision"]
 
     monkeypatch.delenv("DATABASE_URL", raising=False)
     unavailable = client.get("/v1/cart")
