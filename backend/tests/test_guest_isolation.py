@@ -44,6 +44,7 @@ def guest_id_for_token(postgres_connection, token: str) -> str:
 
 
 def cleanup_guest_rows(postgres_connection) -> None:
+    postgres_connection.execute("DELETE FROM guest_carts WHERE owner_id LIKE 'guest-%'")
     postgres_connection.execute("DELETE FROM carts WHERE session_id LIKE 'guest-%'")
     postgres_connection.execute("DELETE FROM orders WHERE session_id LIKE 'guest-%'")
     postgres_connection.execute("DELETE FROM guest_sessions")
@@ -81,7 +82,7 @@ def test_two_guest_cookie_jars_are_isolated_and_reset_revokes_old_scope(
         "modifiers": [],
     }
     postgres_connection.execute(
-        "INSERT INTO carts (session_id, items) VALUES (%s, %s::jsonb)",
+        "INSERT INTO guest_carts (owner_id, revision, items) VALUES (%s, 1, %s::jsonb)",
         (guest_a, json.dumps([cart_item])),
     )
     postgres_connection.execute(
@@ -96,13 +97,20 @@ def test_two_guest_cookie_jars_are_isolated_and_reset_revokes_old_scope(
     a_cart = client_a.get("/v1/cart")
     b_cart = client_b.get("/v1/cart")
     assert a_cart.status_code == 200
+    assert a_cart.json()["revision"] == 1
     assert a_cart.json()["items"][0]["id"] == "line-a"
     assert "session_id" not in a_cart.json()
     assert b_cart.status_code == 200
-    assert b_cart.json()["items"] == []
+    assert b_cart.json() == {"schema_version": 1, "revision": 0, "items": []}
 
-    b_clear = client_b.delete("/v1/cart", headers={"Origin": TEST_ORIGIN})
+    b_clear = client_b.request(
+        "DELETE",
+        "/v1/cart",
+        headers={"Origin": TEST_ORIGIN},
+        json={"expected_revision": 0},
+    )
     assert b_clear.status_code == 200
+    assert b_clear.json()["revision"] == 1
     assert client_a.get("/v1/cart").json()["items"][0]["id"] == "line-a"
 
     a_orders = client_a.get("/v1/orders")
@@ -118,7 +126,12 @@ def test_two_guest_cookie_jars_are_isolated_and_reset_revokes_old_scope(
     assert foreign_order.json()["error"]["code"] == "not_found"
     assert foreign_order.json()["error"]["message"] == "Order not found"
 
-    forbidden_origin = client_a.delete("/v1/cart", headers={"Origin": "https://evil.example"})
+    forbidden_origin = client_a.request(
+        "DELETE",
+        "/v1/cart",
+        headers={"Origin": "https://evil.example"},
+        json={"expected_revision": 1},
+    )
     assert forbidden_origin.status_code == 403
     assert forbidden_origin.json()["error"]["code"] == "origin_forbidden"
 
@@ -142,7 +155,7 @@ def test_two_guest_cookie_jars_are_isolated_and_reset_revokes_old_scope(
     assert reset.status_code == 200
     new_token = client_a.cookies.get(COOKIE_NAME)
     assert new_token and new_token != old_token
-    assert client_a.get("/v1/cart").json()["items"] == []
+    assert client_a.get("/v1/cart").json() == {"schema_version": 1, "revision": 0, "items": []}
     assert client_a.get("/v1/orders").json() == []
 
     revoked = TestClient(app, base_url=TEST_ORIGIN).get(
