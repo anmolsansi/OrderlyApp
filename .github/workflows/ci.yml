@@ -25,6 +25,10 @@ jobs:
         with:
           node-version: '22'
           cache: npm
+      - name: Use npm 11 lock resolver
+        run: |
+          npm install --global npm@11.20.0
+          npm --version
       - name: Refresh package lock from package manifest
         run: npm install --package-lock-only --ignore-scripts
       - name: Commit generated lock when required
