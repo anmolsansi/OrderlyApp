@@ -16,7 +16,8 @@
     "test:contracts": "vitest run tests/contract-fixtures.test.ts",
     "test:backend": "python -m pytest backend/tests",
     "test:e2e": "playwright test",
-    "test:e2e:list": "playwright test --list"
+    "test:e2e:list": "playwright test --list",
+    "test:e2e:install": "playwright install --with-deps chromium"
   },
   "dependencies": {
     "next": "16.3.8",
