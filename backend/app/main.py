@@ -35,20 +35,31 @@ from .models import (
     CartPricingResponse,
     CartResponse,
     CartUpsertRequest,
+    CheckoutQuoteRequest,
+    CheckoutQuoteResponse,
     HealthResponse,
     OrderCreateRequest,
     OrderResponse,
+    ReceiptResponse,
     Restaurant,
     SessionResponse,
 )
+from .pricing import (
+    CatalogChangedError,
+    InvalidCheckoutError,
+    PricingStorageUnavailableError,
+    quote_current_cart,
+)
 from .redis_store import redis_client, redis_url
 from .store import (
+    InvalidReceiptCursorError,
+    ReceiptStorageUnavailableError,
     calculate_cart_pricing,
     create_order,
     get_catalog_snapshot,
-    get_order_for_session,
+    get_order_snapshot_for_owner,
     get_restaurant,
-    list_orders_for_session,
+    list_order_snapshots_for_owner,
     search_restaurants,
     validate_cart_items,
 )
@@ -188,6 +199,67 @@ def cart_storage_exception_handler(
     )
 
 
+@app.exception_handler(InvalidCheckoutError)
+def invalid_checkout_exception_handler(request: Request, exc: InvalidCheckoutError) -> JSONResponse:
+    return _error_response(
+        request,
+        422,
+        "invalid_checkout",
+        "Checkout details are invalid",
+        exc.fields,
+    )
+
+
+@app.exception_handler(CatalogChangedError)
+def catalog_changed_exception_handler(request: Request, _exc: CatalogChangedError) -> JSONResponse:
+    return _error_response(
+        request,
+        409,
+        "catalog_changed",
+        "Catalog changed after the quote",
+    )
+
+
+@app.exception_handler(PricingStorageUnavailableError)
+def pricing_storage_exception_handler(
+    request: Request,
+    _exc: PricingStorageUnavailableError,
+) -> JSONResponse:
+    return _error_response(
+        request,
+        503,
+        "storage_unavailable",
+        "Receipt pricing storage is unavailable",
+    )
+
+
+@app.exception_handler(ReceiptStorageUnavailableError)
+def receipt_storage_exception_handler(
+    request: Request,
+    _exc: ReceiptStorageUnavailableError,
+) -> JSONResponse:
+    return _error_response(
+        request,
+        503,
+        "storage_unavailable",
+        "Receipt storage is unavailable",
+    )
+
+
+@app.exception_handler(InvalidReceiptCursorError)
+def invalid_receipt_cursor_exception_handler(
+    request: Request,
+    _exc: InvalidReceiptCursorError,
+) -> JSONResponse:
+    return _error_response(
+        request,
+        422,
+        "invalid_cursor",
+        "Receipt cursor is invalid",
+        ["cursor"],
+    )
+
+
 @app.exception_handler(CatalogConfigurationError)
 def catalog_configuration_exception_handler(
     request: Request,
@@ -217,6 +289,14 @@ def validation_exception_handler(request: Request, exc: RequestValidationError) 
             if field
         )
     )
+    if request.url.path == "/v1/checkout/quote":
+        return _error_response(
+            request,
+            422,
+            "invalid_checkout",
+            "Checkout details are invalid",
+            fields,
+        )
     cart_fields = [
         field
         for field in fields
@@ -327,12 +407,23 @@ def carts_clear(
     return delete_cart(guest.guest_id, payload.expected_revision)
 
 
+@app.post("/v1/checkout/quote", response_model=CheckoutQuoteResponse)
+def checkout_quote(
+    request: Request,
+    payload: CheckoutQuoteRequest,
+    guest: VerifiedGuest = Depends(verify_request_guest),
+) -> CheckoutQuoteResponse:
+    require_allowed_origin(request)
+    return quote_current_cart(guest.guest_id, payload)
+
+
 @app.post("/v1/orders", response_model=OrderResponse, status_code=201)
 def orders_create(
     request: Request,
     payload: OrderCreateRequest,
     guest: VerifiedGuest = Depends(verify_request_guest),
 ) -> OrderResponse:
+    """Legacy pre-C6 submit endpoint retained until ST-07 replaces it atomically."""
     require_allowed_origin(request)
     if not payload.cart_items:
         raise ApiContractError(422, "invalid_cart", "Cart cannot be empty", ["items"])
@@ -363,6 +454,7 @@ def cart_pricing(
     payload: CartPricingRequest,
     _guest: VerifiedGuest = Depends(verify_request_guest),
 ) -> CartPricingResponse:
+    """Legacy pre-C5 pricing endpoint retained for existing web consumers until ST-09."""
     require_allowed_origin(request)
     snapshot = get_catalog_snapshot()
     validation = validate_cart_items(payload.cart_items, snapshot=snapshot)
@@ -389,14 +481,18 @@ def cart_pricing(
     )
 
 
-@app.get("/v1/orders", response_model=List[OrderResponse])
-def orders_index(guest: VerifiedGuest = Depends(verify_request_guest)) -> List[OrderResponse]:
-    return [OrderResponse.model_validate(order, from_attributes=True) for order in list_orders_for_session(guest.guest_id)]
+@app.get("/v1/orders", response_model=List[ReceiptResponse])
+def orders_index(
+    cursor: Optional[str] = Query(default=None, max_length=36),
+    limit: int = Query(default=50, ge=1, le=50),
+    guest: VerifiedGuest = Depends(verify_request_guest),
+) -> List[ReceiptResponse]:
+    return list_order_snapshots_for_owner(guest.guest_id, cursor=cursor, limit=limit)
 
 
-@app.get("/v1/orders/{order_id}", response_model=OrderResponse)
-def orders_show(order_id: str, guest: VerifiedGuest = Depends(verify_request_guest)) -> OrderResponse:
-    order = get_order_for_session(order_id, guest.guest_id)
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found")
-    return OrderResponse.model_validate(order, from_attributes=True)
+@app.get("/v1/orders/{order_id}", response_model=ReceiptResponse)
+def orders_show(order_id: str, guest: VerifiedGuest = Depends(verify_request_guest)) -> ReceiptResponse:
+    receipt = get_order_snapshot_for_owner(order_id, guest.guest_id)
+    if not receipt:
+        raise ApiContractError(404, "order_not_found", "Order not found", [])
+    return receipt
