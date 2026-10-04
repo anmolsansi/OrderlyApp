@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { MarketplaceNav } from '@/app/components/MarketplaceNav';
 import { fetchCart, saveCart } from '@/lib/api';
-import { canAddItemToCart, CART_STORAGE_KEY, getOrCreateBackendSessionId, validateCartItem } from '@/lib/cart';
+import { canAddItemToCart, CART_STORAGE_KEY, validateCartItem } from '@/lib/cart';
 import { getDefaultModifiers, getItemTotal, getMenuItem, getRestaurant } from '@/lib/marketplace';
 import type { CartItem, CartItemModifier } from '@/lib/types';
 import { routes } from '@/lib/routes';
@@ -74,17 +74,16 @@ export default function ItemCustomizationPage() {
       modifiers,
       specialInstructions: note.trim() || undefined,
     };
-    const sessionId = getOrCreateBackendSessionId(window.localStorage);
     const stored = window.localStorage.getItem(CART_STORAGE_KEY);
     const fallbackCart = stored ? JSON.parse(stored) as CartItem[] : [];
-    const currentCart = await fetchCart(sessionId) ?? fallbackCart;
+    const currentCart = await fetchCart() ?? fallbackCart;
     const cartCompatibility = canAddItemToCart(currentCart, currentRestaurant.id);
     if (!cartCompatibility.ok) {
       setErrors(cartCompatibility.errors);
       return;
     }
     const nextCart = [...currentCart, cartItem];
-    await saveCart(sessionId, nextCart);
+    await saveCart(nextCart);
     window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(nextCart));
     window.localStorage.setItem('orderlyapp.marketplace.note.v1', note);
     router.push(routes.cart);

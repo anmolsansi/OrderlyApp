@@ -5,11 +5,35 @@
   "positive": {
     "schema_version": 1,
     "expires_at": "2030-01-31T00:00:00Z",
+    "session_response": {
+      "schema_version": 1,
+      "expires_at": "2030-01-31T00:00:00Z"
+    },
     "cookie": {
+      "name": "orderly_guest",
+      "opaque": true,
+      "contains_owner_id": false,
       "http_only": true,
       "secure_on_https": true,
       "same_site": "Lax",
-      "path": "/api/orderly"
+      "backend_path": "/v1",
+      "browser_path": "/api/orderly",
+      "ttl_days": 30,
+      "sliding": false
+    },
+    "ownership": {
+      "source": "verified_cookie_only",
+      "request_owner_fields_allowed": false,
+      "spoofed_owner_headers_ignored": true,
+      "foreign_order_lookup_status": 404,
+      "global_order_listing_public": false,
+      "caller_chosen_session_route_public": false
+    },
+    "reset": {
+      "old_cookie_invalidated": true,
+      "new_cookie_issued": true,
+      "old_guest_cart_deleted": true,
+      "old_guest_orders_deleted": true
     },
     "fixture_jars": ["guest-A", "guest-B"]
   },
@@ -41,6 +65,36 @@
         "code": "origin_forbidden",
         "message": "Request origin is not allowed",
         "request_id": "synthetic-request-3",
+        "fields": []
+      }
+    },
+    {
+      "name": "forged_cookie",
+      "status": 401,
+      "error": {
+        "code": "session_invalid",
+        "message": "Guest session is invalid",
+        "request_id": "synthetic-request-4",
+        "fields": []
+      }
+    },
+    {
+      "name": "foreign_order_id",
+      "status": 404,
+      "error": {
+        "code": "not_found",
+        "message": "Order not found",
+        "request_id": "synthetic-request-5",
+        "fields": []
+      }
+    },
+    {
+      "name": "storage_unavailable",
+      "status": 503,
+      "error": {
+        "code": "storage_unavailable",
+        "message": "Guest session storage is unavailable",
+        "request_id": "synthetic-request-6",
         "fields": []
       }
     }

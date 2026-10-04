@@ -7,7 +7,6 @@ import { clearBackendCart, fetchCart, saveCart } from '@/lib/api';
 import {
   CART_STORAGE_KEY,
   getCartLineTotal,
-  getOrCreateBackendSessionId,
   getSelectedModifierLabels,
   removeCartItem,
   updateCartItemQuantity,
@@ -29,10 +28,9 @@ export default function CartPage() {
   useEffect(() => {
     let active = true;
     async function loadCart(): Promise<void> {
-      const sessionId = getOrCreateBackendSessionId(window.localStorage);
       const stored = window.localStorage.getItem(CART_STORAGE_KEY);
       const fallbackCart = stored ? JSON.parse(stored) as CartItem[] : [];
-      const backendCart = await fetchCart(sessionId);
+      const backendCart = await fetchCart();
       const nextCart = backendCart ?? fallbackCart;
       if (!active) return;
       setCart(nextCart);
@@ -46,17 +44,15 @@ export default function CartPage() {
   }, []);
 
   async function persist(nextCart: CartItem[]): Promise<void> {
-    const sessionId = getOrCreateBackendSessionId(window.localStorage);
     setCart(nextCart);
     window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(nextCart));
-    await saveCart(sessionId, nextCart);
+    await saveCart(nextCart);
   }
 
   async function clearCart(): Promise<void> {
-    const sessionId = getOrCreateBackendSessionId(window.localStorage);
     setCart([]);
     window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify([]));
-    await clearBackendCart(sessionId);
+    await clearBackendCart();
   }
 
   return (

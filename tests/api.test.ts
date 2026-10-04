@@ -29,11 +29,22 @@ const checkoutDetails: CheckoutDetails = {
   tipCents: 500,
 };
 
-function mockJsonResponse(payload: unknown, ok = true): Response {
+function mockJsonResponse(payload: unknown, ok = true, status = ok ? 200 : 500): Response {
   return {
     ok,
+    status,
     json: async () => payload,
   } as Response;
+}
+
+function gatewayMock(operation: (url: string, init?: RequestInit) => Response | Promise<Response>) {
+  return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+    const url = String(input);
+    if (url === '/api/orderly/session') {
+      return mockJsonResponse({ schema_version: 1, expires_at: '2030-01-31T00:00:00Z' });
+    }
+    return operation(url, init);
+  });
 }
 
 describe('backend API client', () => {
@@ -41,31 +52,38 @@ describe('backend API client', () => {
     vi.restoreAllMocks();
   });
 
-  it('loads and normalizes backend carts with special instructions', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(mockJsonResponse({
-      session_id: 'session-test',
-      updated_at: '2026-05-13T09:00:00Z',
-      items: [{
-        id: cartItem.id,
-        restaurant_id: cartItem.restaurantId,
-        menu_item_id: cartItem.menuItemId,
-        name: cartItem.name,
-        quantity: cartItem.quantity,
-        base_price_cents: cartItem.basePriceCents,
-        modifiers: [{ group_id: 'size', option_ids: ['large'] }],
-        special_instructions: cartItem.specialInstructions,
-      }],
-    }));
+  it('loads and normalizes cookie-owned backend carts', async () => {
+    const fetchMock = gatewayMock(url => {
+      expect(url).toBe('/api/orderly/cart');
+      return mockJsonResponse({
+        updated_at: '2026-05-13T09:00:00Z',
+        items: [{
+          id: cartItem.id,
+          restaurant_id: cartItem.restaurantId,
+          menu_item_id: cartItem.menuItemId,
+          name: cartItem.name,
+          quantity: cartItem.quantity,
+          base_price_cents: cartItem.basePriceCents,
+          modifiers: [{ group_id: 'size', option_ids: ['large'] }],
+          special_instructions: cartItem.specialInstructions,
+        }],
+      });
+    });
 
-    await expect(fetchCart('session-test')).resolves.toMatchObject([{ specialInstructions: 'Extra napkins' }]);
+    await expect(fetchCart()).resolves.toMatchObject([{ specialInstructions: 'Extra napkins' }]);
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes('session-test'))).toBe(false);
   });
 
-  it('saves cart payloads using backend field names', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(mockJsonResponse({}));
+  it('saves cart payloads without browser ownership fields', async () => {
+    let operationInit: RequestInit | undefined;
+    gatewayMock((url, init) => {
+      expect(url).toBe('/api/orderly/cart');
+      operationInit = init;
+      return mockJsonResponse({});
+    });
 
-    await expect(saveCart('session-test', [cartItem])).resolves.toBe(true);
-    const [, init] = fetchMock.mock.calls[0];
-    expect(JSON.parse(init?.body as string)).toEqual({
+    await expect(saveCart([cartItem])).resolves.toBe(true);
+    expect(JSON.parse(operationInit?.body as string)).toEqual({
       items: [{
         id: 'cart-test',
         restaurant_id: 'marios-pizza',
@@ -82,35 +100,39 @@ describe('backend API client', () => {
     });
   });
 
-  it('submits checkout details and normalizes backend orders', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(mockJsonResponse({
-      id: 'ORD-BACKEND',
-      session_id: 'session-test',
-      cart_items: [{
-        id: cartItem.id,
-        restaurant_id: cartItem.restaurantId,
-        menu_item_id: cartItem.menuItemId,
-        name: cartItem.name,
-        quantity: cartItem.quantity,
-        base_price_cents: cartItem.basePriceCents,
-        modifiers: [{ group_id: 'size', option_ids: ['large'] }],
-      }],
-      subtotal_cents: 3998,
-      status: 'Placed',
-      created_at: '2026-05-13T09:00:00Z',
-    }));
+  it('submits checkout details without session_id and normalizes backend orders', async () => {
+    let operationInit: RequestInit | undefined;
+    gatewayMock((url, init) => {
+      expect(url).toBe('/api/orderly/orders');
+      operationInit = init;
+      return mockJsonResponse({
+        id: 'ORD-BACKEND',
+        cart_items: [{
+          id: cartItem.id,
+          restaurant_id: cartItem.restaurantId,
+          menu_item_id: cartItem.menuItemId,
+          name: cartItem.name,
+          quantity: cartItem.quantity,
+          base_price_cents: cartItem.basePriceCents,
+          modifiers: [{ group_id: 'size', option_ids: ['large'] }],
+        }],
+        subtotal_cents: 3998,
+        status: 'Placed',
+        created_at: '2026-05-13T09:00:00Z',
+      });
+    });
 
-    const order = await createBackendOrder('session-test', [cartItem], 3998, checkoutDetails);
-    const [, init] = fetchMock.mock.calls[0];
+    const order = await createBackendOrder([cartItem], 3998, checkoutDetails);
+    const body = JSON.parse(operationInit?.body as string);
 
-    expect(JSON.parse(init?.body as string)).toMatchObject({
-      session_id: 'session-test',
+    expect(body).toMatchObject({
       subtotal_cents: 3998,
       tip_cents: 500,
       customer_name: 'Jamie Demo',
       customer_email: 'jamie@example.com',
       delivery_address: '123 Demo Street',
     });
+    expect(body).not.toHaveProperty('session_id');
     expect(order).toMatchObject({
       id: 'ORD-BACKEND',
       status: 'Placed',
@@ -119,29 +141,31 @@ describe('backend API client', () => {
     });
   });
 
-  it('returns undefined when backend order fetches fail', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(mockJsonResponse({}, false));
+  it('returns undefined when protected order fetches fail', async () => {
+    gatewayMock(() => mockJsonResponse({}, false, 404));
     await expect(fetchOrder('missing')).resolves.toBeUndefined();
     await expect(fetchOrders()).resolves.toBeUndefined();
   });
 
-  it('normalizes backend order lists', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(mockJsonResponse([{
-      id: 'ORD-LIST',
-      session_id: 'session-test',
-      cart_items: [{
-        id: 'line-1',
-        restaurant_id: restaurants[0].id,
-        menu_item_id: restaurants[0].menu[0].id,
-        name: restaurants[0].menu[0].name,
-        quantity: 1,
-        base_price_cents: restaurants[0].menu[0].priceCents,
-        modifiers: [],
-      }],
-      subtotal_cents: restaurants[0].menu[0].priceCents,
-      status: 'Placed',
-      created_at: '2026-05-13T09:00:00Z',
-    }]));
+  it('normalizes guest-scoped backend order lists', async () => {
+    gatewayMock(url => {
+      expect(url).toBe('/api/orderly/orders');
+      return mockJsonResponse([{
+        id: 'ORD-LIST',
+        cart_items: [{
+          id: 'line-1',
+          restaurant_id: restaurants[0].id,
+          menu_item_id: restaurants[0].menu[0].id,
+          name: restaurants[0].menu[0].name,
+          quantity: 1,
+          base_price_cents: restaurants[0].menu[0].priceCents,
+          modifiers: [],
+        }],
+        subtotal_cents: restaurants[0].menu[0].priceCents,
+        status: 'Placed',
+        created_at: '2026-05-13T09:00:00Z',
+      }]);
+    });
 
     await expect(fetchOrders()).resolves.toMatchObject([{ id: 'ORD-LIST' }]);
   });
