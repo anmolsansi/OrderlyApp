@@ -1,0 +1,45 @@
+{
+  "contract": "C2",
+  "schema_version": 1,
+  "synthetic": true,
+  "positive": {
+    "profile": {
+      "schemaVersion": 1,
+      "id": "demo-profile-1",
+      "name": "Demo visitor",
+      "defaultAddressId": "demo-address-1"
+    },
+    "addresses": [
+      {
+        "id": "demo-address-1",
+        "label": "Demo address",
+        "street": "100 Demo Street",
+        "city": "Demo City",
+        "state": "CA",
+        "postal_code": "94105"
+      }
+    ]
+  },
+  "negative": [
+    {
+      "name": "invalid_profile",
+      "status": 422,
+      "error": {
+        "code": "invalid_profile",
+        "message": "Demo profile is invalid",
+        "request_id": "synthetic-request-1",
+        "fields": ["profile"]
+      }
+    },
+    {
+      "name": "storage_unavailable",
+      "status": 0,
+      "error": {
+        "code": "storage_unavailable",
+        "message": "Demo profile storage is unavailable",
+        "request_id": "synthetic-request-2",
+        "fields": []
+      }
+    }
+  ]
+}
