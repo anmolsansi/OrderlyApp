@@ -47,6 +47,44 @@ describe('same-origin Orderly API gateway', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('forwards C5 checkout quote POSTs through the existing same-origin boundary', async () => {
+    process.env.ORDERLY_API_ORIGIN = 'https://api.orderly.test';
+    let forwardedBody = '';
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      forwardedBody = typeof init?.body === 'string'
+        ? init.body
+        : init?.body instanceof ArrayBuffer
+          ? new TextDecoder().decode(init.body)
+          : '';
+      return new Response(JSON.stringify({
+        schema_version: 1,
+        cart_revision: 7,
+        catalog_fingerprint: 'a'.repeat(64),
+        totals: {
+          subtotal_cents: 1000,
+          discount_cents: 500,
+          delivery_fee_cents: 199,
+          service_fee_cents: 249,
+          tax_cents: 44,
+          tip_cents: 200,
+          total_cents: 1192,
+        },
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    });
+
+    const response = await call(POST, 'POST', 'checkout/quote', {
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ expected_revision: 7, tip_cents: 200, promotion_code: 'DEMO5' }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(String(fetchMock.mock.calls[0][0])).toBe('https://api.orderly.test/v1/checkout/quote');
+    expect(JSON.parse(forwardedBody)).toEqual({ expected_revision: 7, tip_cents: 200, promotion_code: 'DEMO5' });
+  });
+
   it('rejects unsafe cross-origin requests before contacting the backend', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch');
     const response = await POST(
