@@ -1,0 +1,6 @@
+# ST-01 pinned test-only dependencies.
+# Install the backend package first with: python -m pip install -e ./backend
+# Then install this lock from repository root with:
+# python -m pip install -r backend/requirements-test.lock
+httpx==0.28.1
+pytest==8.4.2
