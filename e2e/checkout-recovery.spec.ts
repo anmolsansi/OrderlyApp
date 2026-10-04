@@ -95,7 +95,7 @@ test('lost accepted response replays the exact key and body into one durable rec
   await expect(page.getByText(acceptedOrderId, { exact: true }).first()).toBeVisible();
 
   await page.goto('/orders');
-  await expect(page.getByRole('link', { name: new RegExp(acceptedOrderId) })).toBeVisible();
+  await expect(page.locator(`a[href="/order-confirmation?orderId=${acceptedOrderId}"]`)).toBeVisible();
 
   await page.goto('/order-confirmation?orderId=00000000-0000-4000-8000-000000000000');
   await expect(page.getByRole('heading', { name: /order not found/i })).toBeVisible();
