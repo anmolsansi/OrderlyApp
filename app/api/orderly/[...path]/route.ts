@@ -44,6 +44,24 @@ function upstreamOrigin(): string {
   return url.origin;
 }
 
+function firstForwardedValue(value: string | null): string | undefined {
+  const first = value?.split(',', 1)[0]?.trim();
+  return first || undefined;
+}
+
+function publicRequestOrigin(request: NextRequest): string {
+  const protocol = firstForwardedValue(request.headers.get('x-forwarded-proto'))
+    ?? request.nextUrl.protocol.replace(':', '');
+  const host = firstForwardedValue(request.headers.get('x-forwarded-host'))
+    ?? request.headers.get('host')?.trim()
+    ?? request.nextUrl.host;
+
+  if (!['http', 'https'].includes(protocol) || !host) {
+    throw new Error('Unable to determine public request origin');
+  }
+  return `${protocol}://${host}`;
+}
+
 function normalizedPath(segments: string[]): string | undefined {
   if (segments.length === 0 || segments.length > 2) return undefined;
   if (segments.some(segment => !/^[A-Za-z0-9._~-]+$/.test(segment))) return undefined;
@@ -54,10 +72,16 @@ function routeAllowed(path: string, method: string): boolean {
   return ALLOWED_ROUTES.some(route => route.pattern.test(path) && route.methods.has(method));
 }
 
-function sameOriginAllowed(request: NextRequest): boolean {
+function sameOriginAllowed(request: NextRequest, publicOrigin: string): boolean {
   if (!UNSAFE_METHODS.has(request.method)) return true;
+
   const origin = request.headers.get('origin');
-  return origin === request.nextUrl.origin;
+  if (origin) return origin === publicOrigin;
+
+  // Some same-origin browser POSTs omit Origin. Sec-Fetch-Site is a forbidden
+  // request header for page JavaScript, so it can safely distinguish a real
+  // same-origin browser navigation/fetch from a scripted cross-site request.
+  return request.headers.get('sec-fetch-site') === 'same-origin';
 }
 
 async function boundedBody(request: NextRequest): Promise<ArrayBuffer | undefined> {
@@ -75,7 +99,7 @@ async function boundedBody(request: NextRequest): Promise<ArrayBuffer | undefine
   return data.byteLength > 0 ? data : undefined;
 }
 
-function upstreamHeaders(request: NextRequest): Headers {
+function upstreamHeaders(request: NextRequest, publicOrigin: string): Headers {
   const headers = new Headers();
   const accept = request.headers.get('accept');
   const contentType = request.headers.get('content-type');
@@ -85,8 +109,8 @@ function upstreamHeaders(request: NextRequest): Headers {
   if (contentType) headers.set('content-type', contentType);
   if (cookie) headers.set('cookie', cookie);
 
-  headers.set('origin', request.nextUrl.origin);
-  headers.set('x-forwarded-proto', request.nextUrl.protocol.replace(':', ''));
+  headers.set('origin', publicOrigin);
+  headers.set('x-forwarded-proto', new URL(publicOrigin).protocol.replace(':', ''));
   return headers;
 }
 
@@ -112,7 +136,14 @@ async function proxy(request: NextRequest, context: RouteContext): Promise<NextR
     return errorResponse(404, 'not_found', 'API route not found');
   }
 
-  if (!sameOriginAllowed(request)) {
+  let publicOrigin: string;
+  try {
+    publicOrigin = publicRequestOrigin(request);
+  } catch {
+    return errorResponse(400, 'invalid_request_origin', 'Unable to determine request origin');
+  }
+
+  if (!sameOriginAllowed(request, publicOrigin)) {
     return errorResponse(403, 'origin_forbidden', 'Request origin is not allowed');
   }
 
@@ -143,7 +174,7 @@ async function proxy(request: NextRequest, context: RouteContext): Promise<NextR
   try {
     const upstream = await fetch(target, {
       method: request.method,
-      headers: upstreamHeaders(request),
+      headers: upstreamHeaders(request, publicOrigin),
       body,
       cache: 'no-store',
       redirect: 'manual',
@@ -164,7 +195,7 @@ async function proxy(request: NextRequest, context: RouteContext): Promise<NextR
     if (setCookie) {
       responseHeaders.append(
         'set-cookie',
-        rewriteGuestCookie(setCookie, request.nextUrl.protocol === 'https:'),
+        rewriteGuestCookie(setCookie, new URL(publicOrigin).protocol === 'https:'),
       );
     }
 
