@@ -22,6 +22,7 @@ from .models import (
     CartPricingResponse,
     MenuItem,
     Order,
+    ReceiptResponse,
     Restaurant,
     RevisionedCart,
 )
@@ -31,6 +32,16 @@ DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 RESTAURANTS_FILE = DATA_DIR / "restaurants.json"
 CARTS_FILE = DATA_DIR / "carts.json"
 ORDERS_FILE = DATA_DIR / "orders.json"
+
+
+class ReceiptStorageUnavailableError(RuntimeError):
+    def __init__(self) -> None:
+        super().__init__("Receipt storage is unavailable")
+
+
+class InvalidReceiptCursorError(ValueError):
+    def __init__(self) -> None:
+        super().__init__("Receipt cursor is invalid")
 
 
 def ensure_data_dir() -> None:
@@ -343,6 +354,86 @@ def update_guest_cart_row(
         items=[CartItem.model_validate(item) for item in row["items"]],
         updated_at=row["updated_at"],
     )
+
+
+def insert_order_snapshot(conn: Any, owner_id: str, receipt: ReceiptResponse) -> ReceiptResponse:
+    """Insert one immutable C5 receipt inside the caller's transaction."""
+    conn.execute(
+        """
+        INSERT INTO guest_orders (id, owner_id, snapshot, created_at)
+        VALUES (%s::uuid, %s, %s::jsonb, %s)
+        """,
+        (
+            receipt.id,
+            owner_id,
+            json.dumps(receipt.model_dump(mode="json")),
+            receipt.created_at,
+        ),
+    )
+    return receipt
+
+
+def _receipt_from_row(row: Dict[str, Any]) -> ReceiptResponse:
+    return ReceiptResponse.model_validate(row["snapshot"])
+
+
+def get_order_snapshot_for_owner(order_id: str, owner_id: str) -> Optional[ReceiptResponse]:
+    if not database_url():
+        raise ReceiptStorageUnavailableError()
+    try:
+        with get_connection() as conn:
+            row = conn.execute(
+                "SELECT snapshot FROM guest_orders WHERE id::text = %s AND owner_id = %s",
+                (order_id, owner_id),
+            ).fetchone()
+        return _receipt_from_row(row) if row else None
+    except ReceiptStorageUnavailableError:
+        raise
+    except Exception as exc:
+        raise ReceiptStorageUnavailableError() from exc
+
+
+def list_order_snapshots_for_owner(
+    owner_id: str,
+    *,
+    cursor: Optional[str] = None,
+    limit: int = 50,
+) -> List[ReceiptResponse]:
+    if not database_url():
+        raise ReceiptStorageUnavailableError()
+    if not 1 <= limit <= 50:
+        raise ValueError("Receipt list limit must be between 1 and 50")
+
+    try:
+        with get_connection() as conn:
+            params: list[Any] = [owner_id]
+            where = "owner_id = %s"
+            if cursor:
+                cursor_row = conn.execute(
+                    "SELECT id, created_at FROM guest_orders WHERE id::text = %s AND owner_id = %s",
+                    (cursor, owner_id),
+                ).fetchone()
+                if cursor_row is None:
+                    raise InvalidReceiptCursorError()
+                where += " AND (created_at, id) < (%s, %s::uuid)"
+                params.extend([cursor_row["created_at"], str(cursor_row["id"])])
+
+            params.append(limit)
+            rows = conn.execute(
+                f"""
+                SELECT snapshot
+                FROM guest_orders
+                WHERE {where}
+                ORDER BY created_at DESC, id DESC
+                LIMIT %s
+                """,
+                tuple(params),
+            ).fetchall()
+        return [_receipt_from_row(row) for row in rows]
+    except InvalidReceiptCursorError:
+        raise
+    except Exception as exc:
+        raise ReceiptStorageUnavailableError() from exc
 
 
 # Legacy pre-C4 cart helpers remain for old offline/order compatibility only.

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -44,6 +45,7 @@ def guest_id_for_token(postgres_connection, token: str) -> str:
 
 
 def cleanup_guest_rows(postgres_connection) -> None:
+    postgres_connection.execute("DELETE FROM guest_orders WHERE owner_id LIKE 'guest-%'")
     postgres_connection.execute("DELETE FROM guest_carts WHERE owner_id LIKE 'guest-%'")
     postgres_connection.execute("DELETE FROM carts WHERE session_id LIKE 'guest-%'")
     postgres_connection.execute("DELETE FROM orders WHERE session_id LIKE 'guest-%'")
@@ -85,12 +87,57 @@ def test_two_guest_cookie_jars_are_isolated_and_reset_revokes_old_scope(
         "INSERT INTO guest_carts (owner_id, revision, items) VALUES (%s, 1, %s::jsonb)",
         (guest_a, json.dumps([cart_item])),
     )
+
+    receipt_id = "11111111-1111-4111-8111-111111111113"
+    created_at = datetime(2030, 1, 1, tzinfo=timezone.utc)
+    receipt = {
+        "schema_version": 1,
+        "id": receipt_id,
+        "status": "Placed",
+        "created_at": created_at.isoformat(),
+        "items": [
+            {
+                "id": "line-a",
+                "restaurant_id": "fixture-restaurant",
+                "menu_item_id": "fixture-item",
+                "name": "Synthetic item",
+                "unit_price_cents": 500,
+                "quantity": 1,
+                "line_total_cents": 500,
+                "modifiers": [],
+                "special_instructions": None,
+            }
+        ],
+        "checkout": {
+            "name": "Demo Visitor",
+            "phone": "+1-555-0100",
+            "email": "demo@example.test",
+            "street": "100 Demo Street",
+            "apartment": None,
+            "city": "Demo City",
+            "state": "CA",
+            "postal_code": "94105",
+            "delivery_instructions": None,
+            "payment_method": "mock",
+            "tip_cents": 0,
+        },
+        "totals": {
+            "subtotal_cents": 500,
+            "discount_cents": 0,
+            "delivery_fee_cents": 199,
+            "service_fee_cents": 249,
+            "tax_cents": 44,
+            "tip_cents": 0,
+            "total_cents": 992,
+        },
+        "pricing_version": "mock-v1",
+    }
     postgres_connection.execute(
         """
-        INSERT INTO orders (id, session_id, cart_items, subtotal_cents, status)
-        VALUES (%s, %s, %s::jsonb, %s, 'Placed')
+        INSERT INTO guest_orders (id, owner_id, snapshot, created_at)
+        VALUES (%s::uuid, %s, %s::jsonb, %s)
         """,
-        ("ORD-GUEST-A", guest_a, json.dumps([cart_item]), 500),
+        (receipt_id, guest_a, json.dumps(receipt), created_at),
     )
     postgres_connection.commit()
 
@@ -116,14 +163,15 @@ def test_two_guest_cookie_jars_are_isolated_and_reset_revokes_old_scope(
     a_orders = client_a.get("/v1/orders")
     b_orders = client_b.get("/v1/orders")
     assert a_orders.status_code == 200
-    assert [order["id"] for order in a_orders.json()] == ["ORD-GUEST-A"]
+    assert [order["id"] for order in a_orders.json()] == [receipt_id]
+    assert "owner_id" not in a_orders.json()[0]
     assert "session_id" not in a_orders.json()[0]
     assert b_orders.status_code == 200
     assert b_orders.json() == []
 
-    foreign_order = client_b.get("/v1/orders/ORD-GUEST-A")
+    foreign_order = client_b.get(f"/v1/orders/{receipt_id}")
     assert foreign_order.status_code == 404
-    assert foreign_order.json()["error"]["code"] == "not_found"
+    assert foreign_order.json()["error"]["code"] == "order_not_found"
     assert foreign_order.json()["error"]["message"] == "Order not found"
 
     forbidden_origin = client_a.request(
