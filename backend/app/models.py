@@ -69,12 +69,16 @@ class Cart(BaseModel):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+class CartResponse(BaseModel):
+    items: List[CartItem] = Field(default_factory=list)
+    updated_at: datetime
+
+
 class CartUpsertRequest(BaseModel):
     items: List[CartItem]
 
 
 class OrderCreateRequest(BaseModel):
-    session_id: str
     cart_items: List[CartItem]
     subtotal_cents: int = Field(ge=0)
     delivery_address: Optional[str] = None
@@ -110,6 +114,19 @@ class Order(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+class OrderResponse(BaseModel):
+    id: str
+    cart_items: List[CartItem]
+    subtotal_cents: int = Field(ge=0)
+    status: OrderStatus = "Placed"
+    created_at: datetime
+
+
+class SessionResponse(BaseModel):
+    schema_version: Literal[1] = 1
+    expires_at: datetime
+
+
 class HealthResponse(BaseModel):
     ok: bool
     service: str
@@ -120,7 +137,8 @@ class HealthResponse(BaseModel):
 class ErrorBody(BaseModel):
     code: str
     message: str
-    fields: Optional[Dict[str, str]] = None
+    request_id: str
+    fields: List[str] = Field(default_factory=list)
 
 
 class ErrorResponse(BaseModel):
