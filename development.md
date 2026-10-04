@@ -1633,3 +1633,36 @@ The guide is a **documented handoff plan**, not executable-ready work already te
 **Provider→consumer test:** Section6 records schema, positive/negative errors, fixtures, retry/security/lifecycle and conformance for every named interface. Section7 records each consumer gate. Consumers do not need private SQL or pricing code; they need the public contracts and executable fixtures ST-01 supplies. A provider may not freeze incomplete examples and ask the consumer to guess missing fields. If fixture/conformance fails, repair it in the provider before releasing the dependent wave.
 
 **Maintenance rules:** Update only the affected packet/contract/DAG rows when discoveries change the plan; preserve dated evidence and failed runs. Any new task gets an ID, explicit ownership and acceptance proof. No unchecked release blocker disappears merely because an engineer wrote the code.
+
+## ST-01 implementation evidence — 2026-10-04
+
+This section records the executed foundation evidence for **ST-01 — Reproduce the baseline and publish executable contracts**. It does not mark ST-02 through ST-13 complete and does not claim the current product is production-ready.
+
+### Verified source and runners
+
+- Starting `main` SHA: `78b8fa6a7d6a779a8985d34413d81d8b23673403`.
+- Work branch: `chore/st-01-baseline-contracts`.
+- Frontend runtime: Node 22; supported range in `package.json` is `>=20.9.0 <25`.
+- Lock resolver used for ST-01 evidence: npm `11.20.0`.
+- Backend hosted runtime: Python `3.12`; application metadata remains `>=3.9`.
+- Database baseline: PostgreSQL `16`.
+- Browser baseline: Playwright Chromium installed with `playwright install --with-deps chromium`.
+- WEB verification: `npm run test`, `npm run typecheck`, `npm run build`, plus `npm audit --audit-level=high`.
+- CONTRACTS-TS verification: `npm run test:contracts`.
+- BACKEND verification: `python -m pytest backend/tests -q` after applying repository migrations against real Postgres.
+- E2E verification: the existing Playwright product suite with a seeded real Postgres backend and live FastAPI health check.
+
+Hosted run `37199252860`, assessed at SHA `ca097fe195f30fbab198e3b635a72b6d47788d41`, passed WEB, BACKEND/Postgres, standalone Chromium launch, API-backed product E2E, and the baseline evidence summary. C0–C8 executable fixtures live under `tests/fixtures/contracts/` and are consumed by both Python and TypeScript conformance tests.
+
+### Dependency assessment and decisions
+
+- Next.js moved from `16.2.2` to `16.3.8`, the available non-major fix path identified by the repository's current advisory evidence.
+- Vitest moved from the earlier `4.1.x` range to `4.1.11`, outside the recorded affected range.
+- The regenerated lockfile is committed and hosted WEB evidence passes `npm audit --audit-level=high`.
+- npm `10.9.9` crashed inside Arborist with `Cannot read properties of null (reading 'edgesOut')` while reconciling the old lockfile. ST-01 regenerated the lock with npm `11.20.0` instead of hand-editing it.
+- The earlier missing Chromium runtime is resolved by explicit provisioning and a separate browser-launch gate. Browser infrastructure failure is now distinct from product assertion failure.
+
+### Contract freeze status
+
+C0 is frozen by ST-01 at schema version `1`, including the explicit runner and mode/reproducibility fixture. C1–C8 are executable version-1 scaffolds only. Their named provider tickets remain responsible for provider conformance and their later freeze points exactly as defined in the contract registry above.
+
