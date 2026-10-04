@@ -31,3 +31,23 @@ Use these names consistently in issues, CI evidence, and stabilization reviews:
 - `AUDIT`: `npm audit --audit-level=high`
 
 `WEB` covers the frontend unit suite, typecheck, and production build. `BACKEND` includes the ST-01 contract and baseline tests. Hosted BACKEND additionally provisions a real PostgreSQL service before pytest runs.
+
+## Clean frontend verification
+
+From a clean checkout of the exact SHA being assessed:
+
+```bash
+node --version
+npm --version
+npm install --global npm@11.20.0
+npm ci --ignore-scripts
+npm run test:contracts
+npm run test
+npm run typecheck
+npm run build
+npm audit --audit-level=high
+```
+
+Expected runtime for hosted evidence is Node 22 with npm 11.20.0. `npm ci` must use the committed `package-lock.json`. Do not replace it with `npm install` during ordinary verification because that would change the resolved dependency graph.
+
+A WEB failure is a product or source failure only after dependency installation succeeds. A missing runtime or broken lock is foundation failure and stays owned by ST-01.
