@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SYNTHETIC_DEMO_ADDRESSES } from '../lib/auth';
+import { SYNTHETIC_DEMO_ADDRESSES, getPreferredDemoAddress } from '../lib/auth';
 import { createMockOrderId, validateCheckoutDetails } from '../lib/cart';
 import { orderStatusSteps, restaurants, validateFixtures } from '../lib/mock-data';
 import type { CheckoutDetails } from '../lib/types';
@@ -50,5 +50,12 @@ describe('fixtures and checkout primitives', () => {
       };
       expect(validateCheckoutDetails(details)).toEqual({ ok: true, errors: [] });
     }
+  });
+
+  it('uses the requested synthetic default and falls back to the first known address for an invalid default', () => {
+    expect(getPreferredDemoAddress({ defaultAddressId: 'demo-address-2' }, SYNTHETIC_DEMO_ADDRESSES)?.id).toBe('demo-address-2');
+    expect(getPreferredDemoAddress({ defaultAddressId: 'missing-address' }, SYNTHETIC_DEMO_ADDRESSES)?.id).toBe('demo-address-1');
+    expect(getPreferredDemoAddress(undefined, SYNTHETIC_DEMO_ADDRESSES)?.id).toBe('demo-address-1');
+    expect(getPreferredDemoAddress(undefined, [])).toBeUndefined();
   });
 });
