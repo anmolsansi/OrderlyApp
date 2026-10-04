@@ -15,7 +15,14 @@ import {
   saveRevisionedCart,
   submitCheckoutOrder,
 } from '@/lib/api';
-import { getDemoAddresses, getDemoProfile, SYNTHETIC_DEMO_ADDRESSES } from '@/lib/auth';
+import {
+  SYNTHETIC_DEMO_ADDRESSES,
+  forgetDemoProfile,
+  getDemoAddresses,
+  getDemoProfile,
+  getPreferredDemoAddress,
+  type DemoProfileErrorCode,
+} from '@/lib/auth';
 import { updateCartItemQuantity, validateCheckoutDetails } from '@/lib/cart';
 import { routes } from '@/lib/routes';
 import type {
@@ -34,6 +41,11 @@ const SYNTHETIC_PHONE = '+1-555-0100';
 const SYNTHETIC_EMAIL = 'demo@example.test';
 const PROMOTION_CODE = 'DEMO5' as const;
 const CUSTOM_ADDRESS_ID = 'custom';
+
+type ProfileStorageError = {
+  code: DemoProfileErrorCode;
+  message: string;
+};
 
 function detailsFromAddress(name: string, address: DemoAddress, tipCents: number): CheckoutDetails {
   return {
@@ -71,7 +83,9 @@ export default function CheckoutPage() {
   const [addresses, setAddresses] = useState<DemoAddress[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState(defaultAddress.id);
   const [profileAvailable, setProfileAvailable] = useState(false);
-  const [profileError, setProfileError] = useState<string | null>(null);
+  const [profileError, setProfileError] = useState<ProfileStorageError | null>(null);
+  const [ephemeralProfile, setEphemeralProfile] = useState(false);
+  const [profileReloadKey, setProfileReloadKey] = useState(0);
   const [loading, setLoading] = useState(mode === 'api');
   const [loadError, setLoadError] = useState<string | null>(null);
   const [quoteError, setQuoteError] = useState<string | null>(null);
@@ -89,6 +103,11 @@ export default function CheckoutPage() {
     if (mode !== 'api') return;
     let active = true;
     async function load(): Promise<void> {
+      setProfileAvailable(false);
+      setProfileError(null);
+      setEphemeralProfile(false);
+      setAddresses([]);
+
       const storedRecovery = loadCheckoutRecovery(window.sessionStorage);
       if (storedRecovery) {
         deliberateInput.current = true;
@@ -101,27 +120,28 @@ export default function CheckoutPage() {
       const addressesResult = getDemoAddresses(window.localStorage);
       if (!active) return;
 
-      let availableAddresses: DemoAddress[] = [];
       if (!addressesResult.ok) {
-        setProfileError(addressesResult.message);
+        setProfileError({ code: addressesResult.code, message: addressesResult.message });
       } else {
-        availableAddresses = addressesResult.value;
-        setAddresses(availableAddresses);
+        setAddresses(addressesResult.value);
       }
 
       if (!profileResult.ok) {
-        setProfileError(profileResult.message);
-      } else {
-        setProfileAvailable(Boolean(profileResult.value));
+        setProfileError({ code: profileResult.code, message: profileResult.message });
       }
 
-      if (storedRecovery && availableAddresses.length > 0) {
-        setSelectedAddressId(matchingAddressId(availableAddresses, storedRecovery.submission.checkout));
-      } else if (profileResult.ok && profileResult.value && availableAddresses.length > 0 && !deliberateInput.current) {
-        const address = availableAddresses.find(candidate => candidate.id === profileResult.value?.defaultAddressId) ?? availableAddresses[0];
-        if (address) {
-          setSelectedAddressId(address.id);
-          setDetails(previous => detailsFromAddress(profileResult.value?.name ?? previous.name, address, previous.tipCents));
+      if (profileResult.ok && addressesResult.ok) {
+        setProfileAvailable(Boolean(profileResult.value));
+        const availableAddresses = addressesResult.value;
+
+        if (storedRecovery && availableAddresses.length > 0) {
+          setSelectedAddressId(matchingAddressId(availableAddresses, storedRecovery.submission.checkout));
+        } else if (profileResult.value && !deliberateInput.current) {
+          const address = getPreferredDemoAddress(profileResult.value, availableAddresses);
+          if (address) {
+            setSelectedAddressId(address.id);
+            setDetails(previous => detailsFromAddress(profileResult.value?.name ?? previous.name, address, previous.tipCents));
+          }
         }
       }
 
@@ -131,6 +151,7 @@ export default function CheckoutPage() {
         setLoadError(cartResult.error.message);
         setCart(null);
       } else {
+        setLoadError(null);
         setCart(cartResult.data);
       }
       setLoading(false);
@@ -139,7 +160,7 @@ export default function CheckoutPage() {
     return () => {
       active = false;
     };
-  }, [mode]);
+  }, [mode, profileReloadKey]);
 
   useEffect(() => {
     if (
@@ -174,6 +195,38 @@ export default function CheckoutPage() {
       setCheckoutState('idle');
       setCheckoutErrors([]);
     }
+  }
+
+  function retryProfileStorage(): void {
+    setProfileReloadKey(value => value + 1);
+  }
+
+  function clearInvalidProfileStorage(): void {
+    const result = forgetDemoProfile(window.localStorage);
+    if (!result.ok) {
+      setProfileError({ code: result.code, message: result.message });
+      return;
+    }
+    retryProfileStorage();
+  }
+
+  function useTemporaryProfile(): void {
+    const temporaryAddresses = SYNTHETIC_DEMO_ADDRESSES.map(address => ({ ...address }));
+    setAddresses(temporaryAddresses);
+    setProfileAvailable(true);
+    setProfileError(null);
+    setEphemeralProfile(true);
+
+    if (!deliberateInput.current) {
+      const address = getPreferredDemoAddress(undefined, temporaryAddresses);
+      if (address) {
+        setSelectedAddressId(address.id);
+        setDetails(previous => detailsFromAddress(previous.name || 'Demo visitor', address, previous.tipCents));
+      }
+      return;
+    }
+
+    setSelectedAddressId(matchingAddressId(temporaryAddresses, details));
   }
 
   async function mutateCart(nextItems: RevisionedCart['items']): Promise<void> {
@@ -460,7 +513,24 @@ export default function CheckoutPage() {
               )}
 
               {profileError && checkoutState !== 'uncertain' && (
-                <div className="validation-panel" role="alert"><p>{profileError}</p></div>
+                <div className="validation-panel" role="alert">
+                  <p>{profileError.message}</p>
+                  <div className="filter-row">
+                    <button className="ghost-button" type="button" onClick={retryProfileStorage}>Retry profile</button>
+                    {profileError.code === 'invalid_profile' && (
+                      <button className="ghost-button" type="button" onClick={clearInvalidProfileStorage}>Clear local demo data</button>
+                    )}
+                    {profileError.code === 'storage_unavailable' && (
+                      <button className="checkout-button" type="button" onClick={useTemporaryProfile}>Use temporary demo profile</button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {ephemeralProfile && checkoutState !== 'uncertain' && (
+                <div className="validation-panel" role="status">
+                  <p>Browser profile storage is unavailable. This temporary synthetic profile is used only for this checkout and does not change server guest ownership.</p>
+                </div>
               )}
 
               {!profileAvailable && !profileError && !loading && checkoutState !== 'uncertain' && (
