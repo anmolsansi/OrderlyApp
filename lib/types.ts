@@ -1,3 +1,27 @@
+export type DataMode = 'api' | 'local_demo';
+export type ApiErrorKind = 'validation' | 'conflict' | 'session' | 'network' | 'server';
+
+export interface ApiErrorDetails {
+  code: string;
+  message: string;
+  requestId?: string;
+  fields?: string[];
+  currentCart?: RevisionedCart;
+}
+
+export interface ApiSuccess<T> {
+  ok: true;
+  data: T;
+}
+
+export interface ApiFailure {
+  ok: false;
+  kind: ApiErrorKind;
+  error: ApiErrorDetails;
+}
+
+export type ApiResult<T> = ApiSuccess<T> | ApiFailure;
+
 export type CustomizationSelectionType = 'single' | 'multiple';
 export type ModifierType = CustomizationSelectionType;
 
@@ -77,6 +101,12 @@ export interface CartItem {
   basePriceCents: number;
   modifiers: CartItemModifier[];
   specialInstructions?: string;
+}
+
+export interface RevisionedCart {
+  schemaVersion: 1;
+  revision: number;
+  items: CartItem[];
 }
 
 export interface CartTotals {
