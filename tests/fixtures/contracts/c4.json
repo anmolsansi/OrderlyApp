@@ -2,6 +2,26 @@
   "contract": "C4",
   "schema_version": 1,
   "synthetic": true,
+  "initial": {
+    "schema_version": 1,
+    "revision": 0,
+    "items": []
+  },
+  "write_request": {
+    "expected_revision": 0,
+    "items": [
+      {
+        "id": "line-1",
+        "restaurant_id": "fixture-r1",
+        "menu_item_id": "fixture-i1",
+        "quantity": 1,
+        "modifiers": []
+      }
+    ]
+  },
+  "delete_request": {
+    "expected_revision": 1
+  },
   "positive": {
     "schema_version": 1,
     "revision": 1,
@@ -41,6 +61,26 @@
         "message": "Cart storage is unavailable",
         "request_id": "synthetic-request-2",
         "fields": []
+      }
+    },
+    {
+      "name": "invalid_cart",
+      "status": 422,
+      "error": {
+        "code": "invalid_cart",
+        "message": "Cart contains invalid catalog choices",
+        "request_id": "synthetic-request-3",
+        "fields": ["items.0.menu_item_id"]
+      }
+    },
+    {
+      "name": "invalid_expected_revision",
+      "status": 422,
+      "error": {
+        "code": "invalid_cart",
+        "message": "Cart contains invalid catalog choices",
+        "request_id": "synthetic-request-4",
+        "fields": ["expected_revision"]
       }
     }
   ]

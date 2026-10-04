@@ -9,6 +9,14 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from .cart_service import (
+    CartConflictError,
+    CartStorageUnavailableError,
+    CartValidationError,
+    delete_cart,
+    get_cart,
+    put_cart,
+)
 from .catalog import CatalogConfigurationError, CatalogValidationResult
 from .database import database_url, get_connection
 from .identity import (
@@ -22,6 +30,7 @@ from .identity import (
     verify_request_guest,
 )
 from .models import (
+    CartDeleteRequest,
     CartPricingRequest,
     CartPricingResponse,
     CartResponse,
@@ -35,16 +44,13 @@ from .models import (
 from .redis_store import redis_client, redis_url
 from .store import (
     calculate_cart_pricing,
-    clear_cart,
     create_order,
-    get_cart,
     get_catalog_snapshot,
     get_order_for_session,
     get_restaurant,
     list_orders_for_session,
     search_restaurants,
     validate_cart_items,
-    write_cart,
 )
 
 app = FastAPI(title="OrderlyApp API", version="0.2.0")
@@ -142,6 +148,46 @@ def api_contract_exception_handler(request: Request, exc: ApiContractError) -> J
     return _error_response(request, exc.status_code, exc.code, exc.message, exc.fields)
 
 
+@app.exception_handler(CartConflictError)
+def cart_conflict_exception_handler(request: Request, exc: CartConflictError) -> JSONResponse:
+    return JSONResponse(
+        status_code=409,
+        content={
+            "error": {
+                "code": "cart_conflict",
+                "message": "Basket changed in another tab",
+                "request_id": _request_id(request),
+                "fields": [],
+            },
+            "current_cart": exc.current_cart.model_dump(mode="json"),
+        },
+    )
+
+
+@app.exception_handler(CartValidationError)
+def cart_validation_exception_handler(request: Request, exc: CartValidationError) -> JSONResponse:
+    return _error_response(
+        request,
+        422,
+        "invalid_cart",
+        "Cart contains invalid catalog choices",
+        exc.fields,
+    )
+
+
+@app.exception_handler(CartStorageUnavailableError)
+def cart_storage_exception_handler(
+    request: Request,
+    _exc: CartStorageUnavailableError,
+) -> JSONResponse:
+    return _error_response(
+        request,
+        503,
+        "storage_unavailable",
+        "Cart storage is unavailable",
+    )
+
+
 @app.exception_handler(CatalogConfigurationError)
 def catalog_configuration_exception_handler(
     request: Request,
@@ -171,7 +217,11 @@ def validation_exception_handler(request: Request, exc: RequestValidationError) 
             if field
         )
     )
-    cart_fields = [field for field in fields if field == "items" or field.startswith("items.")]
+    cart_fields = [
+        field
+        for field in fields
+        if field == "expected_revision" or field == "items" or field.startswith("items.")
+    ]
     if cart_fields and len(cart_fields) == len(fields):
         return _error_response(
             request,
@@ -254,7 +304,7 @@ def restaurants_show(restaurant_id: str) -> Restaurant:
 
 @app.get("/v1/cart", response_model=CartResponse)
 def carts_show(guest: VerifiedGuest = Depends(verify_request_guest)) -> CartResponse:
-    return CartResponse.model_validate(get_cart(guest.guest_id), from_attributes=True)
+    return get_cart(guest.guest_id)
 
 
 @app.put("/v1/cart", response_model=CartResponse)
@@ -264,22 +314,17 @@ def carts_upsert(
     guest: VerifiedGuest = Depends(verify_request_guest),
 ) -> CartResponse:
     require_allowed_origin(request)
-    snapshot = get_catalog_snapshot()
-    validation = validate_cart_items(payload.items, snapshot=snapshot)
-    _invalid_cart(validation)
-    return CartResponse.model_validate(
-        write_cart(guest.guest_id, validation.items),
-        from_attributes=True,
-    )
+    return put_cart(guest.guest_id, payload.expected_revision, payload.items)
 
 
 @app.delete("/v1/cart", response_model=CartResponse)
 def carts_clear(
     request: Request,
+    payload: CartDeleteRequest,
     guest: VerifiedGuest = Depends(verify_request_guest),
 ) -> CartResponse:
     require_allowed_origin(request)
-    return CartResponse.model_validate(clear_cart(guest.guest_id), from_attributes=True)
+    return delete_cart(guest.guest_id, payload.expected_revision)
 
 
 @app.post("/v1/orders", response_model=OrderResponse, status_code=201)

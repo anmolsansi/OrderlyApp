@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import json
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
@@ -13,9 +10,9 @@ from pydantic import ValidationError
 from app import main as main_module
 from app import store
 from app.catalog import CatalogSnapshot, canonicalize_cart_items, search_snapshot
-from app.identity import VerifiedGuest, verify_request_guest
 from app.models import (
     CartItem,
+    CartItemInput,
     MenuItem,
     ModifierGroup,
     ModifierOption,
@@ -104,6 +101,27 @@ def cart_item(
         menu_item_id=menu_item_id,
         name=name,
         base_price_cents=base_price_cents,
+        quantity=quantity,
+        modifiers=modifiers if modifiers is not None else [
+            {"group_id": "size", "option_ids": ["small"]}
+        ],
+        special_instructions=special_instructions,
+    )
+
+
+def cart_input(
+    *,
+    line_id: str = "line-1",
+    restaurant_id: str = "r1",
+    menu_item_id: str = "r1-item",
+    quantity: int = 1,
+    modifiers: list[dict[str, Any]] | None = None,
+    special_instructions: str | None = None,
+) -> CartItemInput:
+    return CartItemInput(
+        id=line_id,
+        restaurant_id=restaurant_id,
+        menu_item_id=menu_item_id,
         quantity=quantity,
         modifiers=modifiers if modifiers is not None else [
             {"group_id": "size", "option_ids": ["small"]}
@@ -275,7 +293,7 @@ def test_search_preserves_query_cuisine_sort_and_explicit_open_filter() -> None:
 def test_store_search_loads_catalog_once(monkeypatch: pytest.MonkeyPatch) -> None:
     calls = 0
 
-    def load_once() -> list[Restaurant]:
+    def load_once(connection: Any | None = None) -> list[Restaurant]:
         nonlocal calls
         calls += 1
         return [restaurant()]
@@ -288,68 +306,23 @@ def test_store_search_loads_catalog_once(monkeypatch: pytest.MonkeyPatch) -> Non
     assert [item.id for item in result] == ["r1"]
 
 
-def _configure_route_test(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-    catalog: CatalogSnapshot,
-) -> TestClient:
-    monkeypatch.setenv("ORDERLY_DATA_MODE", "api")
-    monkeypatch.setenv("ORDERLY_SESSION_SECRET", "st04-test-secret-value-that-is-longer-than-32-bytes")
-    monkeypatch.setenv("ORDERLY_ALLOWED_ORIGINS", "http://127.0.0.1:3200")
-    monkeypatch.setenv("ORDERLY_FORCE_JSON_STORE", "1")
-    monkeypatch.delenv("DATABASE_URL", raising=False)
-    monkeypatch.delenv("REDIS_URL", raising=False)
-    monkeypatch.setattr(store, "CARTS_FILE", tmp_path / "carts.json")
-    monkeypatch.setattr(main_module, "get_catalog_snapshot", lambda: catalog)
-    main_module.app.dependency_overrides[verify_request_guest] = lambda: VerifiedGuest(
-        guest_id="guest-st04",
-        expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+def test_c4_input_adapter_preserves_c3_canonical_authority() -> None:
+    result = store.validate_cart_input_items([cart_input()], snapshot())
+
+    assert result.ok is True
+    assert result.items[0].name == "Canonical Meal"
+    assert result.items[0].base_price_cents == 1000
+    assert result.items[0].modifiers[0].option_ids == ["small"]
+
+
+def test_c4_input_adapter_preserves_c3_invalid_field_paths() -> None:
+    result = store.validate_cart_input_items(
+        [cart_input(modifiers=[{"group_id": "size", "option_ids": ["missing"]}])],
+        snapshot(),
     )
-    return TestClient(main_module.app)
 
-
-def test_cart_route_persists_canonical_values_not_client_spoofs(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-) -> None:
-    client = _configure_route_test(monkeypatch, tmp_path, snapshot())
-    try:
-        response = client.put(
-            "/v1/cart",
-            headers={"Origin": "http://127.0.0.1:3200"},
-            json={"items": [cart_item().model_dump(mode="json")]},
-        )
-    finally:
-        main_module.app.dependency_overrides.clear()
-
-    assert response.status_code == 200
-    saved = json.loads((tmp_path / "carts.json").read_text())
-    persisted_item = saved["guest-st04"]["items"][0]
-    assert persisted_item["name"] == "Canonical Meal"
-    assert persisted_item["base_price_cents"] == 1000
-
-
-def test_invalid_cart_route_has_no_write_side_effect(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-) -> None:
-    client = _configure_route_test(monkeypatch, tmp_path, snapshot())
-    payload = cart_item(
-        modifiers=[{"group_id": "size", "option_ids": ["missing"]}]
-    ).model_dump(mode="json")
-    try:
-        response = client.put(
-            "/v1/cart",
-            headers={"Origin": "http://127.0.0.1:3200"},
-            json={"items": [payload]},
-        )
-    finally:
-        main_module.app.dependency_overrides.clear()
-
-    assert response.status_code == 422
-    assert response.json()["error"]["code"] == "invalid_cart"
-    assert response.json()["error"]["fields"] == ["items.0.modifiers.0.option_ids.0"]
-    assert not (tmp_path / "carts.json").exists()
+    assert result.ok is False
+    assert result.fields == ["items.0.modifiers.0.option_ids.0"]
 
 
 def test_restaurant_not_found_uses_c3_error_code(

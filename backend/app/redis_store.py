@@ -27,7 +27,7 @@ def redis_client():
         return client
     except Exception as exc:
         if not _warned_redis_failure:
-            print(f"Warning: Redis unavailable; falling back to non-Redis cart store ({exc.__class__.__name__})")
+            print(f"Warning: Redis unavailable ({exc.__class__.__name__}); authoritative cart storage is unchanged")
             _warned_redis_failure = True
         return None
 
