@@ -51,3 +51,25 @@ npm audit --audit-level=high
 Expected runtime for hosted evidence is Node 22 with npm 11.20.0. `npm ci` must use the committed `package-lock.json`. Do not replace it with `npm install` during ordinary verification because that would change the resolved dependency graph.
 
 A WEB failure is a product or source failure only after dependency installation succeeds. A missing runtime or broken lock is foundation failure and stays owned by ST-01.
+
+## Backend and PostgreSQL verification
+
+Hosted CI uses PostgreSQL 16 with a disposable `orderlyapp_test` database. For the equivalent local check, start only the database service or point the test environment at an isolated disposable Postgres instance:
+
+```bash
+docker compose up -d postgres
+python -m venv .venv
+. .venv/bin/activate
+python -m pip install -e ./backend
+python -m pip install -r backend/requirements-test.lock
+export DATABASE_URL=postgresql://orderly:orderly@127.0.0.1:5432/orderlyapp
+export ORDERLY_TEST_DATABASE_URL="$DATABASE_URL"
+python backend/scripts/migrate.py
+python -m pytest backend/tests -q
+```
+
+On Windows, activate the virtual environment using the shell-specific `.venv` activation command and set environment variables with that shell's syntax.
+
+The Postgres integration test may skip when run locally without `DATABASE_URL`/`ORDERLY_TEST_DATABASE_URL`. It does **not** skip in hosted CI. When `CI=true`, a missing database URL fails the fixture because hosted baseline evidence must prove a real database connection.
+
+The unit-style health check uses `ORDERLY_FORCE_JSON_STORE=1` and removes external database/Redis variables through pytest's monkeypatch fixture. That keeps the unit baseline isolated from a developer's services and credentials.
