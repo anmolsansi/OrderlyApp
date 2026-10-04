@@ -1,16 +1,24 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { restaurants } from '../lib/mock-data';
 import {
+  API_CART_DRAFT_STORAGE_KEY,
   canAddItemToCart,
+  CART_STORAGE_KEY,
   clampCartQuantity,
   getCartSubtotal,
   getItemTotal,
+  LOCAL_DEMO_CART_STORAGE_KEY,
+  mirrorAcceptedApiCart,
+  readApiCartDraft,
+  readLocalDemoCart,
   updateCartItemQuantity,
   validateCart,
   validateCartItem,
   validateCheckoutDetails,
+  writeApiCartDraft,
+  writeLocalDemoCart,
 } from '../lib/cart';
-import type { CartItem, CheckoutDetails } from '../lib/types';
+import type { CartItem, CheckoutDetails, Restaurant } from '../lib/types';
 
 const item = restaurants[0].menu[1];
 const validModifiers = [
@@ -20,7 +28,25 @@ const validModifiers = [
   { groupId: 'toppings', optionIds: ['pepperoni'] },
 ];
 
+function makeMemoryWindow() {
+  const values = new Map<string, string>();
+  return {
+    values,
+    window: {
+      localStorage: {
+        getItem: (key: string) => values.get(key) ?? null,
+        setItem: (key: string, value: string) => { values.set(key, value); },
+        removeItem: (key: string) => { values.delete(key); },
+      },
+    },
+  };
+}
+
 describe('cart logic', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('calculates modifier totals', () => {
     expect(getItemTotal(item, validModifiers)).toBe(2424);
   });
@@ -31,7 +57,7 @@ describe('cart logic', () => {
     expect(result.errors[0]).toContain('needs a size');
   });
 
-  it('rejects cross-restaurant cart conflicts', () => {
+  it('rejects cross-restaurant cart conflicts before deliberate replacement', () => {
     const cart: CartItem[] = [
       { id: '1', restaurantId: restaurants[0].id, menuItemId: restaurants[0].menu[0].id, name: restaurants[0].menu[0].name, quantity: 1, basePriceCents: restaurants[0].menu[0].priceCents, modifiers: validModifiers },
       { id: '2', restaurantId: restaurants[1].id, menuItemId: restaurants[1].menu[0].id, name: restaurants[1].menu[0].name, quantity: 1, basePriceCents: restaurants[1].menu[0].priceCents, modifiers: validModifiers },
@@ -39,11 +65,21 @@ describe('cart logic', () => {
     expect(validateCart(cart).ok).toBe(false);
   });
 
-  it('calculates subtotal', () => {
+  it('calculates subtotal from the supplied canonical catalog rather than global fixtures', () => {
     const cart: CartItem[] = [
       { id: '1', restaurantId: restaurants[0].id, menuItemId: item.id, name: item.name, quantity: 2, basePriceCents: item.priceCents, modifiers: validModifiers },
     ];
+    const canonicalRestaurant: Restaurant = {
+      ...restaurants[0],
+      menu: restaurants[0].menu.map(candidate => candidate.id === item.id ? { ...candidate, priceCents: 3000 } : candidate),
+      menuCategories: restaurants[0].menuCategories.map(category => ({
+        ...category,
+        items: category.items.map(candidate => candidate.id === item.id ? { ...candidate, priceCents: 3000 } : candidate),
+      })),
+    };
+
     expect(getCartSubtotal(cart)).toBe(4848);
+    expect(getCartSubtotal(cart, [canonicalRestaurant])).toBe(7850);
   });
 
   it('clamps cart item quantities', () => {
@@ -63,6 +99,39 @@ describe('cart logic', () => {
 
     expect(canAddItemToCart(cart, restaurants[1].id).ok).toBe(false);
     expect(canAddItemToCart(cart, restaurants[0].id).ok).toBe(true);
+  });
+
+  it('keeps local_demo, API draft, and legacy accepted mirror namespaces separate', () => {
+    const memory = makeMemoryWindow();
+    vi.stubGlobal('window', memory.window);
+    const cart: CartItem[] = [{
+      id: 'local-line',
+      restaurantId: restaurants[0].id,
+      menuItemId: item.id,
+      name: item.name,
+      quantity: 1,
+      basePriceCents: item.priceCents,
+      modifiers: validModifiers,
+    }];
+    const apiDraft = [{ ...cart[0], id: 'draft-line' }];
+
+    expect(writeLocalDemoCart(cart)).toBe(true);
+    expect(writeApiCartDraft(apiDraft)).toBe(true);
+    expect(mirrorAcceptedApiCart([])).toBe(true);
+
+    expect(readLocalDemoCart()).toEqual(cart);
+    expect(readApiCartDraft()).toEqual(apiDraft);
+    expect(JSON.parse(memory.values.get(CART_STORAGE_KEY) ?? 'null')).toEqual([]);
+    expect(memory.values.has(LOCAL_DEMO_CART_STORAGE_KEY)).toBe(true);
+    expect(memory.values.has(API_CART_DRAFT_STORAGE_KEY)).toBe(true);
+  });
+
+  it('rejects malformed local preview storage instead of trusting it', () => {
+    const memory = makeMemoryWindow();
+    memory.values.set(LOCAL_DEMO_CART_STORAGE_KEY, JSON.stringify({ schemaVersion: 1, items: [{ id: 'bad' }] }));
+    vi.stubGlobal('window', memory.window);
+
+    expect(readLocalDemoCart()).toEqual([]);
   });
 
   it('validates checkout details', () => {
