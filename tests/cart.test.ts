@@ -71,15 +71,15 @@ describe('cart logic', () => {
     ];
     const canonicalRestaurant: Restaurant = {
       ...restaurants[0],
-      menu: restaurants[0].menu.map(candidate => candidate.id === item.id ? { ...candidate, priceCents: 3000 } : candidate),
+      menu: restaurants[0].menu.map(candidate => candidate.id === item.id ? { ...candidate, priceCents: candidate.priceCents + 1000 } : candidate),
       menuCategories: restaurants[0].menuCategories.map(category => ({
         ...category,
-        items: category.items.map(candidate => candidate.id === item.id ? { ...candidate, priceCents: 3000 } : candidate),
+        items: category.items.map(candidate => candidate.id === item.id ? { ...candidate, priceCents: candidate.priceCents + 1000 } : candidate),
       })),
     };
 
     expect(getCartSubtotal(cart)).toBe(4848);
-    expect(getCartSubtotal(cart, [canonicalRestaurant])).toBe(7850);
+    expect(getCartSubtotal(cart, [canonicalRestaurant])).toBe(6848);
   });
 
   it('clamps cart item quantities', () => {
