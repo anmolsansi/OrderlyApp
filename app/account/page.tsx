@@ -3,66 +3,162 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { MarketplaceNav } from '@/app/components/MarketplaceNav';
-import { getSessionProfile, isSignedIn, signOut as clearAuthSession } from '@/lib/auth';
-import { ADDRESSES_STORAGE_KEY, PROFILE_STORAGE_KEY } from '@/lib/cart';
-import { mockAddresses, mockUserProfile } from '@/lib/mock-data';
+import {
+  forgetDemoProfile,
+  getDemoAddresses,
+  getDemoProfile,
+  saveDemoProfile,
+} from '@/lib/auth';
+import { resetGuestSession } from '@/lib/api';
 import { routes } from '@/lib/routes';
-import type { Address, UserProfile } from '@/lib/types';
+import type { DemoAddress, DemoProfile } from '@/lib/types';
 
 export default function AccountPage() {
-  const [signedIn, setSignedIn] = useState(false);
-  const [profile, setProfile] = useState<UserProfile>(mockUserProfile);
-  const [addresses, setAddresses] = useState<Address[]>(mockAddresses);
-  const [newLabel, setNewLabel] = useState('Gym');
-  const [newStreet, setNewStreet] = useState('500 Mission Street');
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [profile, setProfile] = useState<DemoProfile | undefined>();
+  const [addresses, setAddresses] = useState<DemoAddress[]>([]);
+  const [draftName, setDraftName] = useState('');
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  const [resettingGuest, setResettingGuest] = useState(false);
+
+  function loadProfile(): void {
+    setStatus('loading');
+    setError('');
+
+    const profileResult = getDemoProfile(window.localStorage);
+    if (!profileResult.ok) {
+      setError(profileResult.message);
+      setStatus('error');
+      return;
+    }
+
+    const addressResult = getDemoAddresses(window.localStorage);
+    if (!addressResult.ok) {
+      setError(addressResult.message);
+      setStatus('error');
+      return;
+    }
+
+    setProfile(profileResult.value);
+    setAddresses(addressResult.value);
+    setDraftName(profileResult.value?.name ?? '');
+    setStatus('ready');
+  }
 
   useEffect(() => {
-    const hasSession = isSignedIn(window.localStorage);
-    setSignedIn(hasSession);
-    const storedAddresses = window.localStorage.getItem(ADDRESSES_STORAGE_KEY);
-    setProfile(getSessionProfile(window.localStorage));
-    if (storedAddresses) setAddresses(JSON.parse(storedAddresses) as Address[]);
+    loadProfile();
   }, []);
 
-  function persistProfile(nextProfile: UserProfile): void {
-    setProfile(nextProfile);
-    window.localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(nextProfile));
+  function persistProfile(nextProfile: DemoProfile, successMessage: string): void {
+    setError('');
+    setMessage('');
+    const result = saveDemoProfile(window.localStorage, nextProfile);
+    if (!result.ok) {
+      setError(result.message);
+      return;
+    }
+    setProfile(result.value);
+    setDraftName(result.value.name);
+    setMessage(successMessage);
   }
 
-  function persistAddresses(nextAddresses: Address[]): void {
-    setAddresses(nextAddresses);
-    window.localStorage.setItem(ADDRESSES_STORAGE_KEY, JSON.stringify(nextAddresses));
+  function saveDisplayName(): void {
+    if (!profile) return;
+    persistProfile({ ...profile, name: draftName }, 'Demo name saved on this browser.');
   }
 
-  function addAddress(): void {
-    const nextAddress: Address = {
-      id: `addr-${Date.now()}`,
-      userId: profile.id,
-      label: newLabel.trim() || 'Saved address',
-      street: newStreet.trim() || '500 Mission Street',
-      city: 'San Francisco',
-      state: 'CA',
-      postalCode: '94105',
-      deliveryInstructions: 'Ring doorbell.',
-    };
-    persistAddresses([...addresses, nextAddress]);
+  function makeDefaultAddress(addressId: string): void {
+    if (!profile) return;
+    persistProfile({ ...profile, defaultAddressId: addressId }, 'Default synthetic address updated.');
   }
 
-  function signOut(): void {
-    clearAuthSession(window.localStorage);
-    setSignedIn(false);
+  function forgetLocalProfile(): void {
+    setError('');
+    setMessage('');
+    const result = forgetDemoProfile(window.localStorage);
+    if (!result.ok) {
+      setError(result.message);
+      return;
+    }
+    setProfile(undefined);
+    setDraftName('');
+    setMessage('Local demo profile forgotten. Your private server guest was not changed.');
   }
 
-  if (!signedIn) {
+  async function startFreshGuest(): Promise<void> {
+    setResettingGuest(true);
+    setError('');
+    setMessage('');
+
+    const reset = await resetGuestSession();
+    if (!reset) {
+      setError('Could not start a fresh guest session. Your existing guest scope remains active.');
+      setResettingGuest(false);
+      return;
+    }
+
+    const forgotten = forgetDemoProfile(window.localStorage);
+    if (!forgotten.ok) {
+      setError('Fresh guest session started, but the local demo profile could not be cleared. Retry after enabling browser storage.');
+      setResettingGuest(false);
+      return;
+    }
+
+    setProfile(undefined);
+    setDraftName('');
+    setMessage('Fresh guest session started. Choose a demo profile before continuing.');
+    setResettingGuest(false);
+  }
+
+  if (status === 'loading') {
     return (
       <main className="marketplace-page">
         <div className="container">
           <MarketplaceNav active="Account" />
           <section className="card">
-            <span className="kicker">Account</span>
-            <h1>Sign in required</h1>
-            <p>Sign in to manage profile details, saved addresses, and order history.</p>
-            <Link className="checkout-button inline-action" href={routes.signIn(routes.account)}>Sign in</Link>
+            <span className="kicker">Demo profile</span>
+            <h1>Loading profile</h1>
+            <p>Checking this browser for local presentation data.</p>
+          </section>
+        </div>
+      </main>
+    );
+  }
+
+  if (status === 'error') {
+    return (
+      <main className="marketplace-page">
+        <div className="container">
+          <MarketplaceNav active="Account" />
+          <section className="card" role="alert">
+            <span className="kicker">Demo profile unavailable</span>
+            <h1>Browser storage needs attention</h1>
+            <p>{error}</p>
+            <button className="checkout-button inline-action" type="button" onClick={loadProfile}>Retry</button>
+          </section>
+        </div>
+      </main>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <main className="marketplace-page">
+        <div className="container">
+          <MarketplaceNav active="Account" />
+          <section className="card">
+            <span className="kicker">Demo profile</span>
+            <h1>Choose a demo profile</h1>
+            <p>A demo profile is only a local display label. Server cart and order ownership comes from the private guest session.</p>
+            {message && <p role="status">{message}</p>}
+            {error && <p role="alert">{error}</p>}
+            <div className="confirmation-actions">
+              <Link className="checkout-button inline-action" href={routes.signIn(routes.account)}>Choose demo profile</Link>
+              <button className="ghost-button" type="button" disabled={resettingGuest} onClick={startFreshGuest}>
+                {resettingGuest ? 'Starting fresh guest…' : 'Start fresh guest session'}
+              </button>
+            </div>
           </section>
         </div>
       </main>
@@ -78,56 +174,54 @@ export default function AccountPage() {
           <article className="card checkout-cart-panel">
             <div className="cart-header">
               <div>
-                <span className="kicker">Profile</span>
-                <h1>Account details</h1>
+                <span className="kicker">Demo profile</span>
+                <h1>Local profile details</h1>
               </div>
-              <button className="ghost-button" type="button" onClick={signOut}>Sign out</button>
             </div>
+            <p>This profile changes presentation only. It is not authentication and cannot grant access to another guest&apos;s orders.</p>
+
+            {error && <div className="validation-panel" role="alert"><p>{error}</p></div>}
+            {message && <p role="status">{message}</p>}
+
             <div className="checkout-form-grid">
-              <label>
-                <span>Name</span>
-                <input value={profile.name} onChange={event => persistProfile({ ...profile, name: event.target.value })} />
-              </label>
-              <label>
-                <span>Phone</span>
-                <input value={profile.phone} onChange={event => persistProfile({ ...profile, phone: event.target.value })} />
-              </label>
               <label className="full-field">
-                <span>Email</span>
-                <input value={profile.email} onChange={event => persistProfile({ ...profile, email: event.target.value })} />
+                <span>Display name</span>
+                <input
+                  autoComplete="off"
+                  maxLength={60}
+                  value={draftName}
+                  onChange={event => setDraftName(event.target.value)}
+                />
               </label>
+              <button className="checkout-button full-field" type="button" onClick={saveDisplayName}>Save display name</button>
+            </div>
+
+            <div className="confirmation-actions">
+              <button className="ghost-button" type="button" onClick={forgetLocalProfile}>Forget local profile</button>
+              <button className="ghost-button" type="button" disabled={resettingGuest} onClick={startFreshGuest}>
+                {resettingGuest ? 'Starting fresh guest…' : 'Start fresh guest session'}
+              </button>
             </div>
           </article>
 
           <aside className="card payment-review-panel">
-            <span className="kicker">Saved addresses</span>
-            <h2>Delivery locations</h2>
+            <span className="kicker">Synthetic addresses</span>
+            <h2>Default demo location</h2>
+            <p>These are fixed demo records. OrderlyApp does not collect a real delivery address in this profile screen.</p>
             <div className="cart-lines">
               {addresses.map(address => (
                 <div className="cart-line detailed" key={address.id}>
                   <div>
                     <strong>{address.label}</strong>
-                    <p>{address.street}{address.apartment ? `, ${address.apartment}` : ''}</p>
+                    <p>{address.street}</p>
                     <p>{address.city}, {address.state} {address.postalCode}</p>
                   </div>
-                  <button className="ghost-button" type="button" onClick={() => persistProfile({ ...profile, defaultAddressId: address.id })}>
+                  <button className="ghost-button" type="button" onClick={() => makeDefaultAddress(address.id)}>
                     {profile.defaultAddressId === address.id ? 'Default' : 'Make default'}
                   </button>
-                  {profile.defaultAddressId !== address.id && <button className="ghost-button" type="button" onClick={() => persistAddresses(addresses.filter(candidate => candidate.id !== address.id))}>Remove</button>}
                 </div>
               ))}
             </div>
-            <div className="checkout-form-grid">
-              <label>
-                <span>Label</span>
-                <input value={newLabel} onChange={event => setNewLabel(event.target.value)} />
-              </label>
-              <label>
-                <span>Street</span>
-                <input value={newStreet} onChange={event => setNewStreet(event.target.value)} />
-              </label>
-            </div>
-            <button className="checkout-button" type="button" onClick={addAddress}>Add address</button>
           </aside>
         </section>
       </div>
