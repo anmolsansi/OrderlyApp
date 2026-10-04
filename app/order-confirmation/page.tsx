@@ -2,44 +2,130 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { MarketplaceNav } from '@/app/components/MarketplaceNav';
-import { fetchOrder } from '@/lib/api';
-import { ORDER_HISTORY_STORAGE_KEY, ORDER_STORAGE_KEY } from '@/lib/cart';
-import { getSelectedModifierLabels } from '@/lib/cart';
-import { getRestaurant } from '@/lib/marketplace';
-import { orderStatusSteps } from '@/lib/mock-data';
+import { fetchOrderReceipt, getOrderlyDataMode } from '@/lib/api';
 import { routes } from '@/lib/routes';
-import type { Order } from '@/lib/types';
+import type { OrderReceipt } from '@/lib/types';
 import { formatMoney } from '@/lib/types';
+
+type ReceiptViewState = 'loading' | 'success' | 'not_found' | 'error' | 'unavailable';
 
 function OrderConfirmationContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get('orderId');
-  const [order, setOrder] = useState<Order | null>(null);
-  const restaurant = useMemo(() => order ? getRestaurant(order.restaurantId) : undefined, [order]);
+  const mode = getOrderlyDataMode();
+  const [order, setOrder] = useState<OrderReceipt | null>(null);
+  const [viewState, setViewState] = useState<ReceiptViewState>(mode === 'local_demo' ? 'unavailable' : 'loading');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [retryVersion, setRetryVersion] = useState(0);
 
   useEffect(() => {
-    let active = true;
-    async function loadOrder(): Promise<void> {
-      const stored = window.localStorage.getItem(ORDER_STORAGE_KEY);
-      const storedHistory = window.localStorage.getItem(ORDER_HISTORY_STORAGE_KEY);
-      const latestOrder = stored ? JSON.parse(stored) as Order : null;
-      const history = storedHistory ? JSON.parse(storedHistory) as Order[] : [];
-      const backendOrder = orderId ? await fetchOrder(orderId) : undefined;
-      const nextOrder = backendOrder ?? (orderId ? history.find(candidate => candidate.id === orderId) ?? latestOrder : latestOrder);
-      if (!active) return;
-      setOrder(nextOrder);
-      if (nextOrder) {
-        window.localStorage.setItem(ORDER_STORAGE_KEY, JSON.stringify(nextOrder));
-        window.localStorage.setItem(ORDER_HISTORY_STORAGE_KEY, JSON.stringify([nextOrder, ...history.filter(candidate => candidate.id !== nextOrder.id)]));
-      }
+    if (mode === 'local_demo') {
+      setViewState('unavailable');
+      return;
     }
-    void loadOrder();
+    if (!orderId) {
+      setOrder(null);
+      setViewState('not_found');
+      return;
+    }
+
+    let active = true;
+    setViewState('loading');
+    setErrorMessage(null);
+    void fetchOrderReceipt(orderId).then(result => {
+      if (!active) return;
+      if (result.ok) {
+        setOrder(result.data);
+        setViewState('success');
+        return;
+      }
+      setOrder(null);
+      if (result.error.code === 'order_not_found') {
+        setViewState('not_found');
+        return;
+      }
+      setErrorMessage(result.error.message);
+      setViewState('error');
+    });
+
     return () => {
       active = false;
     };
-  }, [orderId]);
+  }, [mode, orderId, retryVersion]);
+
+  if (viewState === 'unavailable') {
+    return (
+      <main className="marketplace-page">
+        <div className="container">
+          <MarketplaceNav active="Orders" />
+          <section className="card full-width" role="status">
+            <span className="kicker">Local fixture preview</span>
+            <h1>Order receipts unavailable in fixture preview</h1>
+            <p>The local preview never creates or displays cached accepted orders.</p>
+            <Link className="checkout-button inline-action" href={routes.restaurants()}>Browse preview restaurants</Link>
+          </section>
+        </div>
+      </main>
+    );
+  }
+
+  if (viewState === 'loading') {
+    return (
+      <main className="marketplace-page">
+        <div className="container">
+          <MarketplaceNav active="Orders" />
+          <section className="card full-width" role="status">
+            <span className="kicker">Saved receipt</span>
+            <h1>Loading exact order…</h1>
+            <p>Checking the current guest&apos;s durable receipt.</p>
+          </section>
+        </div>
+      </main>
+    );
+  }
+
+  if (viewState === 'not_found') {
+    return (
+      <main className="marketplace-page">
+        <div className="container">
+          <MarketplaceNav active="Orders" />
+          <section className="card full-width">
+            <span className="kicker">Saved receipt</span>
+            <h1>Order not found</h1>
+            <p>{orderId ? `No order ${orderId} belongs to this guest session.` : 'This receipt link is missing an order ID.'}</p>
+            <div className="confirmation-actions">
+              <Link className="ghost-button" href={routes.orderHistory}>View my orders</Link>
+              <Link className="checkout-button inline-action" href={routes.restaurants()}>Browse restaurants</Link>
+            </div>
+          </section>
+        </div>
+      </main>
+    );
+  }
+
+  if (viewState === 'error' || !order) {
+    return (
+      <main className="marketplace-page">
+        <div className="container">
+          <MarketplaceNav active="Orders" />
+          <section className="card full-width validation-panel" role="alert">
+            <span className="kicker">Saved receipt</span>
+            <h1>Receipt could not be loaded</h1>
+            <p>{errorMessage ?? 'The server receipt is temporarily unavailable.'}</p>
+            <button className="ghost-button" type="button" onClick={() => setRetryVersion(value => value + 1)}>Retry</button>
+          </section>
+        </div>
+      </main>
+    );
+  }
+
+  const address = [
+    order.checkout.street,
+    order.checkout.apartment,
+    `${order.checkout.city}, ${order.checkout.state} ${order.checkout.postalCode}`,
+  ].filter(Boolean).join(', ');
 
   return (
     <main className="marketplace-page">
@@ -48,57 +134,55 @@ function OrderConfirmationContent() {
 
         <section className="card confirmation-hero">
           <span className="confirmation-check">✓</span>
-          <span className="kicker">Finalized order</span>
-          <h1>{order ? 'Order placed!' : 'No active mock order yet'}</h1>
-          <p>{order ? `Mock order ${order.id} is confirmed with ${restaurant?.name ?? 'the restaurant'}.` : 'Place an order from checkout to activate this confirmation page.'}</p>
-          {order && <p>{order.cartItems.reduce((sum, item) => sum + item.quantity, 0)} item{order.cartItems.length === 1 ? '' : 's'} · Total {formatMoney(order.totals.totalCents)}</p>}
+          <span className="kicker">Saved mock order</span>
+          <h1>Order placed</h1>
+          <p>Order {order.id} is durably saved for this guest session.</p>
+          <p>{order.items.reduce((sum, item) => sum + item.quantity, 0)} item{order.items.reduce((sum, item) => sum + item.quantity, 0) === 1 ? '' : 's'} · Total {formatMoney(order.totals.totalCents)}</p>
         </section>
 
         <section className="card full-width status-card">
-          <span className="kicker">Order progress</span>
-          <h2>{order ? `Estimated arrival: ${new Date(order.estimatedDeliveryAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : 'Progress timeline preview'}</h2>
-          <div className="status-grid">
-            {orderStatusSteps.map((step, index) => (
-              <div className={`status-step ${order && orderStatusSteps.findIndex(candidate => candidate.status === order.status) >= index ? 'active' : ''}`} key={step.status}>
-                <strong>{step.label}</strong>
-                <p>{step.description}</p>
+          <span className="kicker">Order status</span>
+          <h2>{order.status}</h2>
+          <p>This mock demo records the saved order only. It does not claim restaurant acceptance, dispatch, or a delivery ETA.</p>
+          <p>Saved {new Date(order.createdAt).toLocaleString()}</p>
+        </section>
+
+        <section className="card full-width receipt-card">
+          <span className="kicker">Immutable receipt</span>
+          <h2>Receipt details</h2>
+          <div className="payment-breakdown">
+            <div><span>Order number</span><strong>{order.id}</strong></div>
+            <div><span>Delivery address</span><strong>{address}</strong></div>
+            <div><span>Delivery instructions</span><strong>{order.checkout.deliveryInstructions || 'None'}</strong></div>
+            <div><span>Subtotal</span><strong>{formatMoney(order.totals.subtotalCents)}</strong></div>
+            <div><span>Delivery</span><strong>{formatMoney(order.totals.deliveryFeeCents)}</strong></div>
+            <div><span>Service</span><strong>{formatMoney(order.totals.serviceFeeCents)}</strong></div>
+            <div><span>Tax</span><strong>{formatMoney(order.totals.taxCents)}</strong></div>
+            <div><span>Discount</span><strong>-{formatMoney(order.totals.discountCents)}</strong></div>
+            <div><span>Tip</span><strong>{formatMoney(order.totals.tipCents ?? 0)}</strong></div>
+            <div><span>Total</span><strong>{formatMoney(order.totals.totalCents)}</strong></div>
+            <div><span>Payment</span><strong>Mock payment, no card details stored</strong></div>
+          </div>
+
+          <div className="cart-lines">
+            {order.items.map(item => (
+              <div className="cart-line detailed" key={item.id}>
+                <div>
+                  <strong>{item.quantity} × {item.name}</strong>
+                  {item.modifiers.map(modifier => (
+                    <p key={modifier.groupId}>{modifier.name}: {modifier.options.map(option => option.name).join(', ')}</p>
+                  ))}
+                  {item.specialInstructions && <p>Note: {item.specialInstructions}</p>}
+                </div>
+                <strong>{formatMoney(item.lineTotalCents)}</strong>
               </div>
             ))}
           </div>
         </section>
 
-        {order && (
-          <section className="card full-width receipt-card">
-            <span className="kicker">Receipt</span>
-            <h2>Mock receipt details</h2>
-            <div className="payment-breakdown">
-              <div><span>Order number</span><strong>{order.id}</strong></div>
-              <div><span>Restaurant</span><strong>{restaurant?.name ?? 'Restaurant'}</strong></div>
-              <div><span>Subtotal</span><strong>{formatMoney(order.totals.subtotalCents)}</strong></div>
-              <div><span>Delivery</span><strong>{formatMoney(order.totals.deliveryFeeCents)}</strong></div>
-              <div><span>Service</span><strong>{formatMoney(order.totals.serviceFeeCents)}</strong></div>
-              <div><span>Tax</span><strong>{formatMoney(order.totals.taxCents)}</strong></div>
-              <div><span>Tip</span><strong>{formatMoney(order.totals.tipCents ?? 0)}</strong></div>
-              <div><span>Total</span><strong>{formatMoney(order.totals.totalCents)}</strong></div>
-              <div><span>Payment</span><strong>Mock Visa •••• 4242</strong></div>
-            </div>
-            <div className="cart-lines">
-              {order.cartItems.map(cartItem => (
-                <div className="cart-line detailed" key={cartItem.id}>
-                  <div>
-                    <strong>{cartItem.quantity} x {cartItem.name}</strong>
-                    {getSelectedModifierLabels(cartItem).map(label => <p key={label}>{label}</p>)}
-                    {cartItem.specialInstructions && <p>Note: {cartItem.specialInstructions}</p>}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
         <section className="confirmation-actions">
-          <Link className="ghost-button" href={routes.restaurants()}>Browse more restaurants</Link>
-          <Link className="checkout-button inline-action" href={routes.restaurant('marios-pizza')}>Reorder pizza</Link>
+          <Link className="ghost-button" href={routes.orderHistory}>View my orders</Link>
+          <Link className="checkout-button inline-action" href={routes.restaurants()}>Browse more restaurants</Link>
         </section>
       </div>
     </main>
@@ -107,7 +191,7 @@ function OrderConfirmationContent() {
 
 export default function OrderConfirmationPage() {
   return (
-    <Suspense fallback={<main className="marketplace-page"><div className="container"><MarketplaceNav active="Orders" /><section className="card"><h1>Loading order</h1></section></div></main>}>
+    <Suspense fallback={<main className="marketplace-page"><div className="container"><MarketplaceNav active="Orders" /><section className="card"><h1>Loading exact order…</h1></section></div></main>}>
       <OrderConfirmationContent />
     </Suspense>
   );
