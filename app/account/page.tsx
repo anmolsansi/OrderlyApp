@@ -81,7 +81,7 @@ export default function AccountPage() {
     if (ephemeralProfile) {
       setProfile(nextProfile);
       setDraftName(nextProfile.name);
-      setMessage(`${successMessage} This temporary profile is not stored.`);
+      setMessage('Temporary profile updated for this page only. Nothing was saved to browser storage.');
       return;
     }
 
