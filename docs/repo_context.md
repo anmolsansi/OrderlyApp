@@ -6,28 +6,29 @@ This file describes the current stabilization architecture. The canonical implem
 
 OrderlyApp is a portfolio voice-assisted food-ordering marketplace with mock checkout. The application is still in stabilization. It is not ready for real customer orders or payments.
 
-ST-01 established reproducible baseline contracts and CI. ST-02 moved cart/order ownership from a browser-generated identifier to a private server-issued guest session. ST-03 replaced the old local password/account simulation with a browser-only demo profile that has no ownership authority. ST-04 makes the backend catalog authoritative for restaurant/item availability, modifier validity, canonical labels, and catalog-derived item/option prices. ST-05 makes `/v1/cart` a PostgreSQL-only, owner-scoped, revisioned compare-and-swap resource so stale tabs cannot silently overwrite newer baskets and storage outages cannot switch cart authority. ST-06 adds deterministic `mock-v1` quotes and immutable owner-scoped receipt snapshots so later catalog/profile changes cannot rewrite order history. Later slices still own atomic/idempotent checkout, broader typed frontend API errors, final address/checkout integration, observability, retention, and deployment proof.
+ST-01 established reproducible baseline contracts and CI. ST-02 moved cart/order ownership from a browser-generated identifier to a private server-issued guest session. ST-03 replaced the old local password/account simulation with a browser-only demo profile that has no ownership authority. ST-04 makes the backend catalog authoritative for restaurant/item availability, modifier validity, canonical labels, and catalog-derived item/option prices. ST-05 makes `/v1/cart` a PostgreSQL-only, owner-scoped, revisioned compare-and-swap resource so stale tabs cannot silently overwrite newer baskets and storage outages cannot switch cart authority. ST-06 adds deterministic `mock-v1` quotes and immutable owner-scoped receipt snapshots so later catalog/profile changes cannot rewrite order history. ST-07 makes C6 checkout atomic and idempotent: one PostgreSQL transaction locks/revalidates the quoted cart, writes one immutable receipt and guest-scoped idempotency record, then clears/revisions the cart exactly once. Later slices still own broader typed frontend API errors, product/cart frontend cutover, checkout UI recovery, observability, retention, and deployment proof.
 
 ## Current architecture
 
 | Area | Source | Current behavior |
 |---|---|---|
 | Frontend | `app/**` | Next.js marketplace UI, local fixtures still drive several product/cart views until ST-08 |
-| Same-origin API gateway | `app/api/orderly/[...path]/route.ts` | fixed upstream, explicit path/method allowlist, origin checks, 64 KiB body cap, timeout, safe header/cookie forwarding |
-| Browser API client | `lib/api.ts` | calls `/api/orderly`; protected operations bootstrap the HttpOnly guest cookie; C4/C5 frontend cutover is deferred to ST-08/ST-09 |
+| Same-origin API gateway | `app/api/orderly/[...path]/route.ts` | fixed upstream, explicit path/method allowlist, origin checks, 64 KiB body cap, timeout, safe header/cookie forwarding; C6 `Idempotency-Key` forwards only on order POST |
+| Browser API client | `lib/api.ts` | calls `/api/orderly`; protected operations bootstrap the HttpOnly guest cookie; C4/C5/C6 frontend cutover is deferred to ST-08/ST-09 |
 | Cart helpers | `lib/cart.ts` | frontend cart validation and local mirror/presentation only; no backend owner-ID generator |
 | Demo profile | `lib/auth.ts`, sign-in/account pages | password-free C2 presentation profile and fixed synthetic addresses in versioned local storage; never server authentication |
-| API | `backend/app/main.py` | public catalog plus versioned `/v1` guest session, revisioned cart, C5 quote, immutable receipt read, legacy pricing and temporary pre-C6 submit routes |
+| API | `backend/app/main.py` | public catalog plus versioned `/v1` guest session, revisioned cart, C5 quote, atomic C6 order submit, and immutable receipt read; legacy pricing remains only for pre-cutover web consumers |
 | Cart service | `backend/app/cart_service.py` | C4 business boundary: Postgres requirement, row lock/CAS revision checks, whole-cart atomic mutation, typed conflict/validation/storage failures |
-| Canonical catalog | `backend/app/catalog.py`, `backend/app/store.py` | one coherent snapshot per operation; explicit availability and modifier rules; canonical item/option pricing; C4 cart writes reuse the C3 validator inside the cart transaction |
+| Order service | `backend/app/order_service.py` | C6 boundary: strict UUID key normalization, canonical validated-body SHA-256, pre-lock and post-lock replay checks, cart serialization, quote revalidation, receipt/key/cart single transaction |
+| Canonical catalog | `backend/app/catalog.py`, `backend/app/store.py` | one coherent snapshot per operation; explicit availability and modifier rules; canonical item/option pricing; C4/C6 writes reuse C3 validation inside their database transaction |
 | Pricing/receipt domain | `backend/app/pricing.py` | deterministic integer `mock-v1` quote rules, half-up tax, promotion policy, catalog fingerprint, canonical receipt-line and immutable snapshot construction |
 | Guest identity | `backend/app/identity.py` | opaque HMAC-signed token, hashed token lookup, 30-day expiry, reset/revocation/cleanup, exact-origin enforcement |
-| Persistence | `backend/app/store.py`, `database.py` | PostgreSQL is API-mode catalog, C4 cart, and C5 receipt authority; `guest_carts` owns revisioned baskets; `guest_orders` stores immutable owner-scoped C5 snapshots; Redis/JSON are not C4/C5 API fallbacks |
-| Redis | `backend/app/redis_store.py` | optional legacy cleanup/health helper; not consulted by the C4 `/v1/cart` or C5 receipt authority paths |
-| Schema | `backend/migrations/001_initial.sql` through `005_order_snapshots.sql` | base schema, guest sessions, catalog semantics, additive revisioned guest carts, and additive immutable guest receipt snapshots; legacy `carts`/`orders` remain isolated from C4/C5 |
+| Persistence | `backend/app/store.py`, `database.py` | PostgreSQL is API-mode catalog, C4 cart, C5 receipt, and C6 checkout authority; `guest_carts` owns revisioned baskets; `guest_orders` stores immutable receipts; `order_idempotency` maps guest/key/digest/order; Redis/JSON are not C4/C5/C6 API fallbacks |
+| Redis | `backend/app/redis_store.py` | optional legacy cleanup/health helper; not consulted by C4 `/v1/cart`, C5 receipt authority, or C6 checkout writes |
+| Schema | `backend/migrations/001_initial.sql` through `006_order_idempotency.sql` | base schema, guest sessions, catalog semantics, additive revisioned guest carts, immutable receipt snapshots, and additive guest-scoped checkout idempotency ledger; legacy `carts`/`orders` remain isolated |
 | Deployment | Dockerfiles, `docker-compose.yml`, `infra/render.yaml` | explicit guest secret/origin/API mode configuration; server-only gateway upstream origin |
-| Contract fixtures | `tests/fixtures/contracts/*.json` | ST-01 baseline contracts; C1 frozen for ST-02, C2 frozen for ST-03, C3 frozen for ST-04, C4 frozen for ST-05, C5 extended/frozen for ST-06 deterministic quote/receipt behavior |
-| Tests | `tests/*.test.ts`, `backend/tests`, `e2e/orderly.spec.ts` | frontend contracts/profile tests, gateway coverage, real-Postgres guest isolation, canonical catalog tests, C4 concurrency/failure tests, C5 money/snapshot/immutability/pagination tests, browser profile/session coverage |
+| Contract fixtures | `tests/fixtures/contracts/*.json` | ST-01 baseline contracts; C1 frozen for ST-02, C2 for ST-03, C3 for ST-04, C4 for ST-05, C5 for ST-06, and C6 extended/frozen for ST-07 atomic/replay behavior |
+| Tests | `tests/*.test.ts`, `backend/tests`, `e2e/orderly.spec.ts` | frontend contracts/profile tests, gateway coverage, real-Postgres guest isolation, canonical catalog tests, C4 concurrency/failure tests, C5 money/snapshot tests, C6 replay/concurrency/rollback/recovery tests, browser profile/session coverage |
 | CI | `.github/workflows/ci.yml` | Node 22, npm 11.20.0, Python 3.12, Postgres-backed backend/E2E, Chromium proof, evidence upload |
 
 ## ST-02 ownership boundary
@@ -63,9 +64,9 @@ Each logical catalog/cart/pricing/order operation builds one `CatalogSnapshot`. 
 
 Catalog writes and explicit seeds normalize legacy modifier groups into explicit min/max/default semantics. Required single-choice groups have min 1, max 1, and a valid default option. Existing IDs are preserved.
 
-Cart validation, legacy order creation, and cart pricing validate submitted restaurant/item/modifier IDs against the same C3 rules. C4 cart write inputs no longer contain client-supplied labels/prices at all; accepted cart lines are rebuilt with canonical item names and base prices before persistence.
+Cart validation and cart pricing validate submitted restaurant/item/modifier IDs against the same C3 rules. C4 cart write inputs no longer contain client-supplied labels/prices at all; accepted cart lines are rebuilt with canonical item names and base prices before persistence. C6 checkout revalidates the current locked cart against the same catalog before accepting the quoted fingerprint.
 
-Invalid catalog selections return HTTP 422 `invalid_cart` with stable machine-readable field paths. A missing restaurant read returns HTTP 404 `restaurant_not_found`. A malformed authoritative catalog fails closed as `catalog_unavailable` rather than becoming permissive.
+Invalid catalog selections return HTTP 422 `invalid_cart` on cart mutation. A missing restaurant read returns HTTP 404 `restaurant_not_found`. A malformed authoritative catalog fails closed as `catalog_unavailable` rather than becoming permissive. C6 quote drift returns `catalog_changed` instead of silently repricing an accepted submit request.
 
 With `DATABASE_URL` configured, PostgreSQL is the catalog authority. API mode does not silently switch to the JSON catalog when PostgreSQL configuration is absent or a configured database fails. JSON remains an explicit local/fixture and seed source.
 
@@ -97,17 +98,32 @@ New immutable receipts live in `guest_orders`, keyed to verified C1 ownership. T
 
 `GET /v1/orders` is newest-first, current-owner only, and bounded to 50 rows. An optional cursor is the last receipt UUID from the previous page and is resolved only within the current owner scope. `GET /v1/orders/{id}` returns the same generic `order_not_found` response for missing and foreign IDs.
 
-Legacy `orders(session_id, cart_items, subtotal_cents)` rows are intentionally left offline. They are not copied, backfilled, or supplied with invented current address/tip/owner fields. The temporary pre-C6 POST `/v1/orders` remains until ST-07 replaces submission with one atomic/idempotent transaction.
+Legacy `orders(session_id, cart_items, subtotal_cents)` rows are intentionally left offline. They are not copied, backfilled, or supplied with invented current address/tip/owner fields. C6 now inserts only complete C5 receipt snapshots through the atomic ST-07 service.
 
 See [`docs/ST06_DETERMINISTIC_RECEIPTS.md`](ST06_DETERMINISTIC_RECEIPTS.md) for the exact money rules, C5 contracts, storage behavior, migration, rollback, tests, and ST-07 handoff.
 
-## Known intentional limitations after ST-06
+## ST-07 atomic idempotent checkout boundary
+
+C6 replaces the temporary order-submit path with `backend/app/order_service.py`.
+
+`POST /v1/orders` requires a UUID `Idempotency-Key`, strict C6 request body, the caller's quoted cart revision, and the C5 catalog/pricing fingerprint. The validated body is serialized canonically and hashed with SHA-256. The `(owner_id, idempotency_key)` pair is unique in PostgreSQL.
+
+For a genuinely new request, the service locks the guest's C4 cart row, rechecks the idempotency ledger after acquiring that lock, validates the expected revision, revalidates the current cart against C3, recomputes the C5 fingerprint, builds the immutable C5 receipt, writes the receipt and idempotency record, and clears/increments the cart. All writes share one PostgreSQL transaction.
+
+The second ledger lookup after the cart lock closes the same-key race: if two identical requests both initially see no key, one commits and the waiting request then replays that committed receipt. Different keys submitted against the same expected revision also serialize on the cart row, so only one can commit and the other receives `cart_conflict`.
+
+An exact owner/key/body replay returns HTTP 200 with the stored receipt even though the accepted first request already emptied the cart. The first request returns HTTP 201. Reusing the same owner/key with a different validated body returns HTTP 409 `idempotency_conflict`.
+
+The same-origin gateway forwards `Idempotency-Key` only for order POST. Caller-provided owner/identity headers remain filtered. PostgreSQL outages fail closed as `storage_unavailable`; checkout never switches to Redis/JSON or the old non-idempotent writer.
+
+See [`docs/ST07_ATOMIC_CHECKOUT.md`](ST07_ATOMIC_CHECKOUT.md) for transaction order, request hashing, schema, concurrency behavior, failure semantics, tests, rollback, and ST-09 handoff.
+
+## Known intentional limitations after ST-07
 
 - Frontend product views and cart adapters still use local fixture/mirror behavior in several paths. ST-08 performs the typed C3/C4 API cutover and two-tab conflict UI.
-- The existing order-creation endpoint is still the temporary pre-C6 path and does not atomically consume the C4 cart row or insert a C5 receipt. ST-07 owns idempotency, cart locking/consumption, and `guest_orders` snapshot insertion in one transaction.
-- Checkout does not yet enforce the C5/C6 quote/idempotency contracts end to end. ST-07 and ST-09 own those boundaries.
+- `lib/api.ts` and the checkout UI do not yet generate/persist C6 idempotency keys or submit the C5 revision/fingerprint contract. ST-09 owns that browser integration and recovery UX.
 - Broader typed client failure/degraded-mode semantics are deferred to ST-08/ST-09.
-- Checkout still consumes temporary presentation-profile adapters and does not yet persist the selected C2 synthetic address through the real C6 submit flow. ST-09/ST-10 own that integration.
+- Checkout still consumes temporary presentation-profile adapters and does not yet persist the selected C2 synthetic address through the real C6 browser flow. ST-09/ST-10 own that integration.
 - Voice capture is not part of the current stabilization release scope.
 
 ## Required local guest-session configuration
@@ -124,14 +140,14 @@ DATABASE_URL=postgresql://...
 
 `ORDERLY_SESSION_SECRET` must never be committed. A secret rotation invalidates all existing guest cookies.
 
-Redis is not required for C4 cart or C5 receipt authority.
+Redis is not required for C4 cart, C5 receipt, or C6 checkout authority.
 
 ## Validation expectations
 
-Before merging a stabilization slice, run the applicable contract, frontend, backend, build, and E2E suites. ST-02 additionally requires two independent cookie jars against real PostgreSQL and browser proof of cookie bootstrap/reset attributes. ST-03 additionally requires storage-migration/no-secret tests plus browser proof that profile edits leave the guest cookie stable and only explicit reset rotates it. ST-04 additionally requires adversarial C3 validation, spoofed name/price canonicalization proof, no-write-on-invalid proof, explicit open/availability behavior, and real-PostgreSQL catalog search coverage. ST-05 additionally requires real-PostgreSQL same-revision concurrency proof, sequential revision checks, stale PUT/DELETE conflict/current-cart proof, legacy-cart isolation, Redis-unavailable proof, and fail-closed PostgreSQL storage behavior. ST-06 additionally requires exact 1192-cent totals, half-up tax, promotion/tip boundary checks, real-PostgreSQL complete snapshot roundtrip, catalog-mutation immutability, owner-scoped list/read, pagination, generic foreign/missing 404, and proof that legacy incomplete rows are not exposed as fabricated C5 receipts.
+Before merging a stabilization slice, run the applicable contract, frontend, backend, build, and E2E suites. ST-02 additionally requires two independent cookie jars against real PostgreSQL and browser proof of cookie bootstrap/reset attributes. ST-03 additionally requires storage-migration/no-secret tests plus browser proof that profile edits leave the guest cookie stable and only explicit reset rotates it. ST-04 additionally requires adversarial C3 validation, spoofed name/price canonicalization proof, no-write-on-invalid proof, explicit open/availability behavior, and real-PostgreSQL catalog search coverage. ST-05 additionally requires real-PostgreSQL same-revision concurrency proof, sequential revision checks, stale PUT/DELETE conflict/current-cart proof, legacy-cart isolation, Redis-unavailable proof, and fail-closed PostgreSQL storage behavior. ST-06 additionally requires exact 1192-cent totals, half-up tax, promotion/tip boundary checks, real-PostgreSQL complete snapshot roundtrip, catalog-mutation immutability, owner-scoped list/read, pagination, generic foreign/missing 404, and proof that legacy incomplete rows are not exposed as fabricated C5 receipts. ST-07 additionally requires same-key concurrency proof, changed-body conflict proof, different-key/same-revision serialization, injected transaction rollback at multiple write boundaries, exact stored-receipt replay after a simulated lost response, scoped gateway header forwarding, and fail-closed PostgreSQL behavior.
 
 GitHub Actions is the authoritative shared validation record. The PR must not be merged with required CI failures.
 
 ## Historical assessment
 
-The initial repository assessment remains under [`docs/audit-2026-10-04`](audit-2026-10-04/). It is historical evidence, not a description of the post-ST-01/ST-02/ST-03/ST-04/ST-05/ST-06 architecture. The local graph report remains at [`graphify-out/GRAPH_REPORT.md`](../graphify-out/GRAPH_REPORT.md).
+The initial repository assessment remains under [`docs/audit-2026-10-04`](audit-2026-10-04/). It is historical evidence, not a description of the post-ST-01 through ST-07 architecture. The local graph report remains at [`graphify-out/GRAPH_REPORT.md`](../graphify-out/GRAPH_REPORT.md).

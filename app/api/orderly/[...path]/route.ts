@@ -99,15 +99,19 @@ async function boundedBody(request: NextRequest): Promise<ArrayBuffer | undefine
   return data.byteLength > 0 ? data : undefined;
 }
 
-function upstreamHeaders(request: NextRequest, publicOrigin: string): Headers {
+function upstreamHeaders(request: NextRequest, publicOrigin: string, path: string): Headers {
   const headers = new Headers();
   const accept = request.headers.get('accept');
   const contentType = request.headers.get('content-type');
   const cookie = request.headers.get('cookie');
+  const idempotencyKey = request.headers.get('idempotency-key');
 
   if (accept) headers.set('accept', accept);
   if (contentType) headers.set('content-type', contentType);
   if (cookie) headers.set('cookie', cookie);
+  if (path === 'orders' && request.method === 'POST' && idempotencyKey) {
+    headers.set('idempotency-key', idempotencyKey);
+  }
 
   headers.set('origin', publicOrigin);
   headers.set('x-forwarded-proto', new URL(publicOrigin).protocol.replace(':', ''));
@@ -174,7 +178,7 @@ async function proxy(request: NextRequest, context: RouteContext): Promise<NextR
   try {
     const upstream = await fetch(target, {
       method: request.method,
-      headers: upstreamHeaders(request, publicOrigin),
+      headers: upstreamHeaders(request, publicOrigin, path),
       body,
       cache: 'no-store',
       redirect: 'manual',

@@ -112,4 +112,4 @@ def test_c6_replay_preserves_order_and_receipt() -> None:
     assert first["status"] == 201
     assert replay["status"] == 200
     assert replay["receipt"] == first["receipt"]
-    assert replay["receipt"]["id"] == "fixture-o1"
+    assert replay["receipt"]["id"] == "11111111-1111-4111-8111-111111111112"

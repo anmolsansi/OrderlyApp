@@ -377,16 +377,70 @@ def _receipt_from_row(row: Dict[str, Any]) -> ReceiptResponse:
     return ReceiptResponse.model_validate(row["snapshot"])
 
 
+def get_order_snapshot_for_owner_in_connection(
+    conn: Any,
+    order_id: str,
+    owner_id: str,
+) -> Optional[ReceiptResponse]:
+    """Read one immutable C5 receipt without leaving the caller's transaction."""
+    row = conn.execute(
+        "SELECT snapshot FROM guest_orders WHERE id::text = %s AND owner_id = %s",
+        (order_id, owner_id),
+    ).fetchone()
+    return _receipt_from_row(row) if row else None
+
+
+def get_order_idempotency_record(
+    conn: Any,
+    owner_id: str,
+    idempotency_key: str,
+) -> Optional[Dict[str, Any]]:
+    """Return the guest-scoped C6 key mapping and its already-stored receipt."""
+    row = conn.execute(
+        """
+        SELECT payload_sha256, order_id
+        FROM order_idempotency
+        WHERE owner_id = %s AND idempotency_key = %s
+        """,
+        (owner_id, idempotency_key),
+    ).fetchone()
+    if row is None:
+        return None
+
+    order_id = str(row["order_id"])
+    receipt = get_order_snapshot_for_owner_in_connection(conn, order_id, owner_id)
+    if receipt is None:
+        raise RuntimeError("idempotency record references a missing guest order")
+    return {
+        "payload_sha256": row["payload_sha256"],
+        "order_id": order_id,
+        "receipt": receipt,
+    }
+
+
+def insert_order_idempotency_record(
+    conn: Any,
+    owner_id: str,
+    idempotency_key: str,
+    payload_sha256: str,
+    order_id: str,
+) -> None:
+    """Record one accepted C6 key inside the caller's checkout transaction."""
+    conn.execute(
+        """
+        INSERT INTO order_idempotency (owner_id, idempotency_key, payload_sha256, order_id)
+        VALUES (%s, %s, %s, %s::uuid)
+        """,
+        (owner_id, idempotency_key, payload_sha256, order_id),
+    )
+
+
 def get_order_snapshot_for_owner(order_id: str, owner_id: str) -> Optional[ReceiptResponse]:
     if not database_url():
         raise ReceiptStorageUnavailableError()
     try:
         with get_connection() as conn:
-            row = conn.execute(
-                "SELECT snapshot FROM guest_orders WHERE id::text = %s AND owner_id = %s",
-                (order_id, owner_id),
-            ).fetchone()
-        return _receipt_from_row(row) if row else None
+            return get_order_snapshot_for_owner_in_connection(conn, order_id, owner_id)
     except ReceiptStorageUnavailableError:
         raise
     except Exception as exc:

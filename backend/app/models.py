@@ -202,6 +202,26 @@ class CheckoutDetails(BaseModel):
         return value
 
 
+class OrderSubmissionRequest(BaseModel):
+    """C6 checkout submission. Ownership and idempotency key come from trusted request context."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision: int = Field(ge=0, strict=True)
+    catalog_fingerprint: str = Field(
+        min_length=64,
+        max_length=64,
+        pattern=r"^[0-9A-Fa-f]{64}$",
+    )
+    checkout: CheckoutDetails
+    promotion_code: Optional[Literal["DEMO5"]] = None
+
+    @field_validator("catalog_fingerprint")
+    @classmethod
+    def normalize_catalog_fingerprint(cls, value: str) -> str:
+        return value.lower()
+
+
 class ReceiptModifierOptionSnapshot(BaseModel):
     id: str
     name: str
