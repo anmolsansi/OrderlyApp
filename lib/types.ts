@@ -1,5 +1,6 @@
 export type DataMode = 'api' | 'local_demo';
 export type ApiErrorKind = 'validation' | 'conflict' | 'session' | 'network' | 'server';
+export type CheckoutState = 'idle' | 'submitting' | 'uncertain' | 'accepted' | 'rejected';
 
 export interface ApiErrorDetails {
   code: string;
@@ -137,6 +138,61 @@ export interface CheckoutDetails {
   deliveryInstructions?: string;
   paymentMethod: string;
   tipCents: number;
+}
+
+export interface CheckoutQuote {
+  schemaVersion: 1;
+  cartRevision: number;
+  catalogFingerprint: string;
+  totals: CartTotals;
+}
+
+export interface ReceiptModifierOptionSnapshot {
+  id: string;
+  name: string;
+  priceDeltaCents: number;
+}
+
+export interface ReceiptModifierSnapshot {
+  groupId: string;
+  name: string;
+  options: ReceiptModifierOptionSnapshot[];
+}
+
+export interface ReceiptItemSnapshot {
+  id: string;
+  restaurantId: string;
+  menuItemId: string;
+  name: string;
+  unitPriceCents: number;
+  quantity: number;
+  lineTotalCents: number;
+  modifiers: ReceiptModifierSnapshot[];
+  specialInstructions?: string;
+}
+
+export interface OrderReceipt {
+  schemaVersion: 1;
+  id: string;
+  status: 'Placed';
+  createdAt: string;
+  items: ReceiptItemSnapshot[];
+  checkout: CheckoutDetails;
+  totals: CartTotals;
+  pricingVersion: 'mock-v1';
+}
+
+export interface OrderSubmission {
+  expectedRevision: number;
+  catalogFingerprint: string;
+  checkout: CheckoutDetails;
+  promotionCode?: 'DEMO5';
+}
+
+export interface CheckoutRecovery {
+  schemaVersion: 1;
+  idempotencyKey: string;
+  submission: OrderSubmission;
 }
 
 export interface DemoProfile {
