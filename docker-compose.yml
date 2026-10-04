@@ -17,6 +17,7 @@ services:
       NEXT_PUBLIC_VOICE_MODE: ${NEXT_PUBLIC_VOICE_MODE:-browser}
       NEXT_PUBLIC_CHECKOUT_MODE: ${NEXT_PUBLIC_CHECKOUT_MODE:-mock}
       NEXT_PUBLIC_AUTH_PROVIDER: ${NEXT_PUBLIC_AUTH_PROVIDER:-none}
+      ORDERLY_API_ORIGIN: http://api:8000
     depends_on:
       api:
         condition: service_healthy
@@ -31,6 +32,9 @@ services:
     environment:
       DATABASE_URL: ${ORDERLY_COMPOSE_DATABASE_URL:-postgresql://orderly:orderly@postgres:5432/orderlyapp}
       REDIS_URL: ${ORDERLY_COMPOSE_REDIS_URL:-redis://redis:6379}
+      ORDERLY_DATA_MODE: api
+      ORDERLY_SESSION_SECRET: ${ORDERLY_SESSION_SECRET:?Set ORDERLY_SESSION_SECRET to at least 32 bytes}
+      ORDERLY_ALLOWED_ORIGINS: ${ORDERLY_ALLOWED_ORIGINS:-http://localhost:3100,http://127.0.0.1:3100}
       ORDERLY_CORS_ORIGINS: ${ORDERLY_CORS_ORIGINS:-http://localhost:3100,http://127.0.0.1:3100,http://localhost:3000,http://127.0.0.1:3000}
     depends_on:
       postgres:
