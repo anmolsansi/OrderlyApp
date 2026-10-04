@@ -162,3 +162,24 @@ jobs:
         run: npm run test:e2e:install
       - name: Run product E2E baseline
         run: npm run test:e2e
+
+  baseline-evidence:
+    if: always()
+    needs: [web, backend, browser-runtime, e2e]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Record assessed source and job results
+        shell: bash
+        run: |
+          {
+            echo "## ST-01 baseline evidence"
+            echo "- Source SHA: \`${GITHUB_SHA}\`"
+            echo "- Ref: \`${GITHUB_REF}\`"
+            echo "- Node baseline: 22"
+            echo "- npm resolver: 11.20.0"
+            echo "- Python baseline: 3.12"
+            echo "- WEB: ${{ needs.web.result }}"
+            echo "- BACKEND: ${{ needs.backend.result }}"
+            echo "- Chromium launch: ${{ needs.browser-runtime.result }}"
+            echo "- Product E2E: ${{ needs.e2e.result }}"
+          } >> "$GITHUB_STEP_SUMMARY"
