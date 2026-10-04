@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
+from threading import Barrier
 from typing import Iterator
 from uuid import uuid4
 
@@ -9,7 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from app.cart_service import put_cart
+from app.cart_service import CartConflictError, put_cart
 from app.database import get_connection
 from app.identity import VerifiedGuest, verify_request_guest
 from app.main import app
@@ -22,6 +24,7 @@ from app.models import (
 )
 from app.order_service import (
     IdempotencyConflictError,
+    OrderSubmissionResult,
     canonical_order_payload,
     normalize_idempotency_key,
     order_request_digest,
@@ -207,6 +210,24 @@ def static_submission() -> OrderSubmissionRequest:
     )
 
 
+def concurrent_submit(
+    owner_id: str,
+    request: OrderSubmissionRequest,
+    keys: list[str],
+) -> list[OrderSubmissionResult | Exception]:
+    barrier = Barrier(len(keys))
+
+    def worker(key: str) -> OrderSubmissionResult | Exception:
+        barrier.wait()
+        try:
+            return submit_order(owner_id, key, request)
+        except Exception as exc:  # Test harness captures the competing outcome for assertions.
+            return exc
+
+    with ThreadPoolExecutor(max_workers=len(keys)) as executor:
+        return list(executor.map(worker, keys))
+
+
 def test_c6_request_digest_and_key_validation_are_canonical() -> None:
     request = static_submission()
     explicit_none = request.model_copy(update={"promotion_code": None})
@@ -297,3 +318,38 @@ def test_same_key_changed_payload_conflicts_and_key_scope_is_per_owner(
     assert other.replayed is False
     assert other.receipt.id != first.receipt.id
     assert c6_counts(other_owner_id) == (1, 1)
+
+
+def test_concurrent_identical_key_creates_at_most_one_order(
+    checkout_environment: dict[str, str],
+) -> None:
+    owner_id = checkout_environment["owner_id"]
+    request = submission_for(owner_id)
+    outcomes = concurrent_submit(owner_id, request, [IDEMPOTENCY_KEY, IDEMPOTENCY_KEY])
+
+    assert all(isinstance(outcome, OrderSubmissionResult) for outcome in outcomes)
+    results = [outcome for outcome in outcomes if isinstance(outcome, OrderSubmissionResult)]
+    assert sorted(result.replayed for result in results) == [False, True]
+    assert len({result.receipt.id for result in results}) == 1
+    assert c6_counts(owner_id) == (1, 1)
+    assert current_cart(owner_id).revision == 2
+    assert current_cart(owner_id).items == []
+
+
+def test_different_keys_same_revision_yield_one_commit_and_one_cart_conflict(
+    checkout_environment: dict[str, str],
+) -> None:
+    owner_id = checkout_environment["owner_id"]
+    request = submission_for(owner_id)
+    other_key = "22222222-2222-4222-8222-222222222222"
+    outcomes = concurrent_submit(owner_id, request, [IDEMPOTENCY_KEY, other_key])
+
+    successes = [outcome for outcome in outcomes if isinstance(outcome, OrderSubmissionResult)]
+    conflicts = [outcome for outcome in outcomes if isinstance(outcome, CartConflictError)]
+    assert len(successes) == 1
+    assert successes[0].replayed is False
+    assert len(conflicts) == 1
+    assert conflicts[0].current_cart.revision == 2
+    assert conflicts[0].current_cart.items == []
+    assert c6_counts(owner_id) == (1, 1)
+    assert current_cart(owner_id).revision == 2
