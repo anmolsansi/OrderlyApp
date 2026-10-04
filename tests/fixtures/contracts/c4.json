@@ -72,6 +72,16 @@
         "request_id": "synthetic-request-3",
         "fields": ["items.0.menu_item_id"]
       }
+    },
+    {
+      "name": "invalid_expected_revision",
+      "status": 422,
+      "error": {
+        "code": "invalid_cart",
+        "message": "Cart contains invalid catalog choices",
+        "request_id": "synthetic-request-4",
+        "fields": ["expected_revision"]
+      }
     }
   ]
 }
