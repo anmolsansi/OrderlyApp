@@ -1,92 +1,207 @@
 import { describe, expect, it } from 'vitest';
 import {
-  AUTH_ACCOUNTS_STORAGE_KEY,
-  getCurrentAuthAccount,
-  getCurrentAuthSession,
-  getDemoAccount,
-  getStoredAccounts,
+  DEMO_ADDRESSES_STORAGE_KEY,
+  DEMO_PROFILE_STORAGE_KEY,
+  LEGACY_AUTH_ACCOUNTS_STORAGE_KEY,
+  MAX_DEMO_PROFILE_NAME_LENGTH,
+  SYNTHETIC_DEMO_ADDRESSES,
+  createDefaultDemoProfile,
+  forgetDemoProfile,
+  getDemoAddresses,
+  getDemoProfile,
+  getSessionProfile,
   isSignedIn,
-  signInWithCredentials,
-  signOut,
-  signUpWithCredentials,
+  saveDemoProfile,
 } from '../lib/auth';
-import { PROFILE_STORAGE_KEY, SESSION_STORAGE_KEY } from '../lib/cart';
+import {
+  ADDRESSES_STORAGE_KEY,
+  CART_STORAGE_KEY,
+  ORDER_HISTORY_STORAGE_KEY,
+  PROFILE_STORAGE_KEY,
+  SESSION_STORAGE_KEY,
+} from '../lib/cart';
 
-function createStorage(): Storage {
-  const storage = new Map<string, string>();
-  return {
-    get length() { return storage.size; },
-    clear: () => storage.clear(),
-    getItem: (key: string) => storage.get(key) ?? null,
-    key: (index: number) => Array.from(storage.keys())[index] ?? null,
-    removeItem: (key: string) => { storage.delete(key); },
-    setItem: (key: string, value: string) => { storage.set(key, value); },
+type StorageFailure = 'get' | 'set' | 'remove';
+
+function createStorage(
+  initial: Record<string, string> = {},
+  failures: StorageFailure[] = [],
+): { storage: Storage; snapshot: () => Record<string, string>; clearCalls: () => number } {
+  const values = new Map<string, string>(Object.entries(initial));
+  let clearCount = 0;
+
+  const storage = {
+    get length() { return values.size; },
+    clear: () => { clearCount += 1; values.clear(); },
+    getItem: (key: string) => {
+      if (failures.includes('get')) throw new Error('storage read disabled');
+      return values.get(key) ?? null;
+    },
+    key: (index: number) => Array.from(values.keys())[index] ?? null,
+    removeItem: (key: string) => {
+      if (failures.includes('remove')) throw new Error('storage remove disabled');
+      values.delete(key);
+    },
+    setItem: (key: string, value: string) => {
+      if (failures.includes('set')) throw new Error('storage write disabled');
+      values.set(key, value);
+    },
   } as Storage;
+
+  return {
+    storage,
+    snapshot: () => Object.fromEntries(values.entries()),
+    clearCalls: () => clearCount,
+  };
 }
 
-describe('local auth', () => {
-  it('seeds demo credentials when no local accounts exist', () => {
-    const storage = createStorage();
-    expect(getStoredAccounts(storage)).toEqual([getDemoAccount()]);
+describe('C2 demo profile storage', () => {
+  it('round-trips a valid versioned profile and seeds only synthetic addresses', () => {
+    const { storage } = createStorage();
+    const profile = createDefaultDemoProfile('Riley Demo', 'demo-address-2');
+
+    const saved = saveDemoProfile(storage, profile);
+    const loaded = getDemoProfile(storage);
+    const addresses = getDemoAddresses(storage);
+
+    expect(saved).toEqual({ ok: true, value: profile });
+    expect(loaded).toEqual({ ok: true, value: profile });
+    expect(addresses).toEqual({ ok: true, value: SYNTHETIC_DEMO_ADDRESSES });
+    expect(storage.getItem(DEMO_PROFILE_STORAGE_KEY)).not.toContain('password');
+    expect(storage.getItem(DEMO_ADDRESSES_STORAGE_KEY)).not.toContain('password');
   });
 
-  it('signs in with demo credentials and clears only the session on sign out', () => {
-    const storage = createStorage();
-    storage.setItem('orderlyapp.marketplace.cart.v1', '[]');
+  it('rejects malformed JSON, unknown fields, invalid versions, and invalid names', () => {
+    const malformed = createStorage({ [DEMO_PROFILE_STORAGE_KEY]: '{bad-json' }).storage;
+    expect(getDemoProfile(malformed)).toMatchObject({ ok: false, code: 'invalid_profile' });
 
-    const result = signInWithCredentials(storage, getDemoAccount().email, getDemoAccount().password);
+    const extraField = createStorage({
+      [DEMO_PROFILE_STORAGE_KEY]: JSON.stringify({
+        ...createDefaultDemoProfile(),
+        password: 'should-never-exist',
+      }),
+    }).storage;
+    expect(getDemoProfile(extraField)).toMatchObject({ ok: false, code: 'invalid_profile' });
 
-    expect(result.ok).toBe(true);
-    expect(isSignedIn(storage)).toBe(true);
-    expect(getCurrentAuthAccount(storage)?.email).toBe(getDemoAccount().email);
-    expect(storage.getItem(PROFILE_STORAGE_KEY)).toContain(getDemoAccount().email);
+    const badVersion = createStorage({
+      [DEMO_PROFILE_STORAGE_KEY]: JSON.stringify({
+        ...createDefaultDemoProfile(),
+        schemaVersion: 2,
+      }),
+    }).storage;
+    expect(getDemoProfile(badVersion)).toMatchObject({ ok: false, code: 'invalid_profile' });
 
-    signOut(storage);
+    const emptyName = saveDemoProfile(createStorage().storage, createDefaultDemoProfile('   '));
+    expect(emptyName).toMatchObject({ ok: false, code: 'invalid_profile' });
 
-    expect(isSignedIn(storage)).toBe(false);
+    const longName = saveDemoProfile(
+      createStorage().storage,
+      createDefaultDemoProfile('x'.repeat(MAX_DEMO_PROFILE_NAME_LENGTH + 1)),
+    );
+    expect(longName).toMatchObject({ ok: false, code: 'invalid_profile' });
+  });
+
+  it('surfaces storage read and write failures without throwing', () => {
+    expect(getDemoProfile(createStorage({}, ['get']).storage)).toEqual({
+      ok: false,
+      code: 'storage_unavailable',
+      message: 'Demo profile storage is unavailable',
+    });
+
+    expect(saveDemoProfile(createStorage({}, ['set']).storage, createDefaultDemoProfile())).toEqual({
+      ok: false,
+      code: 'storage_unavailable',
+      message: 'Demo profile storage is unavailable',
+    });
+  });
+
+  it('removes exact legacy account/session/profile/address keys without clearing unrelated data', () => {
+    const { storage, snapshot, clearCalls } = createStorage({
+      [LEGACY_AUTH_ACCOUNTS_STORAGE_KEY]: JSON.stringify([{ email: 'demo@example.com', password: 'legacy-secret' }]),
+      [SESSION_STORAGE_KEY]: JSON.stringify({ userId: 'legacy-user', email: 'demo@example.com' }),
+      [PROFILE_STORAGE_KEY]: JSON.stringify({ name: 'Legacy profile' }),
+      [ADDRESSES_STORAGE_KEY]: JSON.stringify([{ street: 'Real-looking legacy address' }]),
+      [CART_STORAGE_KEY]: '[{"menuItemId":"pizza"}]',
+      [ORDER_HISTORY_STORAGE_KEY]: '[{"id":"ORD-KEEP"}]',
+    });
+
+    expect(getDemoProfile(storage)).toEqual({ ok: true, value: undefined });
+
+    const remaining = snapshot();
+    expect(remaining[LEGACY_AUTH_ACCOUNTS_STORAGE_KEY]).toBeUndefined();
+    expect(remaining[SESSION_STORAGE_KEY]).toBeUndefined();
+    expect(remaining[PROFILE_STORAGE_KEY]).toBeUndefined();
+    expect(remaining[ADDRESSES_STORAGE_KEY]).toBeUndefined();
+    expect(remaining[CART_STORAGE_KEY]).toBe('[{"menuItemId":"pizza"}]');
+    expect(remaining[ORDER_HISTORY_STORAGE_KEY]).toBe('[{"id":"ORD-KEEP"}]');
+    expect(JSON.stringify(remaining)).not.toContain('legacy-secret');
+    expect(clearCalls()).toBe(0);
+  });
+
+  it('rejects tampered synthetic address storage', () => {
+    const { storage } = createStorage({
+      [DEMO_ADDRESSES_STORAGE_KEY]: JSON.stringify([
+        { ...SYNTHETIC_DEMO_ADDRESSES[0], street: 'User supplied street' },
+        SYNTHETIC_DEMO_ADDRESSES[1],
+      ]),
+    });
+
+    expect(getDemoAddresses(storage)).toMatchObject({ ok: false, code: 'invalid_profile' });
+  });
+
+  it('allows local profile id/name/default changes without creating a browser ownership session', () => {
+    const { storage } = createStorage();
+    const first = saveDemoProfile(storage, createDefaultDemoProfile('First name'));
+    expect(first.ok).toBe(true);
+
+    const changed = saveDemoProfile(storage, {
+      schemaVersion: 1,
+      id: 'different-local-label',
+      name: 'Second name',
+      defaultAddressId: 'demo-address-2',
+    });
+
+    expect(changed).toMatchObject({
+      ok: true,
+      value: {
+        id: 'different-local-label',
+        name: 'Second name',
+        defaultAddressId: 'demo-address-2',
+      },
+    });
     expect(storage.getItem(SESSION_STORAGE_KEY)).toBeNull();
-    expect(storage.getItem('orderlyapp.marketplace.cart.v1')).toBe('[]');
   });
 
-  it('creates a local account and prevents duplicate signup', () => {
-    const storage = createStorage();
-    const result = signUpWithCredentials(storage, {
-      name: 'Riley Local',
-      email: 'RILEY@example.com',
-      phone: '+1-555-0199',
-      password: 'password-1',
+  it('keeps checkout compatibility synthetic and presentation-only', () => {
+    const { storage } = createStorage();
+    const profile = {
+      schemaVersion: 1 as const,
+      id: 'local-profile-id',
+      name: 'Demo Checkout Name',
+      defaultAddressId: 'demo-address-2',
+    };
+    expect(saveDemoProfile(storage, profile).ok).toBe(true);
+
+    expect(isSignedIn(storage)).toBe(true);
+    expect(getSessionProfile(storage)).toMatchObject({
+      id: 'local-profile-id',
+      name: 'Demo Checkout Name',
+      defaultAddressId: 'demo-address-2',
     });
-
-    expect(result.ok).toBe(true);
-    expect(getCurrentAuthSession(storage)?.email).toBe('riley@example.com');
-    expect(storage.getItem(AUTH_ACCOUNTS_STORAGE_KEY)).toContain('riley@example.com');
-
-    const duplicate = signUpWithCredentials(storage, {
-      name: 'Riley Again',
-      email: 'riley@example.com',
-      phone: '+1-555-0199',
-      password: 'password-1',
-    });
-
-    expect(duplicate.ok).toBe(false);
-    expect(duplicate.errors[0]).toContain('already exists');
+    expect(getSessionProfile(storage).email).toMatch(/example\.com$/);
   });
 
-  it('rejects invalid or wrong credentials', () => {
-    const storage = createStorage();
+  it('forgets only the local demo profile namespace', () => {
+    const { storage } = createStorage({
+      [CART_STORAGE_KEY]: '[{"menuItemId":"pizza"}]',
+      [ORDER_HISTORY_STORAGE_KEY]: '[{"id":"ORD-KEEP"}]',
+    });
+    expect(saveDemoProfile(storage, createDefaultDemoProfile()).ok).toBe(true);
 
-    expect(signUpWithCredentials(storage, {
-      name: '',
-      email: 'bad',
-      phone: '1',
-      password: 'short',
-    }).errors).toEqual([
-      'Enter a valid email address.',
-      'Name is required.',
-      'Enter a valid phone number.',
-      'Password must be at least 8 characters.',
-    ]);
-
-    expect(signInWithCredentials(storage, getDemoAccount().email, 'wrong-password').ok).toBe(false);
+    expect(forgetDemoProfile(storage)).toEqual({ ok: true, value: undefined });
+    expect(storage.getItem(DEMO_PROFILE_STORAGE_KEY)).toBeNull();
+    expect(storage.getItem(DEMO_ADDRESSES_STORAGE_KEY)).toBeNull();
+    expect(storage.getItem(CART_STORAGE_KEY)).toContain('pizza');
+    expect(storage.getItem(ORDER_HISTORY_STORAGE_KEY)).toContain('ORD-KEEP');
   });
 });
