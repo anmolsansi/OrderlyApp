@@ -116,3 +116,5 @@ Later stabilization tickets still own the product/security changes described in 
 ## Final completion rule
 
 ST-01 is complete only when the current branch head, not merely an earlier commit, has a successful hosted `ST-01 Baseline` run with WEB, BACKEND/Postgres, standalone Chromium launch, product E2E, and baseline-evidence all green. The closing engineering review also requires the `main...chore/st-01-baseline-contracts` diff to remain limited to ST-01 foundation, contracts, CI, dependency, and documentation paths, with no application behavior changes or committed secrets.
+
+`development.md` now marks ST-01 Completed, checks ST-01.01–ST-01.07, and records AC1–AC5 as PASS. This final authored runbook commit exists after that synchronization so hosted CI validates the exact completed packet state before the PR is opened.
