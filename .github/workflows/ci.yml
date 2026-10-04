@@ -164,6 +164,23 @@ jobs:
         run: npm run test:e2e:install
       - name: Run product E2E baseline
         run: npm run test:e2e
+      - name: Collect E2E runtime evidence
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          cp /tmp/orderly-api.log artifacts/orderly-api.log 2>/dev/null || true
+          cp /tmp/orderly-health.json artifacts/orderly-health.json 2>/dev/null || true
+      - name: Upload E2E baseline evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: st01-e2e-${{ github.run_id }}
+          path: |
+            artifacts
+            test-results
+          if-no-files-found: ignore
+          retention-days: 14
 
   baseline-evidence:
     if: always()
