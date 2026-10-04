@@ -10,13 +10,13 @@ import {
   getDemoProfile,
   saveDemoProfile,
 } from '@/lib/auth';
-import { routes } from '@/lib/routes';
+import { routes, sanitizeAppReturnPath } from '@/lib/routes';
 import type { DemoAddress, DemoProfile } from '@/lib/types';
 
 function SignInContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get('next') ?? routes.account;
+  const next = sanitizeAppReturnPath(searchParams.get('next'), routes.account);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [profile, setProfile] = useState<DemoProfile | undefined>();
   const [addresses, setAddresses] = useState<DemoAddress[]>([]);
