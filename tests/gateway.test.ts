@@ -62,6 +62,27 @@ describe('same-origin Orderly API gateway', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('accepts an originless browser same-origin POST using Sec-Fetch-Site', async () => {
+    process.env.ORDERLY_API_ORIGIN = 'https://api.orderly.test';
+    let forwarded: Headers | undefined;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_input, init) => {
+      forwarded = new Headers(init?.headers);
+      return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+    });
+
+    const response = await POST(
+      new NextRequest('https://orderly.test/api/orderly/session', {
+        method: 'POST',
+        headers: { 'sec-fetch-site': 'same-origin' },
+      }),
+      context('session'),
+    );
+
+    expect(response.status).toBe(200);
+    expect(forwarded?.get('origin')).toBe('https://orderly.test');
+    expect(forwarded?.get('x-forwarded-proto')).toBe('https');
+  });
+
   it('drops spoofable identity headers and sets trusted proxy origin metadata', async () => {
     process.env.ORDERLY_API_ORIGIN = 'https://api.orderly.test';
     let forwarded: Headers | undefined;
