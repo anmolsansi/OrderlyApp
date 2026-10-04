@@ -217,7 +217,11 @@ def validation_exception_handler(request: Request, exc: RequestValidationError) 
             if field
         )
     )
-    cart_fields = [field for field in fields if field == "items" or field.startswith("items.")]
+    cart_fields = [
+        field
+        for field in fields
+        if field == "expected_revision" or field == "items" or field.startswith("items.")
+    ]
     if cart_fields and len(cart_fields) == len(fields):
         return _error_response(
             request,
