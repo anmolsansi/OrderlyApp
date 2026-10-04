@@ -1,9 +1,12 @@
-name: ST-01 Baseline
+name: Stabilization CI
 
 on:
   push:
     branches:
-      - chore/st-01-baseline-contracts
+      - main
+      - 'feat/**'
+      - 'fix/**'
+      - 'chore/**'
   pull_request:
     branches:
       - main
@@ -69,9 +72,9 @@ jobs:
         run: |
           python -m pip install -e ./backend
           python -m pip install -r backend/requirements-test.lock
-      - name: Apply existing database migrations
+      - name: Apply database migrations
         run: python backend/scripts/migrate.py
-      - name: Run BACKEND baseline
+      - name: Run BACKEND suite
         run: python -m pytest backend/tests -q
 
   browser-runtime:
@@ -117,10 +120,14 @@ jobs:
     env:
       DATABASE_URL: postgresql://orderly:orderly@127.0.0.1:5432/orderlyapp_e2e
       NEXT_PUBLIC_API_BASE_URL: http://127.0.0.1:8000
+      ORDERLY_API_ORIGIN: http://127.0.0.1:8000
       NEXT_PUBLIC_APP_URL: http://127.0.0.1:3200
       NEXT_PUBLIC_VOICE_MODE: mock
       NEXT_PUBLIC_CHECKOUT_MODE: mock
       NEXT_PUBLIC_AUTH_PROVIDER: none
+      ORDERLY_DATA_MODE: api
+      ORDERLY_SESSION_SECRET: ci-st02-session-secret-with-more-than-32-bytes
+      ORDERLY_ALLOWED_ORIGINS: http://127.0.0.1:3200
       ORDERLY_CORS_ORIGINS: http://127.0.0.1:3200
       PLAYWRIGHT_BASE_URL: http://127.0.0.1:3200
     steps:
@@ -162,7 +169,7 @@ jobs:
           exit 1
       - name: Provision Chromium
         run: npm run test:e2e:install
-      - name: Run product E2E baseline
+      - name: Run product E2E suite
         run: npm run test:e2e
       - name: Collect E2E runtime evidence
         if: always()
@@ -171,11 +178,11 @@ jobs:
           mkdir -p artifacts
           cp /tmp/orderly-api.log artifacts/orderly-api.log 2>/dev/null || true
           cp /tmp/orderly-health.json artifacts/orderly-health.json 2>/dev/null || true
-      - name: Upload E2E baseline evidence
+      - name: Upload E2E evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: st01-e2e-${{ github.run_id }}
+          name: stabilization-e2e-${{ github.run_id }}
           path: |
             artifacts
             test-results
@@ -187,11 +194,11 @@ jobs:
     needs: [web, backend, browser-runtime, e2e]
     runs-on: ubuntu-latest
     steps:
-      - name: Record assessed source and job results
+      - name: Record source and job results
         shell: bash
         run: |
           {
-            echo "## ST-01 baseline evidence"
+            echo "## Stabilization CI evidence"
             echo "- Source SHA: \`${GITHUB_SHA}\`"
             echo "- Ref: \`${GITHUB_REF}\`"
             echo "- Node baseline: 22"
