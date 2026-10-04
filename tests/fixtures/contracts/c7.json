@@ -53,13 +53,106 @@
         ]
       }
     },
+    "quote_result": {
+      "ok": true,
+      "data": {
+        "schemaVersion": 1,
+        "cartRevision": 1,
+        "catalogFingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "totals": {
+          "subtotalCents": 1000,
+          "discountCents": 500,
+          "deliveryFeeCents": 199,
+          "serviceFeeCents": 249,
+          "taxCents": 44,
+          "tipCents": 200,
+          "totalCents": 1192
+        }
+      }
+    },
+    "checkout_recovery": {
+      "schemaVersion": 1,
+      "idempotencyKey": "11111111-1111-4111-8111-111111111111",
+      "submission": {
+        "expectedRevision": 1,
+        "catalogFingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkout": {
+          "name": "Demo Visitor",
+          "phone": "+1-555-0100",
+          "email": "demo@example.test",
+          "street": "100 Demo Street",
+          "apartment": "5A",
+          "city": "Demo City",
+          "state": "CA",
+          "postalCode": "94105",
+          "deliveryInstructions": "Synthetic fixture only",
+          "paymentMethod": "mock",
+          "tipCents": 200
+        },
+        "promotionCode": "DEMO5"
+      }
+    },
+    "receipt_result": {
+      "ok": true,
+      "data": {
+        "schemaVersion": 1,
+        "id": "11111111-1111-4111-8111-111111111112",
+        "status": "Placed",
+        "createdAt": "2030-01-01T00:00:00.000Z",
+        "items": [
+          {
+            "id": "line-1",
+            "restaurantId": "fixture-r1",
+            "menuItemId": "fixture-i1",
+            "name": "Fixture meal",
+            "unitPriceCents": 1000,
+            "quantity": 1,
+            "lineTotalCents": 1000,
+            "modifiers": [],
+            "specialInstructions": "Synthetic fixture only"
+          }
+        ],
+        "checkout": {
+          "name": "Demo Visitor",
+          "phone": "+1-555-0100",
+          "email": "demo@example.test",
+          "street": "100 Demo Street",
+          "apartment": "5A",
+          "city": "Demo City",
+          "state": "CA",
+          "postalCode": "94105",
+          "deliveryInstructions": "Synthetic fixture only",
+          "paymentMethod": "mock",
+          "tipCents": 200
+        },
+        "totals": {
+          "subtotalCents": 1000,
+          "discountCents": 500,
+          "deliveryFeeCents": 199,
+          "serviceFeeCents": 249,
+          "taxCents": 44,
+          "tipCents": 200,
+          "totalCents": 1192
+        },
+        "pricingVersion": "mock-v1"
+      }
+    },
+    "checkout_states": [
+      "idle",
+      "submitting",
+      "uncertain",
+      "accepted",
+      "rejected"
+    ],
     "local_demo_boundary": {
       "mode": "local_demo",
       "catalog_source": "fixtures",
       "basket_namespace": "orderlyapp.marketplace.localDemoCart.v1",
       "api_requests": 0,
       "guest_bootstrap": false,
-      "checkout_enabled": false
+      "checkout_enabled": false,
+      "receipt_enabled": false,
+      "history_enabled": false
     }
   },
   "negative": [
@@ -143,6 +236,28 @@
         "code": "network_error",
         "message": "Order result is uncertain; retry with the same key",
         "request_id": "synthetic-request-7",
+        "fields": []
+      }
+    },
+    {
+      "name": "unknown_exact_order",
+      "ok": false,
+      "kind": "validation",
+      "error": {
+        "code": "order_not_found",
+        "message": "Order not found",
+        "request_id": "synthetic-request-8",
+        "fields": []
+      }
+    },
+    {
+      "name": "local_demo_order_route",
+      "ok": false,
+      "kind": "validation",
+      "error": {
+        "code": "local_demo_orders_unavailable",
+        "message": "Order receipts are unavailable in fixture preview",
+        "request_id": "synthetic-request-9",
         "fields": []
       }
     }
