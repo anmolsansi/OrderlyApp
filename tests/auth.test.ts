@@ -20,6 +20,7 @@ import {
   PROFILE_STORAGE_KEY,
   SESSION_STORAGE_KEY,
 } from '../lib/cart';
+import { routes, sanitizeAppReturnPath } from '../lib/routes';
 
 type StorageFailure = 'get' | 'set' | 'remove';
 
@@ -215,5 +216,41 @@ describe('C2 demo profile storage', () => {
     expect(storage.getItem(DEMO_ADDRESSES_STORAGE_KEY)).toBeNull();
     expect(storage.getItem(CART_STORAGE_KEY)).toContain('pizza');
     expect(storage.getItem(ORDER_HISTORY_STORAGE_KEY)).toContain('ORD-KEEP');
+  });
+});
+
+describe('safe app return paths', () => {
+  it('keeps only known internal destinations and their local query strings', () => {
+    expect(sanitizeAppReturnPath('/')).toBe('/');
+    expect(sanitizeAppReturnPath('/account')).toBe('/account');
+    expect(sanitizeAppReturnPath('/checkout')).toBe('/checkout');
+    expect(sanitizeAppReturnPath('/cart')).toBe('/cart');
+    expect(sanitizeAppReturnPath('/orders')).toBe('/orders');
+    expect(sanitizeAppReturnPath('/restaurants/marios-pizza')).toBe('/restaurants/marios-pizza');
+    expect(sanitizeAppReturnPath('/restaurants/marios-pizza/items/pepperoni-feast')).toBe('/restaurants/marios-pizza/items/pepperoni-feast');
+    expect(sanitizeAppReturnPath('/restaurants?query=pepperoni&filter=Top+Rated')).toBe('/restaurants?query=pepperoni&filter=Top+Rated');
+    expect(sanitizeAppReturnPath('/order-confirmation?orderId=demo-order')).toBe('/order-confirmation?orderId=demo-order');
+    expect(routes.signIn('/checkout')).toBe('/sign-in?next=%2Fcheckout');
+  });
+
+  it('falls back for external, protocol-relative, encoded, malformed, or unknown destinations', () => {
+    const unsafe = [
+      'https://evil.example/steal',
+      '//evil.example/steal',
+      '/\\evil.example/steal',
+      '/%2F%2Fevil.example/steal',
+      '/restaurants/%2e%2e/account',
+      '/checkout#outside-contract',
+      '/unknown-route',
+      ' /checkout',
+      '',
+    ];
+
+    for (const candidate of unsafe) {
+      expect(sanitizeAppReturnPath(candidate)).toBe('/account');
+    }
+
+    expect(sanitizeAppReturnPath(null, '/checkout')).toBe('/checkout');
+    expect(routes.signIn('https://evil.example')).toBe('/sign-in?next=%2Faccount');
   });
 });
