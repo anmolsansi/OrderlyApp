@@ -4,14 +4,57 @@
   "synthetic": true,
   "positive": {
     "idempotency_key": "11111111-1111-4111-8111-111111111111",
+    "request": {
+      "expected_revision": 1,
+      "catalog_fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "checkout": {
+        "name": "Demo Visitor",
+        "phone": "+1-555-0100",
+        "email": "demo@example.test",
+        "street": "100 Demo Street",
+        "apartment": "5A",
+        "city": "Demo City",
+        "state": "CA",
+        "postal_code": "94105",
+        "delivery_instructions": "Synthetic fixture only",
+        "payment_method": "mock",
+        "tip_cents": 200
+      },
+      "promotion_code": "DEMO5"
+    },
     "first_response": {
       "status": 201,
       "receipt": {
         "schema_version": 1,
-        "id": "fixture-o1",
+        "id": "11111111-1111-4111-8111-111111111112",
         "status": "Placed",
         "created_at": "2030-01-01T00:00:00Z",
-        "pricing_version": "mock-v1",
+        "items": [
+          {
+            "id": "line-1",
+            "restaurant_id": "fixture-r1",
+            "menu_item_id": "fixture-i1",
+            "name": "Fixture meal",
+            "unit_price_cents": 1000,
+            "quantity": 1,
+            "line_total_cents": 1000,
+            "modifiers": [],
+            "special_instructions": "Synthetic fixture only"
+          }
+        ],
+        "checkout": {
+          "name": "Demo Visitor",
+          "phone": "+1-555-0100",
+          "email": "demo@example.test",
+          "street": "100 Demo Street",
+          "apartment": "5A",
+          "city": "Demo City",
+          "state": "CA",
+          "postal_code": "94105",
+          "delivery_instructions": "Synthetic fixture only",
+          "payment_method": "mock",
+          "tip_cents": 200
+        },
         "totals": {
           "subtotal_cents": 1000,
           "discount_cents": 500,
@@ -20,17 +63,43 @@
           "tax_cents": 44,
           "tip_cents": 200,
           "total_cents": 1192
-        }
+        },
+        "pricing_version": "mock-v1"
       }
     },
     "replay_response": {
       "status": 200,
       "receipt": {
         "schema_version": 1,
-        "id": "fixture-o1",
+        "id": "11111111-1111-4111-8111-111111111112",
         "status": "Placed",
         "created_at": "2030-01-01T00:00:00Z",
-        "pricing_version": "mock-v1",
+        "items": [
+          {
+            "id": "line-1",
+            "restaurant_id": "fixture-r1",
+            "menu_item_id": "fixture-i1",
+            "name": "Fixture meal",
+            "unit_price_cents": 1000,
+            "quantity": 1,
+            "line_total_cents": 1000,
+            "modifiers": [],
+            "special_instructions": "Synthetic fixture only"
+          }
+        ],
+        "checkout": {
+          "name": "Demo Visitor",
+          "phone": "+1-555-0100",
+          "email": "demo@example.test",
+          "street": "100 Demo Street",
+          "apartment": "5A",
+          "city": "Demo City",
+          "state": "CA",
+          "postal_code": "94105",
+          "delivery_instructions": "Synthetic fixture only",
+          "payment_method": "mock",
+          "tip_cents": 200
+        },
         "totals": {
           "subtotal_cents": 1000,
           "discount_cents": 500,
@@ -39,7 +108,8 @@
           "tax_cents": 44,
           "tip_cents": 200,
           "total_cents": 1192
-        }
+        },
+        "pricing_version": "mock-v1"
       }
     }
   },
@@ -51,6 +121,46 @@
         "code": "idempotency_conflict",
         "message": "Idempotency key was reused with a different payload",
         "request_id": "synthetic-request-1",
+        "fields": []
+      }
+    },
+    {
+      "name": "cart_conflict",
+      "status": 409,
+      "error": {
+        "code": "cart_conflict",
+        "message": "Basket changed in another tab",
+        "request_id": "synthetic-request-2",
+        "fields": []
+      }
+    },
+    {
+      "name": "catalog_changed",
+      "status": 409,
+      "error": {
+        "code": "catalog_changed",
+        "message": "Catalog changed after the quote",
+        "request_id": "synthetic-request-3",
+        "fields": []
+      }
+    },
+    {
+      "name": "invalid_checkout",
+      "status": 422,
+      "error": {
+        "code": "invalid_checkout",
+        "message": "Checkout details are invalid",
+        "request_id": "synthetic-request-4",
+        "fields": ["idempotency_key"]
+      }
+    },
+    {
+      "name": "storage_unavailable",
+      "status": 503,
+      "error": {
+        "code": "storage_unavailable",
+        "message": "Order storage is unavailable",
+        "request_id": "synthetic-request-5",
         "fields": []
       }
     }
