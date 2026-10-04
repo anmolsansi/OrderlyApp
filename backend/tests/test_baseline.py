@@ -64,3 +64,12 @@ def test_contract_negative_envelopes_are_explicit() -> None:
             assert error["message"]
             assert error["request_id"].startswith("synthetic-request-")
             assert isinstance(error["fields"], list)
+
+
+def test_contract_schema_versions_are_stable() -> None:
+    for contract in CONTRACT_NAMES:
+        fixture = load_contract_fixture(contract)
+        assert fixture["schema_version"] == 1
+        positive = fixture["positive"]
+        if "schema_version" in positive:
+            assert positive["schema_version"] == 1
