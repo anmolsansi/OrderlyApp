@@ -167,20 +167,63 @@ def build_receipt_items(snapshot: CatalogSnapshot, items: List[CartItem]) -> Lis
     return receipt_items
 
 
+def _fingerprint_menu_item(menu_item) -> dict:
+    return {
+        "id": menu_item.id,
+        "name": menu_item.name,
+        "price_cents": menu_item.price_cents,
+        "available": menu_item.available,
+        "modifier_groups": [
+            {
+                "id": group.id,
+                "name": group.name,
+                "type": group.type,
+                "required": group.required,
+                "min_selected": group.min_selected,
+                "max_selected": group.max_selected,
+                "default_option_id": group.default_option_id,
+                "options": [
+                    {
+                        "id": option.id,
+                        "name": option.name,
+                        "price_delta_cents": option.price_delta_cents,
+                        "available": option.available,
+                    }
+                    for option in group.options
+                ],
+            }
+            for group in menu_item.modifier_groups
+        ],
+    }
+
+
 def catalog_fingerprint(snapshot: CatalogSnapshot, items: List[CartItem]) -> str:
+    """Hash authoritative menu and fee policy, not mutable cart-only fields."""
     if not items:
         raise InvalidCheckoutError(["cart"])
     restaurant = snapshot.restaurant(items[0].restaurant_id)
     if restaurant is None:
         raise CatalogChangedError()
 
+    menu_item_ids = sorted({item.menu_item_id for item in items})
+    menu_items = []
+    for menu_item_id in menu_item_ids:
+        menu_item = snapshot.menu_item(restaurant.id, menu_item_id)
+        if menu_item is None:
+            raise CatalogChangedError()
+        menu_items.append(_fingerprint_menu_item(menu_item))
+
     payload = {
         "pricing_version": PRICING_VERSION,
-        "delivery_fee_cents": restaurant.delivery_fee_cents,
+        "restaurant": {
+            "id": restaurant.id,
+            "is_open": restaurant.is_open,
+            "delivery_fee_cents": restaurant.delivery_fee_cents,
+        },
         "service_fee_cents": SERVICE_FEE_CENTS,
         "tax_rate": [TAX_RATE_NUMERATOR, TAX_RATE_DENOMINATOR],
         "promotion": {"code": "DEMO5", "cap_cents": DEMO5_DISCOUNT_CAP_CENTS},
-        "items": [item.model_dump(mode="json") for item in build_receipt_items(snapshot, items)],
+        "menu_items": menu_items,
     }
     encoded = json.dumps(
         payload,
