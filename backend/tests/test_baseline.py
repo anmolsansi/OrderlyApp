@@ -100,3 +100,16 @@ def test_c5_mock_v1_fixture_total_is_1192_cents() -> None:
     assert expected_total == 1192
     assert quote_totals["total_cents"] == expected_total
     assert receipt_totals == quote_totals
+
+
+def test_c6_replay_preserves_order_and_receipt() -> None:
+    fixture = load_contract_fixture("C6")
+    positive = fixture["positive"]
+    first = positive["first_response"]
+    replay = positive["replay_response"]
+
+    assert positive["idempotency_key"] == "11111111-1111-4111-8111-111111111111"
+    assert first["status"] == 201
+    assert replay["status"] == 200
+    assert replay["receipt"] == first["receipt"]
+    assert replay["receipt"]["id"] == "fixture-o1"
