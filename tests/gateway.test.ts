@@ -83,7 +83,7 @@ describe('same-origin Orderly API gateway', () => {
     expect(forwarded?.get('x-forwarded-proto')).toBe('https');
   });
 
-  it('drops spoofable identity headers and sets trusted proxy origin metadata', async () => {
+  it('drops spoofable identity headers and non-order idempotency headers', async () => {
     process.env.ORDERLY_API_ORIGIN = 'https://api.orderly.test';
     let forwarded: Headers | undefined;
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (_input, init) => {
@@ -98,6 +98,7 @@ describe('same-origin Orderly API gateway', () => {
         cookie: 'orderly_guest=signed-token',
         'x-orderly-owner': 'guest-forged',
         'x-user-id': 'guest-forged',
+        'idempotency-key': '11111111-1111-4111-8111-111111111111',
       },
       body: '{"items":[]}',
     });
@@ -108,6 +109,29 @@ describe('same-origin Orderly API gateway', () => {
     expect(forwarded?.get('x-forwarded-proto')).toBe('https');
     expect(forwarded?.has('x-orderly-owner')).toBe(false);
     expect(forwarded?.has('x-user-id')).toBe(false);
+    expect(forwarded?.has('idempotency-key')).toBe(false);
+  });
+
+  it('forwards the idempotency key only for C6 order submission', async () => {
+    process.env.ORDERLY_API_ORIGIN = 'https://api.orderly.test';
+    const key = '11111111-1111-4111-8111-111111111111';
+    let forwarded: Headers | undefined;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_input, init) => {
+      forwarded = new Headers(init?.headers);
+      return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } });
+    });
+
+    const response = await call(POST, 'POST', 'orders', {
+      headers: {
+        origin: 'https://orderly.test',
+        'content-type': 'application/json',
+        'idempotency-key': key,
+      },
+      body: '{}',
+    });
+
+    expect(response.status).toBe(200);
+    expect(forwarded?.get('idempotency-key')).toBe(key);
   });
 
   it('rejects request bodies larger than 64 KiB', async () => {
