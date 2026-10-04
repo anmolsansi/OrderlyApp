@@ -1,16 +1,21 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  CHECKOUT_RECOVERY_STORAGE_KEY,
+  clearCheckoutRecovery,
   clearRevisionedCart,
-  createBackendOrder,
-  fetchOrder,
-  fetchOrders,
+  fetchCheckoutQuote,
+  fetchOrderReceipt,
+  fetchOrderReceipts,
   fetchRestaurants,
   fetchRevisionedCart,
   getOrderlyDataMode,
+  loadCheckoutRecovery,
+  saveCheckoutRecovery,
   saveRevisionedCart,
+  submitCheckoutOrder,
 } from '../lib/api';
 import { restaurants } from '../lib/mock-data';
-import type { CartItem, CheckoutDetails } from '../lib/types';
+import type { CartItem, CheckoutDetails, CheckoutRecovery, OrderSubmission } from '../lib/types';
 
 const cartItem: CartItem = {
   id: 'cart-test',
@@ -71,14 +76,68 @@ const canonicalRestaurant = {
 
 const checkoutDetails: CheckoutDetails = {
   name: 'Jamie Demo',
-  phone: '555-0100',
-  email: 'jamie@example.com',
+  phone: '+1-555-0100',
+  email: 'jamie@example.test',
   street: '123 Demo Street',
-  city: 'San Francisco',
+  apartment: '5A',
+  city: 'Demo City',
   state: 'CA',
   postalCode: '94105',
-  paymentMethod: 'Mock Visa 4242',
+  deliveryInstructions: 'Synthetic fixture only',
+  paymentMethod: 'mock',
   tipCents: 500,
+};
+
+const orderSubmission: OrderSubmission = {
+  expectedRevision: 7,
+  catalogFingerprint: 'a'.repeat(64),
+  checkout: checkoutDetails,
+  promotionCode: 'DEMO5',
+};
+
+const canonicalReceipt = {
+  schema_version: 1,
+  id: '11111111-1111-4111-8111-111111111112',
+  status: 'Placed',
+  created_at: '2030-01-01T00:00:00Z',
+  items: [{
+    id: 'line-1',
+    restaurant_id: 'fixture-r1',
+    menu_item_id: 'fixture-i1',
+    name: 'Fixture meal',
+    unit_price_cents: 1000,
+    quantity: 1,
+    line_total_cents: 1300,
+    modifiers: [{
+      group_id: 'size',
+      name: 'Size',
+      options: [{ id: 'large', name: 'Large', price_delta_cents: 300 }],
+    }],
+    special_instructions: 'Synthetic fixture only',
+  }],
+  checkout: {
+    name: checkoutDetails.name,
+    phone: checkoutDetails.phone,
+    email: checkoutDetails.email,
+    street: checkoutDetails.street,
+    apartment: checkoutDetails.apartment,
+    city: checkoutDetails.city,
+    state: checkoutDetails.state,
+    postal_code: checkoutDetails.postalCode,
+    delivery_instructions: checkoutDetails.deliveryInstructions,
+    payment_method: 'mock',
+    tip_cents: checkoutDetails.tipCents,
+  },
+  totals: {
+    subtotal_cents: 1300,
+    discount_cents: 500,
+    delivery_fee_cents: 199,
+    service_fee_cents: 249,
+    tax_cents: 55,
+    tip_cents: 500,
+    total_cents: 1803,
+  },
+  pricing_version: 'mock-v1',
 };
 
 function mockJsonResponse(payload: unknown, ok = true, status = ok ? 200 : 500): Response {
@@ -98,6 +157,18 @@ function gatewayMock(operation: (url: string, init?: RequestInit) => Response | 
     }
     return operation(url, init);
   });
+}
+
+function memoryStorage(initial: Record<string, string> = {}): Storage {
+  const values = new Map(Object.entries(initial));
+  return {
+    get length() { return values.size; },
+    clear: () => values.clear(),
+    getItem: key => values.get(key) ?? null,
+    key: index => Array.from(values.keys())[index] ?? null,
+    removeItem: key => { values.delete(key); },
+    setItem: (key, value) => { values.set(key, value); },
+  };
 }
 
 describe('C7 web API adapter', () => {
@@ -267,52 +338,218 @@ describe('C7 web API adapter', () => {
   });
 });
 
-describe('legacy order adapter retained for ST-09 handoff', () => {
+describe('ST-09 C5/C6 checkout adapters', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
   });
 
-  it('submits legacy checkout details without client ownership fields', async () => {
-    const legacyCartItem: CartItem = {
-      ...cartItem,
-      restaurantId: restaurants[0].id,
-      menuItemId: restaurants[0].menu[0].id,
-      name: restaurants[0].menu[0].name,
-      basePriceCents: restaurants[0].menu[0].priceCents,
-      modifiers: [],
-    };
+  it('requests the server quote with revision, tip, and server-owned promotion policy', async () => {
+    let operationInit: RequestInit | undefined;
+    gatewayMock((url, init) => {
+      expect(url).toBe('/api/orderly/checkout/quote');
+      operationInit = init;
+      return mockJsonResponse({
+        schema_version: 1,
+        cart_revision: 7,
+        catalog_fingerprint: 'a'.repeat(64),
+        totals: canonicalReceipt.totals,
+      });
+    });
+
+    const result = await fetchCheckoutQuote(7, 500, 'DEMO5');
+
+    expect(result).toMatchObject({
+      ok: true,
+      data: {
+        schemaVersion: 1,
+        cartRevision: 7,
+        catalogFingerprint: 'a'.repeat(64),
+        totals: { totalCents: 1803, tipCents: 500 },
+      },
+    });
+    expect(JSON.parse(operationInit?.body as string)).toEqual({
+      expected_revision: 7,
+      tip_cents: 500,
+      promotion_code: 'DEMO5',
+    });
+  });
+
+  it('rejects a malformed successful quote instead of calculating a local replacement', async () => {
+    gatewayMock(() => mockJsonResponse({
+      schema_version: 1,
+      cart_revision: 7,
+      catalog_fingerprint: 'a'.repeat(64),
+      totals: { ...canonicalReceipt.totals, total_cents: '1803' },
+    }));
+
+    await expect(fetchCheckoutQuote(7, 500, 'DEMO5')).resolves.toMatchObject({
+      ok: false,
+      kind: 'server',
+      error: { code: 'invalid_response' },
+    });
+  });
+
+  it('submits the immutable C6 body with the caller-owned UUID idempotency key', async () => {
     let operationInit: RequestInit | undefined;
     gatewayMock((url, init) => {
       expect(url).toBe('/api/orderly/orders');
       operationInit = init;
-      return mockJsonResponse({
-        id: 'ORD-BACKEND',
-        cart_items: [{
-          id: legacyCartItem.id,
-          restaurant_id: legacyCartItem.restaurantId,
-          menu_item_id: legacyCartItem.menuItemId,
-          name: legacyCartItem.name,
-          quantity: legacyCartItem.quantity,
-          base_price_cents: legacyCartItem.basePriceCents,
-          modifiers: [],
-        }],
-        subtotal_cents: legacyCartItem.basePriceCents,
-        status: 'Placed',
-        created_at: '2026-05-13T09:00:00Z',
-      });
+      return mockJsonResponse(canonicalReceipt, true, 201);
     });
 
-    const order = await createBackendOrder([legacyCartItem], legacyCartItem.basePriceCents, checkoutDetails);
-    const body = JSON.parse(operationInit?.body as string);
-    expect(body).not.toHaveProperty('session_id');
-    expect(body).not.toHaveProperty('owner_id');
-    expect(order).toMatchObject({ id: 'ORD-BACKEND', status: 'Placed' });
+    const key = '11111111-1111-4111-8111-111111111111';
+    const result = await submitCheckoutOrder(key, orderSubmission);
+
+    expect(result).toMatchObject({
+      ok: true,
+      data: {
+        id: canonicalReceipt.id,
+        status: 'Placed',
+        checkout: { street: checkoutDetails.street, tipCents: 500 },
+        totals: { totalCents: 1803 },
+        pricingVersion: 'mock-v1',
+      },
+    });
+    expect(new Headers(operationInit?.headers).get('Idempotency-Key')).toBe(key);
+    expect(JSON.parse(operationInit?.body as string)).toEqual({
+      expected_revision: 7,
+      catalog_fingerprint: 'a'.repeat(64),
+      checkout: {
+        name: checkoutDetails.name,
+        phone: checkoutDetails.phone,
+        email: checkoutDetails.email,
+        street: checkoutDetails.street,
+        apartment: checkoutDetails.apartment,
+        city: checkoutDetails.city,
+        state: checkoutDetails.state,
+        postal_code: checkoutDetails.postalCode,
+        delivery_instructions: checkoutDetails.deliveryInstructions,
+        payment_method: 'mock',
+        tip_cents: 500,
+      },
+      promotion_code: 'DEMO5',
+    });
   });
 
-  it('returns undefined when protected legacy order fetches fail', async () => {
-    gatewayMock(() => mockJsonResponse({}, false, 404));
-    await expect(fetchOrder('missing')).resolves.toBeUndefined();
-    await expect(fetchOrders()).resolves.toBeUndefined();
+  it('treats a 200 idempotent replay as the same accepted immutable receipt', async () => {
+    gatewayMock(() => mockJsonResponse(canonicalReceipt, true, 200));
+
+    await expect(submitCheckoutOrder('11111111-1111-4111-8111-111111111111', orderSubmission)).resolves.toMatchObject({
+      ok: true,
+      data: { id: canonicalReceipt.id, totals: { totalCents: 1803 } },
+    });
+  });
+
+  it('keeps a lost POST response as a network failure instead of inventing an order', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('connection reset'));
+
+    await expect(submitCheckoutOrder('11111111-1111-4111-8111-111111111111', orderSubmission)).resolves.toMatchObject({
+      ok: false,
+      kind: 'network',
+      error: { code: 'network_error' },
+    });
+  });
+
+  it('normalizes exact receipt reads and preserves immutable address, modifier, and totals snapshots', async () => {
+    gatewayMock(url => {
+      expect(url).toBe(`/api/orderly/orders/${canonicalReceipt.id}`);
+      return mockJsonResponse(canonicalReceipt);
+    });
+
+    const result = await fetchOrderReceipt(canonicalReceipt.id);
+    expect(result).toMatchObject({
+      ok: true,
+      data: {
+        id: canonicalReceipt.id,
+        checkout: { apartment: '5A', street: '123 Demo Street' },
+        items: [{ modifiers: [{ name: 'Size', options: [{ name: 'Large', priceDeltaCents: 300 }] }] }],
+        totals: { subtotalCents: 1300, totalCents: 1803 },
+      },
+    });
+  });
+
+  it('returns the server 404 for an unknown exact order instead of another receipt', async () => {
+    gatewayMock(() => mockJsonResponse({
+      error: { code: 'order_not_found', message: 'Order not found', request_id: 'missing-order', fields: [] },
+    }, false, 404));
+
+    await expect(fetchOrderReceipt('missing')).resolves.toMatchObject({
+      ok: false,
+      kind: 'validation',
+      error: { code: 'order_not_found', requestId: 'missing-order' },
+    });
+  });
+
+  it('normalizes only the current guest scoped receipt list returned by C5', async () => {
+    gatewayMock(url => {
+      expect(url).toBe('/api/orderly/orders');
+      return mockJsonResponse([canonicalReceipt]);
+    });
+
+    await expect(fetchOrderReceipts()).resolves.toMatchObject({
+      ok: true,
+      data: [{ id: canonicalReceipt.id, totals: { totalCents: 1803 } }],
+    });
+  });
+
+  it('rejects malformed receipt snapshots rather than reconstructing them from fixtures', async () => {
+    gatewayMock(() => mockJsonResponse({ ...canonicalReceipt, totals: { ...canonicalReceipt.totals, tip_cents: -1 } }));
+
+    await expect(fetchOrderReceipt(canonicalReceipt.id)).resolves.toMatchObject({
+      ok: false,
+      kind: 'server',
+      error: { code: 'invalid_response' },
+    });
+  });
+
+  it('makes checkout and receipt APIs explicitly unavailable in local_demo without network calls', async () => {
+    vi.stubEnv('NEXT_PUBLIC_ORDERLY_DATA_MODE', 'local_demo');
+    const fetchMock = vi.spyOn(globalThis, 'fetch');
+
+    await expect(fetchCheckoutQuote(1, 0)).resolves.toMatchObject({ ok: false, error: { code: 'local_demo_checkout_unavailable' } });
+    await expect(submitCheckoutOrder('11111111-1111-4111-8111-111111111111', orderSubmission)).resolves.toMatchObject({ ok: false, error: { code: 'local_demo_checkout_unavailable' } });
+    await expect(fetchOrderReceipt('receipt')).resolves.toMatchObject({ ok: false, error: { code: 'local_demo_orders_unavailable' } });
+    await expect(fetchOrderReceipts()).resolves.toMatchObject({ ok: false, error: { code: 'local_demo_orders_unavailable' } });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('ST-09 checkout recovery storage', () => {
+  it('roundtrips one immutable key/body recovery record', () => {
+    const storage = memoryStorage();
+    const recovery: CheckoutRecovery = {
+      schemaVersion: 1,
+      idempotencyKey: '11111111-1111-4111-8111-111111111111',
+      submission: orderSubmission,
+    };
+
+    expect(saveCheckoutRecovery(storage, recovery)).toBe(true);
+    expect(loadCheckoutRecovery(storage)).toEqual(recovery);
+    expect(clearCheckoutRecovery(storage)).toBe(true);
+    expect(storage.getItem(CHECKOUT_RECOVERY_STORAGE_KEY)).toBeNull();
+  });
+
+  it('rejects malformed persisted recovery data instead of repairing or retrying it', () => {
+    const storage = memoryStorage({
+      [CHECKOUT_RECOVERY_STORAGE_KEY]: JSON.stringify({
+        schemaVersion: 1,
+        idempotencyKey: 'not-a-key',
+        submission: orderSubmission,
+      }),
+    });
+
+    expect(loadCheckoutRecovery(storage)).toBeUndefined();
+  });
+
+  it('fails closed when required recovery storage cannot be written', () => {
+    const brokenStorage = memoryStorage();
+    brokenStorage.setItem = () => { throw new Error('quota'); };
+
+    expect(saveCheckoutRecovery(brokenStorage, {
+      schemaVersion: 1,
+      idempotencyKey: '11111111-1111-4111-8111-111111111111',
+      submission: orderSubmission,
+    })).toBe(false);
   });
 });

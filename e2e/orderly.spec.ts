@@ -4,6 +4,25 @@ async function mockBackendCartAndOrders(page: import('@playwright/test').Page) {
   let backendCart: any[] = [];
   let cartRevision = 0;
   const backendOrders: Record<string, any> = {};
+  const idempotencyOrders: Record<string, string> = {};
+  const catalogFingerprint = 'a'.repeat(64);
+
+  function totals(tipCents: number) {
+    const subtotalCents = backendCart.reduce((sum, item) => sum + item.base_price_cents * item.quantity, 0);
+    const discountCents = subtotalCents > 0 ? Math.min(500, subtotalCents) : 0;
+    const deliveryFeeCents = subtotalCents > 0 ? 199 : 0;
+    const serviceFeeCents = subtotalCents > 0 ? 249 : 0;
+    const taxCents = subtotalCents > 0 ? 44 : 0;
+    return {
+      subtotal_cents: subtotalCents,
+      discount_cents: discountCents,
+      delivery_fee_cents: deliveryFeeCents,
+      service_fee_cents: serviceFeeCents,
+      tax_cents: taxCents,
+      tip_cents: tipCents,
+      total_cents: Math.max(0, subtotalCents - discountCents) + deliveryFeeCents + serviceFeeCents + taxCents + tipCents,
+    };
+  }
 
   await page.route('**', async route => {
     const request = route.request();
@@ -59,17 +78,66 @@ async function mockBackendCartAndOrders(page: import('@playwright/test').Page) {
       }
     }
 
+    if (url.pathname === '/api/orderly/checkout/quote' && request.method() === 'POST') {
+      const payload = JSON.parse(request.postData() ?? '{}');
+      if (payload.expected_revision !== cartRevision) {
+        await route.fulfill({
+          status: 409,
+          json: { error: { code: 'cart_conflict', message: 'Basket changed', request_id: 'e2e-quote-conflict', fields: [] } },
+        });
+        return;
+      }
+      await route.fulfill({
+        json: {
+          schema_version: 1,
+          cart_revision: cartRevision,
+          catalog_fingerprint: catalogFingerprint,
+          totals: totals(payload.tip_cents ?? 0),
+        },
+      });
+      return;
+    }
+
     if (url.pathname === '/api/orderly/orders' && request.method() === 'POST') {
       const payload = JSON.parse(request.postData() ?? '{}');
+      const idempotencyKey = request.headers()['idempotency-key'] ?? '';
+      const replayOrderId = idempotencyOrders[idempotencyKey];
+      if (replayOrderId) {
+        await route.fulfill({ status: 200, json: backendOrders[replayOrderId] });
+        return;
+      }
+      if (payload.expected_revision !== cartRevision) {
+        await route.fulfill({
+          status: 409,
+          json: { error: { code: 'cart_conflict', message: 'Basket changed', request_id: 'e2e-order-conflict', fields: [] } },
+        });
+        return;
+      }
+      const orderTotals = totals(payload.checkout?.tip_cents ?? 0);
       const order = {
-        id: 'ORD-BACKEND',
-        cart_items: payload.cart_items,
-        subtotal_cents: payload.subtotal_cents,
+        schema_version: 1,
+        id: '11111111-1111-4111-8111-111111111112',
         status: 'Placed',
         created_at: new Date().toISOString(),
+        items: backendCart.map(item => ({
+          id: item.id,
+          restaurant_id: item.restaurant_id,
+          menu_item_id: item.menu_item_id,
+          name: item.name,
+          unit_price_cents: item.base_price_cents,
+          quantity: item.quantity,
+          line_total_cents: item.base_price_cents * item.quantity,
+          modifiers: [],
+          ...(item.special_instructions ? { special_instructions: item.special_instructions } : {}),
+        })),
+        checkout: payload.checkout,
+        totals: orderTotals,
+        pricing_version: 'mock-v1',
       };
       backendOrders[order.id] = order;
+      idempotencyOrders[idempotencyKey] = order.id;
       backendCart = [];
+      cartRevision += 1;
       await route.fulfill({ status: 201, json: order });
       return;
     }
@@ -82,7 +150,10 @@ async function mockBackendCartAndOrders(page: import('@playwright/test').Page) {
     const orderMatch = url.pathname.match(/^\/api\/orderly\/orders\/([^/]+)$/);
     if (orderMatch && request.method() === 'GET') {
       const order = backendOrders[orderMatch[1]];
-      await route.fulfill(order ? { json: order } : { status: 404, json: { error: { code: 'not_found', message: 'Order not found' } } });
+      await route.fulfill(order ? { json: order } : {
+        status: 404,
+        json: { error: { code: 'order_not_found', message: 'Order not found', request_id: 'e2e-order-missing', fields: [] } },
+      });
       return;
     }
 
@@ -117,16 +188,16 @@ test('customizes an item, reviews payment, and places order', async ({ page }) =
   await expect(page.getByText(/pepperoni feast/i).first()).toBeVisible();
   await page.getByRole('link', { name: /continue to checkout/i }).click();
   await expect(page).toHaveURL(/\/checkout/);
-  await expect(page.getByText(/mock visa/i)).toBeVisible();
-  await page.getByRole('complementary').getByRole('link', { name: /^sign in$/i }).click();
+  await expect(page.getByText(/mock payment, no card details collected/i)).toBeVisible();
+  await page.getByRole('complementary').getByRole('link', { name: /create demo profile/i }).click();
   await page.getByRole('button', { name: /use demo profile/i }).click();
   await expect(page).toHaveURL(/\/checkout/);
-  await page.getByRole('button', { name: /place order/i }).click();
-  await expect(page).toHaveURL(/\/order-confirmation\?orderId=ORD-BACKEND/);
+  await page.getByRole('button', { name: /place mock order/i }).click();
+  await expect(page).toHaveURL(/\/order-confirmation\?orderId=11111111-1111-4111-8111-111111111112/);
   await expect(page.getByRole('heading', { name: /order placed/i })).toBeVisible();
-  await expect(page.getByRole('heading', { name: /mock receipt details/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /receipt details/i })).toBeVisible();
   await page.reload();
-  await expect(page.getByText('ORD-BACKEND', { exact: true })).toBeVisible();
+  await expect(page.getByText('11111111-1111-4111-8111-111111111112', { exact: true }).first()).toBeVisible();
 });
 
 test('demo profile is password-free and cannot silently change guest ownership', async ({ page, context }) => {
@@ -176,6 +247,7 @@ test('explicit fresh guest reset rotates ownership separately from the demo prof
 
   const [guestAfterReset] = (await context.cookies()).filter(cookie => cookie.name === 'orderly_guest');
   expect(guestAfterReset.value).not.toBe(guestBeforeReset.value);
+  expect(guestAfterReset.httpOnly).toBe(true);
 });
 
 test('restaurant filters open the list page and checkout is disabled when empty', async ({ page }) => {
@@ -185,7 +257,7 @@ test('restaurant filters open the list page and checkout is disabled when empty'
   await expect(page.getByRole('heading', { name: /pizza restaurants near you/i })).toBeVisible();
   await page.goto('/checkout');
   await expect(page.getByText(/your cart is empty/i)).toBeVisible();
-  await expect(page.getByRole('button', { name: /place order/i })).toBeDisabled();
+  await expect(page.getByRole('button', { name: /place mock order/i })).toBeDisabled();
 });
 
 test('restaurant discovery shows sort, no-results, and real API error states', async ({ page }) => {

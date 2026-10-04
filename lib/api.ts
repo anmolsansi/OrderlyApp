@@ -1,20 +1,26 @@
-import { calculateCartTotals, mockUserProfile, restaurants as localDemoRestaurants } from './mock-data';
+import { restaurants as localDemoRestaurants } from './mock-data';
 import type {
   ApiErrorKind,
   ApiFailure,
   ApiResult,
   CartItem,
   CheckoutDetails,
+  CheckoutQuote,
+  CheckoutRecovery,
   DataMode,
   MenuItem,
   ModifierGroup,
-  Order,
+  OrderReceipt,
+  OrderSubmission,
+  ReceiptItemSnapshot,
+  ReceiptModifierSnapshot,
   Restaurant,
   RevisionedCart,
 } from './types';
 
 const API_BASE_URL = '/api/orderly';
 const API_TIMEOUT_MS = 5_000;
+export const CHECKOUT_RECOVERY_STORAGE_KEY = 'orderlyapp.marketplace.checkoutRecovery.v1';
 let sessionBootstrap: Promise<ApiResult<true>> | undefined;
 let cartMutationTail: Promise<void> = Promise.resolve();
 
@@ -94,6 +100,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isNonNegativeInteger(value: unknown): value is number {
   return Number.isInteger(value) && Number(value) >= 0;
+}
+
+function isPositiveInteger(value: unknown): value is number {
+  return Number.isInteger(value) && Number(value) > 0;
 }
 
 function stringArray(value: unknown): string[] | undefined {
@@ -347,6 +357,132 @@ function normalizeRevisionedCart(payload: unknown): RevisionedCart | undefined {
   return { schemaVersion: 1, revision: Number(payload.revision), items: items as CartItem[] };
 }
 
+function normalizeTotals(input: unknown): CheckoutQuote['totals'] | undefined {
+  if (!isRecord(input)) return undefined;
+  const fields = [
+    'subtotal_cents',
+    'discount_cents',
+    'delivery_fee_cents',
+    'service_fee_cents',
+    'tax_cents',
+    'tip_cents',
+    'total_cents',
+  ] as const;
+  if (fields.some(field => !isNonNegativeInteger(input[field]))) return undefined;
+  if (Number(input.tip_cents) > 10_000) return undefined;
+  return {
+    subtotalCents: Number(input.subtotal_cents),
+    discountCents: Number(input.discount_cents),
+    deliveryFeeCents: Number(input.delivery_fee_cents),
+    serviceFeeCents: Number(input.service_fee_cents),
+    taxCents: Number(input.tax_cents),
+    tipCents: Number(input.tip_cents),
+    totalCents: Number(input.total_cents),
+  };
+}
+
+function normalizeCheckoutQuote(payload: unknown): CheckoutQuote | undefined {
+  if (!isRecord(payload) || payload.schema_version !== 1 || !isNonNegativeInteger(payload.cart_revision)) return undefined;
+  if (typeof payload.catalog_fingerprint !== 'string' || payload.catalog_fingerprint.length < 1 || payload.catalog_fingerprint.length > 128) return undefined;
+  const totals = normalizeTotals(payload.totals);
+  if (!totals) return undefined;
+  return {
+    schemaVersion: 1,
+    cartRevision: Number(payload.cart_revision),
+    catalogFingerprint: payload.catalog_fingerprint,
+    totals,
+  };
+}
+
+function normalizeReceiptModifier(input: unknown): ReceiptModifierSnapshot | undefined {
+  if (!isRecord(input) || typeof input.group_id !== 'string' || typeof input.name !== 'string' || !Array.isArray(input.options)) return undefined;
+  const options = input.options.map(option => {
+    if (!isRecord(option) || typeof option.id !== 'string' || typeof option.name !== 'string' || !isNonNegativeInteger(option.price_delta_cents)) return undefined;
+    return { id: option.id, name: option.name, priceDeltaCents: Number(option.price_delta_cents) };
+  });
+  if (options.some(option => option === undefined)) return undefined;
+  return { groupId: input.group_id, name: input.name, options: options as ReceiptModifierSnapshot['options'] };
+}
+
+function normalizeReceiptItem(input: unknown): ReceiptItemSnapshot | undefined {
+  if (!isRecord(input)) return undefined;
+  if (
+    typeof input.id !== 'string'
+    || typeof input.restaurant_id !== 'string'
+    || typeof input.menu_item_id !== 'string'
+    || typeof input.name !== 'string'
+    || !isPositiveInteger(input.unit_price_cents)
+    || !Number.isInteger(input.quantity)
+    || Number(input.quantity) < 1
+    || Number(input.quantity) > 10
+    || !isPositiveInteger(input.line_total_cents)
+    || !Array.isArray(input.modifiers)
+  ) return undefined;
+  const modifiers = input.modifiers.map(normalizeReceiptModifier);
+  if (modifiers.some(modifier => modifier === undefined)) return undefined;
+  if (input.special_instructions !== undefined && input.special_instructions !== null && typeof input.special_instructions !== 'string') return undefined;
+  return {
+    id: input.id,
+    restaurantId: input.restaurant_id,
+    menuItemId: input.menu_item_id,
+    name: input.name,
+    unitPriceCents: Number(input.unit_price_cents),
+    quantity: Number(input.quantity),
+    lineTotalCents: Number(input.line_total_cents),
+    modifiers: modifiers as ReceiptModifierSnapshot[],
+    specialInstructions: typeof input.special_instructions === 'string' ? input.special_instructions : undefined,
+  };
+}
+
+function normalizeCheckoutDetails(input: unknown): CheckoutDetails | undefined {
+  if (!isRecord(input)) return undefined;
+  const required = ['name', 'phone', 'email', 'street', 'city', 'state', 'postal_code'] as const;
+  if (required.some(field => typeof input[field] !== 'string')) return undefined;
+  if (input.apartment !== undefined && input.apartment !== null && typeof input.apartment !== 'string') return undefined;
+  if (input.delivery_instructions !== undefined && input.delivery_instructions !== null && typeof input.delivery_instructions !== 'string') return undefined;
+  if (input.payment_method !== 'mock' || !isNonNegativeInteger(input.tip_cents) || Number(input.tip_cents) > 10_000) return undefined;
+  return {
+    name: input.name as string,
+    phone: input.phone as string,
+    email: input.email as string,
+    street: input.street as string,
+    apartment: typeof input.apartment === 'string' ? input.apartment : undefined,
+    city: input.city as string,
+    state: input.state as string,
+    postalCode: input.postal_code as string,
+    deliveryInstructions: typeof input.delivery_instructions === 'string' ? input.delivery_instructions : undefined,
+    paymentMethod: 'mock',
+    tipCents: Number(input.tip_cents),
+  };
+}
+
+function normalizeOrderReceipt(payload: unknown): OrderReceipt | undefined {
+  if (!isRecord(payload) || payload.schema_version !== 1 || typeof payload.id !== 'string' || payload.status !== 'Placed') return undefined;
+  if (typeof payload.created_at !== 'string' || Number.isNaN(Date.parse(payload.created_at)) || payload.pricing_version !== 'mock-v1') return undefined;
+  if (!Array.isArray(payload.items)) return undefined;
+  const items = payload.items.map(normalizeReceiptItem);
+  if (items.some(item => item === undefined)) return undefined;
+  const checkout = normalizeCheckoutDetails(payload.checkout);
+  const totals = normalizeTotals(payload.totals);
+  if (!checkout || !totals) return undefined;
+  return {
+    schemaVersion: 1,
+    id: payload.id,
+    status: 'Placed',
+    createdAt: new Date(payload.created_at).toISOString(),
+    items: items as ReceiptItemSnapshot[],
+    checkout,
+    totals,
+    pricingVersion: 'mock-v1',
+  };
+}
+
+function normalizeOrderReceiptList(payload: unknown): OrderReceipt[] | undefined {
+  if (!Array.isArray(payload)) return undefined;
+  const receipts = payload.map(normalizeOrderReceipt);
+  return receipts.some(receipt => receipt === undefined) ? undefined : receipts as OrderReceipt[];
+}
+
 function toApiCartItem(input: CartItem): Record<string, unknown> {
   return {
     id: input.id,
@@ -358,6 +494,27 @@ function toApiCartItem(input: CartItem): Record<string, unknown> {
       option_ids: modifier.optionIds,
     })),
     ...(input.specialInstructions ? { special_instructions: input.specialInstructions } : {}),
+  };
+}
+
+function toApiOrderSubmission(input: OrderSubmission): Record<string, unknown> {
+  return {
+    expected_revision: input.expectedRevision,
+    catalog_fingerprint: input.catalogFingerprint,
+    checkout: {
+      name: input.checkout.name,
+      phone: input.checkout.phone,
+      email: input.checkout.email,
+      street: input.checkout.street,
+      ...(input.checkout.apartment ? { apartment: input.checkout.apartment } : {}),
+      city: input.checkout.city,
+      state: input.checkout.state,
+      postal_code: input.checkout.postalCode,
+      ...(input.checkout.deliveryInstructions ? { delivery_instructions: input.checkout.deliveryInstructions } : {}),
+      payment_method: 'mock',
+      tip_cents: input.checkout.tipCents,
+    },
+    ...(input.promotionCode ? { promotion_code: input.promotionCode } : {}),
   };
 }
 
@@ -447,25 +604,135 @@ export function clearRevisionedCart(
   ));
 }
 
-// Temporary compatibility adapters for ST-09-owned checkout code. ST-08 pages use
-// the typed revisioned functions above and never use local data as API fallback.
-export async function fetchCart(): Promise<CartItem[] | undefined> {
-  const result = await fetchRevisionedCart();
-  return result.ok ? result.data.items : undefined;
+export async function fetchCheckoutQuote(
+  expectedRevision: number,
+  tipCents: number,
+  promotionCode?: 'DEMO5',
+): Promise<ApiResult<CheckoutQuote>> {
+  if (getOrderlyDataMode() === 'local_demo') {
+    return failure('validation', 'local_demo_checkout_unavailable', 'Checkout is unavailable in fixture preview');
+  }
+  return requestJson(
+    `${getApiBaseUrl()}/checkout/quote`,
+    normalizeCheckoutQuote,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        expected_revision: expectedRevision,
+        tip_cents: tipCents,
+        ...(promotionCode ? { promotion_code: promotionCode } : {}),
+      }),
+    },
+    true,
+  );
 }
 
-export async function saveCart(items: CartItem[]): Promise<boolean> {
-  const current = await fetchRevisionedCart();
-  if (!current.ok) return false;
-  const saved = await saveRevisionedCart(current.data.revision, items);
-  return saved.ok;
+export async function submitCheckoutOrder(
+  idempotencyKey: string,
+  submission: OrderSubmission,
+): Promise<ApiResult<OrderReceipt>> {
+  if (getOrderlyDataMode() === 'local_demo') {
+    return failure('validation', 'local_demo_checkout_unavailable', 'Checkout is unavailable in fixture preview');
+  }
+
+  const result = await requestJson(
+    `${getApiBaseUrl()}/orders`,
+    normalizeOrderReceipt,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'Idempotency-Key': idempotencyKey,
+      },
+      body: JSON.stringify(toApiOrderSubmission(submission)),
+    },
+    true,
+  );
+
+  if (!result.ok && (result.error.code === 'upstream_timeout' || result.error.code === 'upstream_unavailable')) {
+    return { ...result, kind: 'network' };
+  }
+  return result;
 }
 
-export async function clearBackendCart(): Promise<boolean> {
-  const current = await fetchRevisionedCart();
-  if (!current.ok) return false;
-  const cleared = await clearRevisionedCart(current.data.revision);
-  return cleared.ok;
+export async function fetchOrderReceipt(orderId: string): Promise<ApiResult<OrderReceipt>> {
+  if (getOrderlyDataMode() === 'local_demo') {
+    return failure('validation', 'local_demo_orders_unavailable', 'Order receipts are unavailable in fixture preview');
+  }
+  return requestJson(
+    `${getApiBaseUrl()}/orders/${encodeURIComponent(orderId)}`,
+    normalizeOrderReceipt,
+    { cache: 'no-store' },
+    true,
+  );
+}
+
+export async function fetchOrderReceipts(): Promise<ApiResult<OrderReceipt[]>> {
+  if (getOrderlyDataMode() === 'local_demo') {
+    return failure('validation', 'local_demo_orders_unavailable', 'Order history is unavailable in fixture preview');
+  }
+  return requestJson(
+    `${getApiBaseUrl()}/orders`,
+    normalizeOrderReceiptList,
+    { cache: 'no-store' },
+    true,
+  );
+}
+
+function isStoredCheckoutDetails(value: unknown): value is CheckoutDetails {
+  if (!isRecord(value)) return false;
+  const required = ['name', 'phone', 'email', 'street', 'city', 'state', 'postalCode', 'paymentMethod'] as const;
+  if (required.some(field => typeof value[field] !== 'string')) return false;
+  if (value.apartment !== undefined && typeof value.apartment !== 'string') return false;
+  if (value.deliveryInstructions !== undefined && typeof value.deliveryInstructions !== 'string') return false;
+  return value.paymentMethod === 'mock' && isNonNegativeInteger(value.tipCents) && Number(value.tipCents) <= 10_000;
+}
+
+function isStoredOrderSubmission(value: unknown): value is OrderSubmission {
+  if (!isRecord(value) || !isNonNegativeInteger(value.expectedRevision)) return false;
+  if (typeof value.catalogFingerprint !== 'string' || !/^[0-9a-fA-F]{64}$/.test(value.catalogFingerprint)) return false;
+  if (!isStoredCheckoutDetails(value.checkout)) return false;
+  return value.promotionCode === undefined || value.promotionCode === 'DEMO5';
+}
+
+function isStoredCheckoutRecovery(value: unknown): value is CheckoutRecovery {
+  return isRecord(value)
+    && value.schemaVersion === 1
+    && typeof value.idempotencyKey === 'string'
+    && /^[0-9a-fA-F-]{36}$/.test(value.idempotencyKey)
+    && isStoredOrderSubmission(value.submission);
+}
+
+export function loadCheckoutRecovery(storage: Storage): CheckoutRecovery | undefined {
+  try {
+    const raw = storage.getItem(CHECKOUT_RECOVERY_STORAGE_KEY);
+    if (!raw) return undefined;
+    const parsed = JSON.parse(raw) as unknown;
+    return isStoredCheckoutRecovery(parsed) ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function saveCheckoutRecovery(storage: Storage, recovery: CheckoutRecovery): boolean {
+  if (!isStoredCheckoutRecovery(recovery)) return false;
+  try {
+    storage.setItem(CHECKOUT_RECOVERY_STORAGE_KEY, JSON.stringify(recovery));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function clearCheckoutRecovery(storage: Storage): boolean {
+  try {
+    storage.removeItem(CHECKOUT_RECOVERY_STORAGE_KEY);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function resetGuestSession(): Promise<boolean> {
@@ -483,110 +750,4 @@ export async function resetGuestSession(): Promise<boolean> {
     sessionBootstrap = undefined;
     return false;
   }
-}
-
-interface ApiOrder {
-  id: string;
-  cart_items: Array<{
-    id: string;
-    restaurant_id: string;
-    menu_item_id: string;
-    name: string;
-    quantity: number;
-    base_price_cents: number;
-    modifiers: Array<{ group_id: string; option_ids: string[] }>;
-    special_instructions?: string;
-  }>;
-  subtotal_cents: number;
-  status: Order['status'];
-  created_at: string;
-}
-
-function normalizeLegacyOrderCartItem(input: ApiOrder['cart_items'][number]): CartItem {
-  return {
-    id: input.id,
-    restaurantId: input.restaurant_id,
-    menuItemId: input.menu_item_id,
-    name: input.name,
-    quantity: input.quantity,
-    basePriceCents: input.base_price_cents,
-    modifiers: input.modifiers.map(modifier => ({ groupId: modifier.group_id, optionIds: modifier.option_ids })),
-    specialInstructions: input.special_instructions,
-  };
-}
-
-export async function createBackendOrder(cartItems: CartItem[], subtotalCents: number, checkoutDetails?: CheckoutDetails): Promise<Order | undefined> {
-  if (getOrderlyDataMode() === 'local_demo') return undefined;
-  const responseResult = await fetchProtectedResponse(`${getApiBaseUrl()}/orders`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      cart_items: cartItems.map(item => ({
-        id: item.id,
-        restaurant_id: item.restaurantId,
-        menu_item_id: item.menuItemId,
-        name: item.name,
-        quantity: item.quantity,
-        base_price_cents: item.basePriceCents,
-        modifiers: item.modifiers.map(modifier => ({ group_id: modifier.groupId, option_ids: modifier.optionIds })),
-        special_instructions: item.specialInstructions,
-      })),
-      subtotal_cents: subtotalCents,
-      delivery_address: checkoutDetails?.street,
-      customer_name: checkoutDetails?.name,
-      customer_phone: checkoutDetails?.phone,
-      customer_email: checkoutDetails?.email,
-      tip_cents: checkoutDetails?.tipCents ?? 0,
-    }),
-  });
-  if (!responseResult.ok || !responseResult.data.ok) return undefined;
-  const payload = await readJson(responseResult.data);
-  if (!isRecord(payload) || typeof payload.id !== 'string' || !Array.isArray(payload.cart_items)) return undefined;
-  return normalizeOrder(payload as unknown as ApiOrder, checkoutDetails);
-}
-
-export async function fetchOrder(orderId: string): Promise<Order | undefined> {
-  if (getOrderlyDataMode() === 'local_demo') return undefined;
-  const responseResult = await fetchProtectedResponse(`${getApiBaseUrl()}/orders/${encodeURIComponent(orderId)}`, { cache: 'no-store' });
-  if (!responseResult.ok || !responseResult.data.ok) return undefined;
-  const payload = await readJson(responseResult.data);
-  if (!isRecord(payload)) return undefined;
-  return normalizeOrder(payload as unknown as ApiOrder);
-}
-
-export async function fetchOrders(): Promise<Order[] | undefined> {
-  if (getOrderlyDataMode() === 'local_demo') return undefined;
-  const responseResult = await fetchProtectedResponse(`${getApiBaseUrl()}/orders`, { cache: 'no-store' });
-  if (!responseResult.ok || !responseResult.data.ok) return undefined;
-  const payload = await readJson(responseResult.data);
-  if (!Array.isArray(payload)) return undefined;
-  return payload.map(order => normalizeOrder(order as ApiOrder));
-}
-
-function normalizeOrder(input: ApiOrder, checkoutDetails?: CheckoutDetails): Order {
-  const cartItems = input.cart_items.map(normalizeLegacyOrderCartItem);
-  const restaurantId = cartItems[0]?.restaurantId ?? localDemoRestaurants[0].id;
-  const totals = calculateCartTotals(cartItems, restaurantId);
-  const tipCents = checkoutDetails?.tipCents ?? 0;
-  const totalsWithTip = {
-    ...totals,
-    tipCents,
-    subtotalCents: input.subtotal_cents,
-    totalCents: totals.totalCents + tipCents,
-  };
-  const createdAt = new Date(input.created_at);
-  return {
-    id: input.id,
-    userId: mockUserProfile.id,
-    restaurantId,
-    cartItems,
-    totals: totalsWithTip,
-    subtotalCents: input.subtotal_cents,
-    status: input.status,
-    createdAt: createdAt.toISOString(),
-    updatedAt: createdAt.toISOString(),
-    deliveryAddressId: mockUserProfile.defaultAddressId,
-    estimatedDeliveryAt: new Date(createdAt.getTime() + 35 * 60 * 1000).toISOString(),
-    checkoutDetails,
-  };
 }
