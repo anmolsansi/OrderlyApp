@@ -184,13 +184,14 @@ export default function ItemCustomizationPage() {
       setReplacementIntent(undefined);
       return;
     }
-    if (!replacementIntent.currentCart) {
+    const currentCart = replacementIntent.currentCart;
+    if (!currentCart) {
       setErrors(['The current API basket could not be reconciled. Reload and review it before replacing.']);
       return;
     }
     const intent = replacementIntent;
     setReplacementIntent(undefined);
-    await persistApiCart(intent.currentCart, [intent.item]);
+    await persistApiCart(currentCart, [intent.item]);
   }
 
   if (loading) {
