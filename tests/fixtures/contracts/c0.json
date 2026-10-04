@@ -1,0 +1,34 @@
+{
+  "contract": "C0",
+  "schema_version": 1,
+  "synthetic": true,
+  "positive": {
+    "schema_version": 1,
+    "mode": "api",
+    "source_sha": "fixture-source-sha",
+    "backend_test_command": "python -m pytest backend/tests"
+  },
+  "negative": [
+    {
+      "name": "invalid_mode",
+      "status": 422,
+      "error": {
+        "code": "invalid_config",
+        "message": "ORDERLY_DATA_MODE must be api or local_demo",
+        "request_id": "synthetic-request-1",
+        "fields": ["ORDERLY_DATA_MODE"]
+      }
+    },
+    {
+      "name": "missing_browser_runtime",
+      "status": 0,
+      "blocked": true,
+      "error": {
+        "code": "runtime_blocked",
+        "message": "Chromium runtime is not provisioned",
+        "request_id": "synthetic-request-2",
+        "fields": []
+      }
+    }
+  ]
+}
