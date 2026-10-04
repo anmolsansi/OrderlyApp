@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 
 async function mockBackendCartAndOrders(page: import('@playwright/test').Page) {
   let backendCart: any[] = [];
+  let cartRevision = 0;
   const backendOrders: Record<string, any> = {};
 
   await page.route('**', async route => {
@@ -15,17 +16,45 @@ async function mockBackendCartAndOrders(page: import('@playwright/test').Page) {
 
     if (url.pathname === '/api/orderly/cart') {
       if (request.method() === 'GET') {
-        await route.fulfill({ json: { items: backendCart, updated_at: new Date().toISOString() } });
+        await route.fulfill({ json: { schema_version: 1, revision: cartRevision, items: backendCart } });
         return;
       }
       if (request.method() === 'PUT') {
-        backendCart = JSON.parse(request.postData() ?? '{"items":[]}').items;
-        await route.fulfill({ json: { items: backendCart, updated_at: new Date().toISOString() } });
+        const payload = JSON.parse(request.postData() ?? '{"items":[]}');
+        if (payload.expected_revision !== cartRevision) {
+          await route.fulfill({
+            status: 409,
+            json: {
+              error: { code: 'cart_conflict', message: 'Basket changed', request_id: 'legacy-e2e-conflict', fields: [] },
+              current_cart: { schema_version: 1, revision: cartRevision, items: backendCart },
+            },
+          });
+          return;
+        }
+        backendCart = (payload.items ?? []).map((item: any) => ({
+          ...item,
+          name: item.menu_item_id === 'pepperoni-feast' ? 'Pepperoni Feast' : 'Canonical item',
+          base_price_cents: item.menu_item_id === 'pepperoni-feast' ? 1499 : 1000,
+        }));
+        cartRevision += 1;
+        await route.fulfill({ json: { schema_version: 1, revision: cartRevision, items: backendCart } });
         return;
       }
       if (request.method() === 'DELETE') {
+        const payload = JSON.parse(request.postData() ?? '{}');
+        if (payload.expected_revision !== cartRevision) {
+          await route.fulfill({
+            status: 409,
+            json: {
+              error: { code: 'cart_conflict', message: 'Basket changed', request_id: 'legacy-e2e-delete-conflict', fields: [] },
+              current_cart: { schema_version: 1, revision: cartRevision, items: backendCart },
+            },
+          });
+          return;
+        }
         backendCart = [];
-        await route.fulfill({ json: { items: backendCart, updated_at: new Date().toISOString() } });
+        cartRevision += 1;
+        await route.fulfill({ json: { schema_version: 1, revision: cartRevision, items: backendCart } });
         return;
       }
     }
@@ -159,7 +188,7 @@ test('restaurant filters open the list page and checkout is disabled when empty'
   await expect(page.getByRole('button', { name: /place order/i })).toBeDisabled();
 });
 
-test('restaurant discovery shows sort, no-results, and error states', async ({ page }) => {
+test('restaurant discovery shows sort, no-results, and real API error states', async ({ page }) => {
   await page.goto('/restaurants');
   await page.getByLabel(/sort restaurants/i).selectOption('rating');
   await page.getByRole('button', { name: /apply/i }).click();
@@ -170,9 +199,22 @@ test('restaurant discovery shows sort, no-results, and error states', async ({ p
   await expect(page.getByRole('heading', { name: /no restaurants found/i })).toBeVisible();
   await expect(page.getByRole('link', { name: /clear filters/i })).toBeVisible();
 
-  await page.goto('/restaurants?state=error');
+  await page.route('**/api/orderly/restaurants', async route => {
+    await route.fulfill({
+      status: 503,
+      json: {
+        error: {
+          code: 'storage_unavailable',
+          message: 'Catalog API is unavailable',
+          request_id: 'legacy-e2e-catalog-error',
+          fields: [],
+        },
+      },
+    });
+  });
+  await page.goto('/restaurants');
   await expect(page.locator('.discovery-state-card[role="alert"]')).toContainText(/temporarily unavailable/i);
-  await expect(page.getByRole('link', { name: /retry/i })).toBeVisible();
+  await expect(page.getByRole('button', { name: /retry/i })).toBeVisible();
 });
 
 test('guest session is HttpOnly, opaque, stable on bootstrap, and rotated on reset', async ({ page, context }) => {

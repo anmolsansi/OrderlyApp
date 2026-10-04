@@ -1,12 +1,4 @@
-import {
-  calculateCartSubtotal,
-  calculateItemTotal,
-  findMenuItem,
-  findRestaurant,
-  getDefaultModifiers as getSeedDefaultModifiers,
-  mockUserProfile,
-  restaurants,
-} from './mock-data';
+import { mockUserProfile, restaurants as localDemoRestaurants } from './mock-data';
 import type { CartItem, CartItemModifier, MenuItem, Restaurant } from './types';
 
 export const quickFilters = ['All pizza', 'Fast delivery', 'Top rated', 'Wood fired', 'Open late', 'Open now'];
@@ -24,11 +16,11 @@ export const discoveryMockStates = {
   ],
   empty: {
     title: 'No restaurants found',
-    description: 'Show helpful reset actions when search and filters remove every seeded restaurant.',
+    description: 'No canonical restaurants match the current search and filters.',
   },
   error: {
     title: 'Discovery temporarily unavailable',
-    description: 'Show a retry action and keep the selected search/filter context in view.',
+    description: 'The restaurant API could not be loaded. Retry without changing data mode.',
   },
 };
 
@@ -55,12 +47,27 @@ export const themeOptions = [
 
 export const favoriteRestaurantIds = mockUserProfile.favoriteRestaurantIds;
 
-export function getRestaurant(restaurantId: string): Restaurant | undefined {
-  return findRestaurant(restaurantId);
+// ST-08 callers always pass the selected canonical catalog. The one/two-argument
+// overloads preserve ST-09-owned legacy checkout/history consumers until their cutover.
+export function getRestaurant(restaurantId: string): Restaurant | undefined;
+export function getRestaurant(restaurants: Restaurant[], restaurantId: string): Restaurant | undefined;
+export function getRestaurant(restaurantsOrId: Restaurant[] | string, maybeRestaurantId?: string): Restaurant | undefined {
+  const catalog = Array.isArray(restaurantsOrId) ? restaurantsOrId : localDemoRestaurants;
+  const restaurantId = Array.isArray(restaurantsOrId) ? maybeRestaurantId : restaurantsOrId;
+  return catalog.find(restaurant => restaurant.id === restaurantId);
 }
 
-export function getMenuItem(restaurantId: string, itemId: string): MenuItem | undefined {
-  return findMenuItem(restaurantId, itemId);
+export function getMenuItem(restaurantId: string, itemId: string): MenuItem | undefined;
+export function getMenuItem(restaurants: Restaurant[], restaurantId: string, itemId: string): MenuItem | undefined;
+export function getMenuItem(
+  restaurantsOrId: Restaurant[] | string,
+  restaurantOrItemId: string,
+  maybeItemId?: string,
+): MenuItem | undefined {
+  const catalog = Array.isArray(restaurantsOrId) ? restaurantsOrId : localDemoRestaurants;
+  const restaurantId = Array.isArray(restaurantsOrId) ? restaurantOrItemId : restaurantsOrId;
+  const itemId = Array.isArray(restaurantsOrId) ? maybeItemId : restaurantOrItemId;
+  return catalog.find(restaurant => restaurant.id === restaurantId)?.menu.find(item => item.id === itemId);
 }
 
 function parseDeliveryMinutes(deliveryMinutes: string): number {
@@ -82,7 +89,12 @@ export function sortRestaurants(restaurantsToSort: Restaurant[], sort: Restauran
   });
 }
 
-export function filterRestaurants(query = '', filter = 'All restaurants', sort: RestaurantSort = 'recommended'): Restaurant[] {
+export function filterRestaurants(
+  restaurants: Restaurant[],
+  query = '',
+  filter = 'All restaurants',
+  sort: RestaurantSort = 'recommended',
+): Restaurant[] {
   const normalizedQuery = query.trim().toLowerCase();
   const filtered = restaurants.filter(restaurant => {
     const matchesSearch = normalizedQuery.length === 0
@@ -93,9 +105,9 @@ export function filterRestaurants(query = '', filter = 'All restaurants', sort: 
       || restaurant.menu.some(item => item.name.toLowerCase().includes(normalizedQuery));
     const matchesFilter = filter === 'All restaurants'
       || filter === 'All pizza'
-      || (filter === 'Fast delivery' && Number.parseInt(restaurant.deliveryMinutes, 10) <= 20)
+      || (filter === 'Fast delivery' && parseDeliveryMinutes(restaurant.deliveryMinutes) <= 20)
       || (filter === 'Top rated' && restaurant.rating >= 4.8)
-      || (filter === 'Open now' && restaurant.status !== 'closed')
+      || (filter === 'Open now' && restaurant.isOpen)
       || restaurant.cuisine.toLowerCase() === filter.toLowerCase()
       || restaurant.tags.some(tag => tag.toLowerCase() === filter.toLowerCase());
     return matchesSearch && matchesFilter;
@@ -105,13 +117,32 @@ export function filterRestaurants(query = '', filter = 'All restaurants', sort: 
 }
 
 export function getDefaultModifiers(item: MenuItem): CartItemModifier[] {
-  return getSeedDefaultModifiers(item);
+  return item.modifierGroups.map(group => {
+    const explicitDefault = group.defaultOptionId
+      ? group.options.find(option => option.id === group.defaultOptionId && option.available !== false)
+      : undefined;
+    return {
+      groupId: group.id,
+      optionIds: explicitDefault ? [explicitDefault.id] : [],
+    };
+  });
 }
 
 export function getItemTotal(item: MenuItem, modifiers: CartItemModifier[]): number {
-  return calculateItemTotal(item, modifiers);
+  const modifierDelta = modifiers.reduce((total, modifier) => {
+    const group = item.modifierGroups.find(candidate => candidate.id === modifier.groupId);
+    if (!group) return total;
+    return total + group.options
+      .filter(option => modifier.optionIds.includes(option.id))
+      .reduce((sum, option) => sum + option.priceDeltaCents, 0);
+  }, 0);
+  return item.priceCents + modifierDelta;
 }
 
-export function getCartSubtotal(cartItems: CartItem[]): number {
-  return calculateCartSubtotal(cartItems);
+export function getCartSubtotal(cartItems: CartItem[], restaurants: Restaurant[]): number {
+  return cartItems.reduce((total, cartItem) => {
+    const item = getMenuItem(restaurants, cartItem.restaurantId, cartItem.menuItemId);
+    const unit = item ? getItemTotal(item, cartItem.modifiers) : cartItem.basePriceCents;
+    return total + unit * cartItem.quantity;
+  }, 0);
 }

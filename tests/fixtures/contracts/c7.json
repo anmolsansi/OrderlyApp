@@ -3,11 +3,63 @@
   "schema_version": 1,
   "synthetic": true,
   "positive": {
-    "ok": true,
-    "data": {
-      "schema_version": 1,
-      "revision": 1,
-      "items": []
+    "catalog_result": {
+      "ok": true,
+      "data": [
+        {
+          "id": "fixture-r1",
+          "name": "Fixture cafe",
+          "deliveryFeeCents": 199,
+          "isOpen": true,
+          "menu": [
+            {
+              "id": "fixture-i1",
+              "name": "Fixture meal",
+              "priceCents": 1000,
+              "available": true,
+              "modifierGroups": [
+                {
+                  "id": "size",
+                  "defaultOptionId": "small",
+                  "options": [
+                    {
+                      "id": "small",
+                      "priceDeltaCents": 0,
+                      "available": true
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "cart_result": {
+      "ok": true,
+      "data": {
+        "schemaVersion": 1,
+        "revision": 1,
+        "items": [
+          {
+            "id": "line-1",
+            "restaurantId": "fixture-r1",
+            "menuItemId": "fixture-i1",
+            "name": "Fixture meal",
+            "basePriceCents": 1000,
+            "quantity": 1,
+            "modifiers": []
+          }
+        ]
+      }
+    },
+    "local_demo_boundary": {
+      "mode": "local_demo",
+      "catalog_source": "fixtures",
+      "basket_namespace": "orderlyapp.marketplace.localDemoCart.v1",
+      "api_requests": 0,
+      "guest_bootstrap": false,
+      "checkout_enabled": false
     }
   },
   "negative": [
@@ -21,10 +73,65 @@
         "request_id": "synthetic-request-1",
         "fields": [],
         "currentCart": {
-          "schema_version": 1,
+          "schemaVersion": 1,
           "revision": 2,
           "items": []
         }
+      }
+    },
+    {
+      "name": "invalid_catalog_response",
+      "ok": false,
+      "kind": "server",
+      "error": {
+        "code": "invalid_response",
+        "message": "The API returned an unexpected response shape",
+        "request_id": "synthetic-request-2",
+        "fields": []
+      }
+    },
+    {
+      "name": "invalid_cart",
+      "ok": false,
+      "kind": "validation",
+      "error": {
+        "code": "invalid_cart",
+        "message": "Cart contains invalid catalog choices",
+        "request_id": "synthetic-request-3",
+        "fields": ["items.0.menu_item_id"]
+      }
+    },
+    {
+      "name": "session_expired",
+      "ok": false,
+      "kind": "session",
+      "error": {
+        "code": "session_expired",
+        "message": "Guest session expired",
+        "request_id": "synthetic-request-4",
+        "fields": []
+      }
+    },
+    {
+      "name": "network_error",
+      "ok": false,
+      "kind": "network",
+      "error": {
+        "code": "network_error",
+        "message": "The API could not be reached",
+        "request_id": "synthetic-request-5",
+        "fields": []
+      }
+    },
+    {
+      "name": "storage_unavailable",
+      "ok": false,
+      "kind": "server",
+      "error": {
+        "code": "storage_unavailable",
+        "message": "Cart storage is unavailable",
+        "request_id": "synthetic-request-6",
+        "fields": []
       }
     },
     {
@@ -35,7 +142,7 @@
       "error": {
         "code": "network_error",
         "message": "Order result is uncertain; retry with the same key",
-        "request_id": "synthetic-request-2",
+        "request_id": "synthetic-request-7",
         "fields": []
       }
     }
