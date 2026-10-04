@@ -14,6 +14,7 @@ from uuid import uuid4
 from fastapi import Request, Response
 
 from .database import get_connection
+from .redis_store import delete_cart_keys
 
 COOKIE_NAME = "orderly_guest"
 COOKIE_PATH = "/v1"
@@ -218,6 +219,7 @@ def _insert_guest(conn: object, secret: bytes, now: datetime) -> IssuedGuest:
 
 def cleanup_expired_guests(*, now: datetime | None = None) -> None:
     current_time = now or utc_now()
+    guest_ids: list[str] = []
     try:
         with get_connection() as conn:
             with conn.transaction():
@@ -237,6 +239,11 @@ def cleanup_expired_guests(*, now: datetime | None = None) -> None:
                 conn.execute("DELETE FROM guest_sessions WHERE id = ANY(%s)", (guest_ids,))
     except Exception as exc:
         raise _storage_unavailable() from exc
+
+    # Redis is only a cache/fallback at this stage. Purge old guest keys after
+    # the database transaction; a Redis outage cannot resurrect authorization
+    # because the guest record/token has already been removed server-side.
+    delete_cart_keys(guest_ids)
 
 
 def bootstrap_guest(existing_token: str | None) -> IssuedGuest:
@@ -292,11 +299,14 @@ def reset_guest(existing_token: str | None) -> IssuedGuest:
                     raise IdentityError(401, "session_invalid", "Guest session is invalid")
                 conn.execute("DELETE FROM carts WHERE session_id = %s", (verified.guest_id,))
                 conn.execute("DELETE FROM orders WHERE session_id = %s", (verified.guest_id,))
-                return _insert_guest(conn, settings.secret, now)
+                issued = _insert_guest(conn, settings.secret, now)
     except IdentityError:
         raise
     except Exception as exc:
         raise _storage_unavailable() from exc
+
+    delete_cart_keys([verified.guest_id])
+    return issued
 
 
 def _request_is_https(request: Request) -> bool:
