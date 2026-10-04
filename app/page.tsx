@@ -1,19 +1,60 @@
+'use client';
+
 import Link from 'next/link';
-import type { CSSProperties } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { MarketplaceNav } from '@/app/components/MarketplaceNav';
-import { restaurants } from '@/lib/mock-data';
+import { fetchRestaurants, getOrderlyDataMode } from '@/lib/api';
 import { cuisineRoadmap, favoriteRestaurantIds, featureSteps, quickFilters, themeOptions } from '@/lib/marketplace';
 import { routes } from '@/lib/routes';
+import type { Restaurant } from '@/lib/types';
 import { formatMoney } from '@/lib/types';
 
 export default function HomePage() {
-  const famousRestaurants = [...restaurants].sort((left, right) => right.rating - left.rating).slice(0, 3);
-  const favoriteRestaurants = restaurants.filter(restaurant => favoriteRestaurantIds.includes(restaurant.id));
+  const dataMode = getOrderlyDataMode();
+  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const [catalogError, setCatalogError] = useState<string>();
+  const [loading, setLoading] = useState(true);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    setCatalogError(undefined);
+
+    void fetchRestaurants({ signal: controller.signal }).then(result => {
+      if (controller.signal.aborted) return;
+      if (result.ok) {
+        setRestaurants(result.data);
+      } else {
+        setRestaurants([]);
+        setCatalogError(result.error.message);
+      }
+      setLoading(false);
+    });
+
+    return () => controller.abort();
+  }, [reloadKey]);
+
+  const famousRestaurants = useMemo(
+    () => [...restaurants].sort((left, right) => right.rating - left.rating).slice(0, 3),
+    [restaurants],
+  );
+  const favoriteRestaurants = useMemo(
+    () => restaurants.filter(restaurant => favoriteRestaurantIds.includes(restaurant.id)),
+    [restaurants],
+  );
 
   return (
     <main className="marketplace-page">
       <div className="container">
         <MarketplaceNav active="Home" />
+
+        {dataMode === 'local_demo' && (
+          <div className="validation-panel" role="status">
+            <strong>Local fixture preview</strong>
+            <p>Browsing and the local basket use isolated fixture data. Checkout and backend guest requests are disabled.</p>
+          </div>
+        )}
 
         <section className="hero marketplace-hero">
           <div className="hero-copy">
@@ -73,17 +114,34 @@ export default function HomePage() {
           <Link className="pill" href={routes.restaurants()}>View all restaurants</Link>
         </section>
 
-        <section className="horizontal-rail" aria-label="Famous pizza restaurants">
-          {famousRestaurants.map(restaurant => (
-            <Link className="card feature-restaurant restaurant-tile-button" href={routes.restaurant(restaurant.id)} key={restaurant.id}>
-              <span className="favorite-button" aria-hidden="true">♥</span>
-              <span className="hero-emoji">{restaurant.imageEmoji}</span>
-              <h3>{restaurant.name}</h3>
-              <p>{restaurant.cuisine} · ⭐ {restaurant.rating} · {restaurant.deliveryMinutes}</p>
-              <p>Delivery {formatMoney(restaurant.deliveryFeeCents)}</p>
-            </Link>
-          ))}
-        </section>
+        {loading && (
+          <section className="card discovery-state-card" aria-live="polite">
+            <div><h3>Loading restaurants</h3><p>Checking the selected catalog source.</p></div>
+          </section>
+        )}
+        {!loading && catalogError && (
+          <section className="card discovery-state-card error-state" role="alert">
+            <span aria-hidden="true">!</span>
+            <div>
+              <h3>Restaurants are temporarily unavailable</h3>
+              <p>{catalogError}</p>
+              <button className="ghost-button" type="button" onClick={() => setReloadKey(value => value + 1)}>Retry</button>
+            </div>
+          </section>
+        )}
+        {!loading && !catalogError && (
+          <section className="horizontal-rail" aria-label="Famous pizza restaurants">
+            {famousRestaurants.map(restaurant => (
+              <Link className="card feature-restaurant restaurant-tile-button" href={routes.restaurant(restaurant.id)} key={restaurant.id}>
+                <span className="favorite-button" aria-hidden="true">♥</span>
+                <span className="hero-emoji">{restaurant.imageEmoji}</span>
+                <h3>{restaurant.name}</h3>
+                <p>{restaurant.cuisine} · ⭐ {restaurant.rating} · {restaurant.deliveryMinutes}</p>
+                <p>Delivery {formatMoney(restaurant.deliveryFeeCents)}</p>
+              </Link>
+            ))}
+          </section>
+        )}
 
         <section className="section-heading">
           <div>
@@ -93,15 +151,17 @@ export default function HomePage() {
           <span className="pill">Fast reorders</span>
         </section>
 
-        <section className="favorite-strip" aria-label="Favorite restaurants">
-          {favoriteRestaurants.map(restaurant => (
-            <Link className="favorite-card" href={routes.restaurant(restaurant.id)} key={restaurant.id}>
-              <span>{restaurant.imageEmoji}</span>
-              <strong>{restaurant.name}</strong>
-              <em>{restaurant.deliveryMinutes}</em>
-            </Link>
-          ))}
-        </section>
+        {!loading && !catalogError && (
+          <section className="favorite-strip" aria-label="Favorite restaurants">
+            {favoriteRestaurants.length > 0 ? favoriteRestaurants.map(restaurant => (
+              <Link className="favorite-card" href={routes.restaurant(restaurant.id)} key={restaurant.id}>
+                <span>{restaurant.imageEmoji}</span>
+                <strong>{restaurant.name}</strong>
+                <em>{restaurant.deliveryMinutes}</em>
+              </Link>
+            )) : <span className="pill">No saved favorites in this catalog</span>}
+          </section>
+        )}
 
         <section className="section-heading">
           <div>
