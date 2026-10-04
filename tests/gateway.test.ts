@@ -3,15 +3,16 @@ import { NextRequest } from 'next/server';
 import { DELETE, GET, POST, PUT } from '../app/api/orderly/[...path]/route';
 
 type Handler = typeof GET | typeof POST | typeof PUT | typeof DELETE;
+type GatewayRequestInit = { headers?: HeadersInit; body?: BodyInit };
 
 function context(...path: string[]) {
   return { params: Promise.resolve({ path }) };
 }
 
-function request(method: string, path: string, init: RequestInit = {}): NextRequest {
+function request(method: string, path: string, init: GatewayRequestInit = {}): NextRequest {
   return new NextRequest(`https://orderly.test/api/orderly/${path}`, {
-    ...init,
     method,
+    body: init.body,
     headers: {
       origin: 'https://orderly.test',
       ...(init.headers ?? {}),
@@ -19,7 +20,7 @@ function request(method: string, path: string, init: RequestInit = {}): NextRequ
   });
 }
 
-async function call(handler: Handler, method: string, path: string, init?: RequestInit) {
+async function call(handler: Handler, method: string, path: string, init?: GatewayRequestInit) {
   return handler(request(method, path, init), context(...path.split('/')));
 }
 
