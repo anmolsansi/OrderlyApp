@@ -109,6 +109,11 @@ export interface RevisionedCart {
   items: CartItem[];
 }
 
+export interface CartConflictRecovery {
+  currentCart: RevisionedCart;
+  attemptedItems: CartItem[];
+}
+
 export interface CartTotals {
   subtotalCents: number;
   discountCents: number;
