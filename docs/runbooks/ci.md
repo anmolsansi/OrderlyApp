@@ -112,3 +112,7 @@ Two foundation problems were found and resolved inside ST-01 instead of being hi
 - npm 10.9.9 crashed inside Arborist with `Cannot read properties of null (reading 'edgesOut')` while updating the old lockfile. The lock was regenerated with npm 11.20.0 and hosted CI uses that resolver consistently.
 
 Later stabilization tickets still own the product/security changes described in `development.md`. A green ST-01 baseline means the test foundation can execute; it does not mark ST-02 through ST-13 complete or claim the existing app is production-ready.
+
+## Final completion rule
+
+ST-01 is complete only when the current branch head, not merely an earlier commit, has a successful hosted `ST-01 Baseline` run with WEB, BACKEND/Postgres, standalone Chromium launch, product E2E, and baseline-evidence all green. The closing engineering review also requires the `main...chore/st-01-baseline-contracts` diff to remain limited to ST-01 foundation, contracts, CI, dependency, and documentation paths, with no application behavior changes or committed secrets.
