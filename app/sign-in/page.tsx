@@ -1,60 +1,129 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { MarketplaceNav } from '@/app/components/MarketplaceNav';
-import { getCurrentAuthAccount, getDemoAccount, signInWithCredentials, signOut, signUpWithCredentials } from '@/lib/auth';
+import {
+  createDefaultDemoProfile,
+  forgetDemoProfile,
+  getDemoAddresses,
+  getDemoProfile,
+  saveDemoProfile,
+} from '@/lib/auth';
 import { routes } from '@/lib/routes';
+import type { DemoAddress, DemoProfile } from '@/lib/types';
 
 function SignInContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams.get('next') ?? routes.account;
-  const [signedIn, setSignedIn] = useState(false);
-  const [mode, setMode] = useState<'sign-in' | 'sign-up'>('sign-in');
-  const [sessionEmail, setSessionEmail] = useState('');
-  const [errors, setErrors] = useState<string[]>([]);
-  const demoAccount = getDemoAccount();
-  const [form, setForm] = useState({
-    name: '',
-    email: demoAccount.email,
-    phone: '+1-555-0100',
-    password: demoAccount.password,
-  });
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [profile, setProfile] = useState<DemoProfile | undefined>();
+  const [addresses, setAddresses] = useState<DemoAddress[]>([]);
+  const [name, setName] = useState('Demo visitor');
+  const [defaultAddressId, setDefaultAddressId] = useState('demo-address-1');
+  const [error, setError] = useState('');
 
-  useEffect(() => {
-    const account = getCurrentAuthAccount(window.localStorage);
-    setSignedIn(Boolean(account));
-    setSessionEmail(account?.email ?? '');
-  }, []);
+  function loadProfile(): void {
+    setStatus('loading');
+    setError('');
 
-  function submitAuth(): void {
-    setErrors([]);
-    const result = mode === 'sign-in'
-      ? signInWithCredentials(window.localStorage, form.email, form.password)
-      : signUpWithCredentials(window.localStorage, {
-        name: form.name,
-        email: form.email,
-        phone: form.phone,
-        password: form.password,
-      });
-    if (!result.ok) {
-      setErrors(result.errors);
+    const profileResult = getDemoProfile(window.localStorage);
+    if (!profileResult.ok) {
+      setError(profileResult.message);
+      setStatus('error');
       return;
     }
+
+    const addressResult = getDemoAddresses(window.localStorage);
+    if (!addressResult.ok) {
+      setError(addressResult.message);
+      setStatus('error');
+      return;
+    }
+
+    setAddresses(addressResult.value);
+    setProfile(profileResult.value);
+    setName(profileResult.value?.name ?? 'Demo visitor');
+    setDefaultAddressId(profileResult.value?.defaultAddressId ?? addressResult.value[0]?.id ?? 'demo-address-1');
+    setStatus('ready');
+  }
+
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
+  function submitProfile(): void {
+    const candidate = profile
+      ? { ...profile, name, defaultAddressId }
+      : createDefaultDemoProfile(name, defaultAddressId);
+    const result = saveDemoProfile(window.localStorage, candidate);
+
+    if (!result.ok) {
+      setError(result.message);
+      setStatus('error');
+      return;
+    }
+
+    setProfile(result.value);
     router.push(next);
   }
 
-  function handleSignOut(): void {
-    signOut(window.localStorage);
-    setSignedIn(false);
-    setSessionEmail('');
+  function forgetLocalProfile(): void {
+    const result = forgetDemoProfile(window.localStorage);
+    if (!result.ok) {
+      setError(result.message);
+      setStatus('error');
+      return;
+    }
+
+    setProfile(undefined);
+    setName('Demo visitor');
+    setDefaultAddressId(addresses[0]?.id ?? 'demo-address-1');
   }
 
-  function useDemoAccount(): void {
-    setMode('sign-in');
-    setForm(previous => ({ ...previous, email: demoAccount.email, password: demoAccount.password }));
+  function clearInvalidLocalProfile(): void {
+    const result = forgetDemoProfile(window.localStorage);
+    if (!result.ok) {
+      setError(result.message);
+      setStatus('error');
+      return;
+    }
+    loadProfile();
+  }
+
+  if (status === 'loading') {
+    return (
+      <main className="marketplace-page">
+        <div className="container">
+          <MarketplaceNav active="Account" />
+          <section className="card">
+            <span className="kicker">Public mock demo</span>
+            <h1>Loading demo profile</h1>
+            <p>Checking this browser for a local presentation profile.</p>
+          </section>
+        </div>
+      </main>
+    );
+  }
+
+  if (status === 'error') {
+    return (
+      <main className="marketplace-page">
+        <div className="container">
+          <MarketplaceNav active="Account" />
+          <section className="card" role="alert">
+            <span className="kicker">Demo profile unavailable</span>
+            <h1>Browser storage needs attention</h1>
+            <p>{error}</p>
+            <div className="confirmation-actions">
+              <button className="checkout-button inline-action" type="button" onClick={loadProfile}>Retry</button>
+              <button className="ghost-button" type="button" onClick={clearInvalidLocalProfile}>Clear local demo data</button>
+            </div>
+          </section>
+        </div>
+      </main>
+    );
   }
 
   return (
@@ -64,68 +133,64 @@ function SignInContent() {
 
         <section className="checkout-layout">
           <article className="card checkout-cart-panel">
-            <span className="kicker">Mock account</span>
-            <h1>{signedIn ? 'Signed in' : mode === 'sign-in' ? 'Sign in to OrderlyApp' : 'Create your account'}</h1>
-            <p>{signedIn ? `Current local session: ${sessionEmail}` : 'Use a local demo account to protect checkout and save profile details on this device.'}</p>
+            <span className="kicker">Public mock demo</span>
+            <h1>{profile ? 'Demo profile ready' : 'Choose a demo profile'}</h1>
+            <p>This is a local display profile, not a login. It never controls access to server orders.</p>
 
-            {signedIn ? (
-              <div className="confirmation-actions">
-                <Link className="checkout-button inline-action" href={routes.account}>Open account</Link>
-                <button className="ghost-button" type="button" onClick={handleSignOut}>Sign out</button>
-              </div>
-            ) : (
-              <>
-                <div className="auth-tabs" role="tablist" aria-label="Authentication mode">
-                  <button className={mode === 'sign-in' ? 'active' : ''} type="button" onClick={() => setMode('sign-in')}>Sign in</button>
-                  <button className={mode === 'sign-up' ? 'active' : ''} type="button" onClick={() => setMode('sign-up')}>Sign up</button>
+            <form className="checkout-form-grid" onSubmit={event => { event.preventDefault(); submitProfile(); }}>
+              <label className="full-field">
+                <span>Demo name</span>
+                <input
+                  autoComplete="off"
+                  maxLength={60}
+                  value={name}
+                  onChange={event => setName(event.target.value)}
+                />
+              </label>
+
+              <fieldset className="full-field">
+                <legend>Default synthetic address</legend>
+                <div className="cart-lines">
+                  {addresses.map(address => (
+                    <label className="cart-line detailed" key={address.id}>
+                      <input
+                        checked={defaultAddressId === address.id}
+                        name="demo-address"
+                        type="radio"
+                        value={address.id}
+                        onChange={() => setDefaultAddressId(address.id)}
+                      />
+                      <span>
+                        <strong>{address.label}</strong>
+                        <span>{address.street}, {address.city}, {address.state} {address.postalCode}</span>
+                      </span>
+                    </label>
+                  ))}
                 </div>
-                {errors.length > 0 && (
-                  <div className="validation-panel" role="alert">
-                    {errors.map(error => <p key={error}>{error}</p>)}
-                  </div>
-                )}
-                <form className="checkout-form-grid" onSubmit={event => { event.preventDefault(); submitAuth(); }}>
-                  {mode === 'sign-up' && (
-                    <label className="full-field">
-                      <span>Name</span>
-                      <input autoComplete="name" value={form.name} onChange={event => setForm({ ...form, name: event.target.value })} />
-                    </label>
-                  )}
-                  <label className="full-field">
-                    <span>Email</span>
-                    <input autoComplete="email" type="email" value={form.email} onChange={event => setForm({ ...form, email: event.target.value })} />
-                  </label>
-                  {mode === 'sign-up' && (
-                    <label className="full-field">
-                      <span>Phone</span>
-                      <input autoComplete="tel" type="tel" value={form.phone} onChange={event => setForm({ ...form, phone: event.target.value })} />
-                    </label>
-                  )}
-                  <label className="full-field">
-                    <span>Password</span>
-                    <input autoComplete={mode === 'sign-in' ? 'current-password' : 'new-password'} type="password" value={form.password} onChange={event => setForm({ ...form, password: event.target.value })} />
-                  </label>
-                  <button className="checkout-button full-field" type="submit">{mode === 'sign-in' ? 'Sign in' : 'Create account'}</button>
-                </form>
-                <button className="ghost-button" type="button" onClick={useDemoAccount}>Use demo credentials</button>
-              </>
+              </fieldset>
+
+              <button className="checkout-button full-field" type="submit">
+                {profile ? 'Save profile and continue' : 'Use demo profile'}
+              </button>
+            </form>
+
+            {profile && (
+              <button className="ghost-button" type="button" onClick={forgetLocalProfile}>
+                Forget local profile
+              </button>
             )}
           </article>
 
           <aside className="card payment-review-panel">
-            <span className="kicker">Session behavior</span>
-            <h2>What this enables</h2>
+            <span className="kicker">What this means</span>
+            <h2>Profile is not authentication</h2>
             <div className="payment-breakdown">
-              <div><span>Checkout</span><strong>Requires sign-in</strong></div>
-              <div><span>Sign up</span><strong>Local account</strong></div>
-              <div><span>Sign out</span><strong>Clears session only</strong></div>
-              <div><span>Storage</span><strong>This browser</strong></div>
+              <div><span>Server ownership</span><strong>Private browser guest</strong></div>
+              <div><span>Profile</span><strong>Local label only</strong></div>
+              <div><span>Password</span><strong>Never collected</strong></div>
+              <div><span>Addresses</span><strong>Synthetic demo data</strong></div>
             </div>
-            {signedIn ? (
-              <p>Signing out clears the account session but leaves cart and order fallback data available for the demo.</p>
-            ) : (
-              <p>Demo credentials are prefilled. Create another local account to test signup and returning sign-in.</p>
-            )}
+            <p>Changing or forgetting this profile does not switch the private server guest that owns cart and order data.</p>
           </aside>
         </section>
       </div>
@@ -135,7 +200,7 @@ function SignInContent() {
 
 export default function SignInPage() {
   return (
-    <Suspense fallback={<main className="marketplace-page"><div className="container"><MarketplaceNav active="Account" /><section className="card"><h1>Loading sign in</h1></section></div></main>}>
+    <Suspense fallback={<main className="marketplace-page"><div className="container"><MarketplaceNav active="Account" /><section className="card"><h1>Loading demo profile</h1></section></div></main>}>
       <SignInContent />
     </Suspense>
   );

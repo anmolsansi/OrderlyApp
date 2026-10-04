@@ -1,196 +1,243 @@
 import { ADDRESSES_STORAGE_KEY, PROFILE_STORAGE_KEY, SESSION_STORAGE_KEY } from './cart';
-import { mockAddresses, mockUserProfile } from './mock-data';
-import type { Address, UserProfile } from './types';
+import { mockUserProfile } from './mock-data';
+import type { DemoAddress, DemoProfile, UserProfile } from './types';
 
-export const AUTH_ACCOUNTS_STORAGE_KEY = 'orderlyapp.marketplace.authAccounts.v1';
+export const LEGACY_AUTH_ACCOUNTS_STORAGE_KEY = 'orderlyapp.marketplace.authAccounts.v1';
+export const DEMO_PROFILE_STORAGE_KEY = 'orderlyapp.marketplace.demoProfile.v1';
+export const DEMO_ADDRESSES_STORAGE_KEY = 'orderlyapp.marketplace.demoAddresses.v1';
+export const DEMO_PROFILE_ID = 'demo-profile-1';
+export const MAX_DEMO_PROFILE_NAME_LENGTH = 60;
 
-export interface AuthAccount {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  password: string;
-}
+export const SYNTHETIC_DEMO_ADDRESSES: readonly DemoAddress[] = [
+  {
+    id: 'demo-address-1',
+    label: 'Demo home',
+    street: '100 Demo Street',
+    city: 'Demo City',
+    state: 'CA',
+    postalCode: '94105',
+    deliveryInstructions: 'Synthetic demo address only.',
+  },
+  {
+    id: 'demo-address-2',
+    label: 'Demo office',
+    street: '200 Sample Avenue',
+    city: 'Demo City',
+    state: 'CA',
+    postalCode: '94107',
+    deliveryInstructions: 'Synthetic demo address only.',
+  },
+];
 
-export interface AuthSession {
-  userId: string;
-  email: string;
-  signedInAt: string;
-}
+const LEGACY_PROFILE_STORAGE_KEYS = [
+  LEGACY_AUTH_ACCOUNTS_STORAGE_KEY,
+  SESSION_STORAGE_KEY,
+  PROFILE_STORAGE_KEY,
+  ADDRESSES_STORAGE_KEY,
+] as const;
 
-export interface AuthResult {
-  ok: boolean;
-  errors: string[];
-  account?: AuthAccount;
-}
+export type DemoProfileErrorCode = 'invalid_profile' | 'storage_unavailable';
 
-export function createAuthUserId(seed = Math.random().toString(36)): string {
-  return `user-${Date.now()}-${seed.replace(/[^a-z0-9]/gi, '').slice(0, 8) || 'local'}`;
-}
+export type DemoProfileResult<T> =
+  | { ok: true; value: T }
+  | { ok: false; code: DemoProfileErrorCode; message: string };
 
-export function getStoredAccounts(storage: Storage): AuthAccount[] {
-  const stored = storage.getItem(AUTH_ACCOUNTS_STORAGE_KEY);
-  if (!stored) return [getDemoAccount()];
-  try {
-    const accounts = JSON.parse(stored) as AuthAccount[];
-    const hasDemo = accounts.some(account => normalizeEmail(account.email) === normalizeEmail(mockUserProfile.email));
-    return hasDemo ? accounts : [getDemoAccount(), ...accounts];
-  } catch {
-    return [getDemoAccount()];
-  }
-}
+const INVALID_PROFILE_MESSAGE = 'Demo profile is invalid';
+const STORAGE_UNAVAILABLE_MESSAGE = 'Demo profile storage is unavailable';
 
-export function saveStoredAccounts(storage: Storage, accounts: AuthAccount[]): void {
-  storage.setItem(AUTH_ACCOUNTS_STORAGE_KEY, JSON.stringify(accounts));
-}
-
-export function getDemoAccount(): AuthAccount {
+export function createDefaultDemoProfile(
+  name = 'Demo visitor',
+  defaultAddressId = SYNTHETIC_DEMO_ADDRESSES[0].id,
+): DemoProfile {
   return {
-    id: mockUserProfile.id,
-    name: mockUserProfile.name,
-    email: mockUserProfile.email,
-    phone: mockUserProfile.phone,
-    password: 'demo-password',
+    schemaVersion: 1,
+    id: DEMO_PROFILE_ID,
+    name: name.trim(),
+    defaultAddressId,
   };
 }
 
-export function getCurrentAuthSession(storage: Storage): AuthSession | undefined {
-  const stored = storage.getItem(SESSION_STORAGE_KEY);
-  if (!stored) return undefined;
-  if (stored === 'signed-in') {
-    return { userId: mockUserProfile.id, email: mockUserProfile.email, signedInAt: new Date().toISOString() };
-  }
+export function getDemoProfile(storage: Storage): DemoProfileResult<DemoProfile | undefined> {
+  const migrated = removeLegacyProfileStorage(storage);
+  if (!migrated.ok) return migrated;
+
+  const stored = readStorage(storage, DEMO_PROFILE_STORAGE_KEY);
+  if (!stored.ok) return stored;
+  if (stored.value === null) return success(undefined);
+
   try {
-    return JSON.parse(stored) as AuthSession;
+    const parsed = JSON.parse(stored.value) as unknown;
+    return isDemoProfile(parsed) ? success(parsed) : invalidProfile();
   } catch {
-    return undefined;
+    return invalidProfile();
   }
 }
 
-export function getCurrentAuthAccount(storage: Storage): AuthAccount | undefined {
-  const session = getCurrentAuthSession(storage);
-  if (!session) return undefined;
-  return getStoredAccounts(storage).find(account => account.id === session.userId || normalizeEmail(account.email) === normalizeEmail(session.email));
+export function getDemoAddresses(storage: Storage): DemoProfileResult<DemoAddress[]> {
+  const migrated = removeLegacyProfileStorage(storage);
+  if (!migrated.ok) return migrated;
+
+  const stored = readStorage(storage, DEMO_ADDRESSES_STORAGE_KEY);
+  if (!stored.ok) return stored;
+
+  if (stored.value === null) {
+    const addresses = cloneSyntheticAddresses();
+    const saved = writeStorage(storage, DEMO_ADDRESSES_STORAGE_KEY, JSON.stringify(addresses));
+    return saved.ok ? success(addresses) : saved;
+  }
+
+  try {
+    const parsed = JSON.parse(stored.value) as unknown;
+    return isSyntheticAddressList(parsed) ? success(parsed.map(address => ({ ...address }))) : invalidProfile();
+  } catch {
+    return invalidProfile();
+  }
+}
+
+export function saveDemoProfile(storage: Storage, profile: DemoProfile): DemoProfileResult<DemoProfile> {
+  const migrated = removeLegacyProfileStorage(storage);
+  if (!migrated.ok) return migrated;
+
+  const addresses = getDemoAddresses(storage);
+  if (!addresses.ok) return addresses;
+
+  const normalized = normalizeDemoProfile(profile);
+  if (!normalized) return invalidProfile();
+  if (!addresses.value.some(address => address.id === normalized.defaultAddressId)) return invalidProfile();
+
+  const saved = writeStorage(storage, DEMO_PROFILE_STORAGE_KEY, JSON.stringify(normalized));
+  return saved.ok ? success(normalized) : saved;
+}
+
+export function forgetDemoProfile(storage: Storage): DemoProfileResult<undefined> {
+  const migrated = removeLegacyProfileStorage(storage);
+  if (!migrated.ok) return migrated;
+
+  for (const key of [DEMO_PROFILE_STORAGE_KEY, DEMO_ADDRESSES_STORAGE_KEY]) {
+    const removed = removeStorage(storage, key);
+    if (!removed.ok) return removed;
+  }
+  return success(undefined);
 }
 
 export function isSignedIn(storage: Storage): boolean {
-  return Boolean(getCurrentAuthSession(storage));
-}
-
-export function signOut(storage: Storage): void {
-  storage.removeItem(SESSION_STORAGE_KEY);
-}
-
-export function signInWithCredentials(storage: Storage, email: string, password: string): AuthResult {
-  const errors = validateSignIn(email, password);
-  if (errors.length > 0) return { ok: false, errors };
-
-  const account = getStoredAccounts(storage).find(candidate => normalizeEmail(candidate.email) === normalizeEmail(email));
-  if (!account || account.password !== password) {
-    return { ok: false, errors: ['Email or password does not match a local account.'] };
-  }
-
-  writeSession(storage, account);
-  mirrorProfile(storage, account);
-  return { ok: true, errors: [], account };
-}
-
-export function signUpWithCredentials(storage: Storage, input: Omit<AuthAccount, 'id'>): AuthResult {
-  const errors = validateSignUp(input);
-  if (errors.length > 0) return { ok: false, errors };
-
-  const accounts = getStoredAccounts(storage);
-  if (accounts.some(account => normalizeEmail(account.email) === normalizeEmail(input.email))) {
-    return { ok: false, errors: ['An account already exists for this email. Sign in instead.'] };
-  }
-
-  const account: AuthAccount = {
-    ...input,
-    id: createAuthUserId(input.email),
-    email: normalizeEmail(input.email),
-  };
-  saveStoredAccounts(storage, [account, ...accounts]);
-  writeSession(storage, account);
-  mirrorProfile(storage, account);
-  ensureAddressProfile(storage, account.id);
-  return { ok: true, errors: [], account };
+  const result = getDemoProfile(storage);
+  return result.ok && Boolean(result.value);
 }
 
 export function getSessionProfile(storage: Storage): UserProfile {
-  const account = getCurrentAuthAccount(storage);
-  const storedProfile = storage.getItem(PROFILE_STORAGE_KEY);
-  if (storedProfile) {
-    try {
-      const profile = JSON.parse(storedProfile) as UserProfile;
-      if (!account || profile.id === account.id || normalizeEmail(profile.email) === normalizeEmail(account.email)) {
-        return profile;
-      }
-    } catch {
-      return mockUserProfile;
-    }
+  const result = getDemoProfile(storage);
+  if (!result.ok || !result.value) {
+    return { ...mockUserProfile, favoriteRestaurantIds: [] };
   }
-  return account ? accountToProfile(account) : mockUserProfile;
-}
 
-function validateSignIn(email: string, password: string): string[] {
-  const errors: string[] = [];
-  if (!isValidEmail(email)) errors.push('Enter a valid email address.');
-  if (!password) errors.push('Password is required.');
-  return errors;
-}
-
-function validateSignUp(input: Omit<AuthAccount, 'id'>): string[] {
-  const errors = validateSignIn(input.email, input.password);
-  if (!input.name.trim()) errors.push('Name is required.');
-  if (!/^\+?[0-9 ()-]{7,}$/.test(input.phone.trim())) errors.push('Enter a valid phone number.');
-  if (input.password.length < 8) errors.push('Password must be at least 8 characters.');
-  return errors;
-}
-
-function writeSession(storage: Storage, account: AuthAccount): void {
-  const session: AuthSession = {
-    userId: account.id,
-    email: normalizeEmail(account.email),
-    signedInAt: new Date().toISOString(),
-  };
-  storage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
-}
-
-function mirrorProfile(storage: Storage, account: AuthAccount): void {
-  const storedProfile = storage.getItem(PROFILE_STORAGE_KEY);
-  if (storedProfile) {
-    try {
-      const profile = JSON.parse(storedProfile) as UserProfile;
-      if (profile.id === account.id || normalizeEmail(profile.email) === normalizeEmail(account.email)) return;
-    } catch {
-      // Replace malformed profile data with the authenticated local account.
-    }
-  }
-  storage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(accountToProfile(account)));
-}
-
-function ensureAddressProfile(storage: Storage, userId: string): void {
-  const storedAddresses = storage.getItem(ADDRESSES_STORAGE_KEY);
-  if (storedAddresses) return;
-  const addresses: Address[] = mockAddresses.map(address => ({ ...address, userId }));
-  storage.setItem(ADDRESSES_STORAGE_KEY, JSON.stringify(addresses));
-}
-
-function accountToProfile(account: AuthAccount): UserProfile {
   return {
-    id: account.id,
-    name: account.name,
-    email: normalizeEmail(account.email),
-    phone: account.phone,
-    defaultAddressId: mockUserProfile.defaultAddressId,
+    id: result.value.id,
+    name: result.value.name,
+    email: mockUserProfile.email,
+    phone: mockUserProfile.phone,
+    defaultAddressId: result.value.defaultAddressId,
     favoriteRestaurantIds: [],
   };
 }
 
-function normalizeEmail(email: string): string {
-  return email.trim().toLowerCase();
+export function removeLegacyProfileStorage(storage: Storage): DemoProfileResult<undefined> {
+  for (const key of LEGACY_PROFILE_STORAGE_KEYS) {
+    const removed = removeStorage(storage, key);
+    if (!removed.ok) return removed;
+  }
+  return success(undefined);
 }
 
-function isValidEmail(email: string): boolean {
-  return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(normalizeEmail(email));
+function normalizeDemoProfile(value: DemoProfile): DemoProfile | undefined {
+  if (!isDemoProfileShape(value)) return undefined;
+  const name = value.name.trim();
+  const id = value.id.trim();
+  if (!name || name.length > MAX_DEMO_PROFILE_NAME_LENGTH || !id) return undefined;
+  return { ...value, id, name };
+}
+
+function isDemoProfile(value: unknown): value is DemoProfile {
+  if (!isDemoProfileShape(value)) return false;
+  const normalized = normalizeDemoProfile(value);
+  if (!normalized) return false;
+  return SYNTHETIC_DEMO_ADDRESSES.some(address => address.id === normalized.defaultAddressId);
+}
+
+function isDemoProfileShape(value: unknown): value is DemoProfile {
+  if (!isRecord(value)) return false;
+  const keys = Object.keys(value).sort();
+  const expectedKeys = ['defaultAddressId', 'id', 'name', 'schemaVersion'];
+  return keys.length === expectedKeys.length
+    && keys.every((key, index) => key === expectedKeys[index])
+    && value.schemaVersion === 1
+    && typeof value.id === 'string'
+    && typeof value.name === 'string'
+    && typeof value.defaultAddressId === 'string';
+}
+
+function isSyntheticAddressList(value: unknown): value is DemoAddress[] {
+  if (!Array.isArray(value) || value.length !== SYNTHETIC_DEMO_ADDRESSES.length) return false;
+  return value.every((address, index) => matchesSyntheticAddress(address, SYNTHETIC_DEMO_ADDRESSES[index]));
+}
+
+function matchesSyntheticAddress(value: unknown, expected: DemoAddress): value is DemoAddress {
+  if (!isRecord(value)) return false;
+  const allowedKeys = ['apartment', 'city', 'deliveryInstructions', 'id', 'label', 'postalCode', 'state', 'street'];
+  if (Object.keys(value).some(key => !allowedKeys.includes(key))) return false;
+
+  return value.id === expected.id
+    && value.label === expected.label
+    && value.street === expected.street
+    && value.apartment === expected.apartment
+    && value.city === expected.city
+    && value.state === expected.state
+    && value.postalCode === expected.postalCode
+    && value.deliveryInstructions === expected.deliveryInstructions;
+}
+
+function cloneSyntheticAddresses(): DemoAddress[] {
+  return SYNTHETIC_DEMO_ADDRESSES.map(address => ({ ...address }));
+}
+
+function readStorage(storage: Storage, key: string): DemoProfileResult<string | null> {
+  try {
+    return success(storage.getItem(key));
+  } catch {
+    return storageUnavailable();
+  }
+}
+
+function writeStorage(storage: Storage, key: string, value: string): DemoProfileResult<undefined> {
+  try {
+    storage.setItem(key, value);
+    return success(undefined);
+  } catch {
+    return storageUnavailable();
+  }
+}
+
+function removeStorage(storage: Storage, key: string): DemoProfileResult<undefined> {
+  try {
+    storage.removeItem(key);
+    return success(undefined);
+  } catch {
+    return storageUnavailable();
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function success<T>(value: T): DemoProfileResult<T> {
+  return { ok: true, value };
+}
+
+function invalidProfile<T>(): DemoProfileResult<T> {
+  return { ok: false, code: 'invalid_profile', message: INVALID_PROFILE_MESSAGE };
+}
+
+function storageUnavailable<T>(): DemoProfileResult<T> {
+  return { ok: false, code: 'storage_unavailable', message: STORAGE_UNAVAILABLE_MESSAGE };
 }
