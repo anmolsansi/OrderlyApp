@@ -381,3 +381,122 @@ def test_checkout_precommit_failure_rolls_back_all_writes(
     assert cart.revision == 1
     assert len(cart.items) == 1
     assert c6_counts(owner_id) == (0, 0)
+
+
+def test_unknown_outcome_retry_returns_stored_receipt_without_second_cart_clear(
+    checkout_environment: dict[str, str],
+) -> None:
+    from app.store import get_order_snapshot_for_owner
+
+    owner_id = checkout_environment["owner_id"]
+    request = submission_for(owner_id)
+
+    # Simulate a response that was lost after the database commit by intentionally
+    # discarding the service return value, then reconstructing evidence from storage.
+    submit_order(owner_id, IDEMPOTENCY_KEY, request)
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT order_id
+            FROM order_idempotency
+            WHERE owner_id = %s AND idempotency_key = %s
+            """,
+            (owner_id, IDEMPOTENCY_KEY),
+        ).fetchone()
+    assert row is not None
+    stored = get_order_snapshot_for_owner(str(row["order_id"]), owner_id)
+    assert stored is not None
+    cart_after_commit = current_cart(owner_id)
+
+    replay = submit_order(owner_id, IDEMPOTENCY_KEY, request)
+    cart_after_replay = current_cart(owner_id)
+
+    assert replay.replayed is True
+    assert replay.receipt.model_dump(mode="json") == stored.model_dump(mode="json")
+    assert cart_after_commit.revision == 2
+    assert cart_after_replay.revision == 2
+    assert cart_after_replay.items == []
+    assert cart_after_replay.updated_at == cart_after_commit.updated_at
+    assert c6_counts(owner_id) == (1, 1)
+
+
+def test_stale_revision_catalog_change_and_empty_cart_never_create_partial_order(
+    checkout_environment: dict[str, str],
+) -> None:
+    from app.cart_service import delete_cart
+    from app.pricing import CatalogChangedError
+
+    owner_id = checkout_environment["owner_id"]
+    request = submission_for(owner_id)
+
+    with pytest.raises(CartConflictError):
+        submit_order(
+            owner_id,
+            IDEMPOTENCY_KEY,
+            request.model_copy(update={"expected_revision": 0}),
+        )
+    assert c6_counts(owner_id) == (0, 0)
+    assert current_cart(owner_id).revision == 1
+
+    with pytest.raises(CatalogChangedError):
+        submit_order(
+            owner_id,
+            IDEMPOTENCY_KEY,
+            request.model_copy(update={"catalog_fingerprint": "0" * 64}),
+        )
+    assert c6_counts(owner_id) == (0, 0)
+    assert current_cart(owner_id).revision == 1
+
+    cleared = delete_cart(owner_id, 1)
+    assert cleared.revision == 2
+    assert cleared.items == []
+    with pytest.raises(InvalidCheckoutError) as exc_info:
+        submit_order(
+            owner_id,
+            IDEMPOTENCY_KEY,
+            request.model_copy(update={"expected_revision": 2}),
+        )
+    assert exc_info.value.fields == ["cart"]
+    assert c6_counts(owner_id) == (0, 0)
+    assert current_cart(owner_id).revision == 2
+
+
+def test_order_api_rejects_missing_and_malformed_idempotency_key(
+    checkout_environment: dict[str, str],
+) -> None:
+    owner_id = checkout_environment["owner_id"]
+    payload = submission_for(owner_id)
+    app.dependency_overrides[verify_request_guest] = lambda: VerifiedGuest(
+        guest_id=owner_id,
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    client = TestClient(app, base_url=TEST_ORIGIN)
+
+    missing = client.post(
+        "/v1/orders",
+        headers={"Origin": TEST_ORIGIN},
+        json=payload.model_dump(mode="json"),
+    )
+    assert missing.status_code == 422
+    assert missing.json()["error"]["code"] == "invalid_checkout"
+    assert missing.json()["error"]["fields"] == ["idempotency_key"]
+
+    malformed = client.post(
+        "/v1/orders",
+        headers={"Origin": TEST_ORIGIN, "Idempotency-Key": "not-a-uuid"},
+        json=payload.model_dump(mode="json"),
+    )
+    assert malformed.status_code == 422
+    assert malformed.json()["error"]["code"] == "invalid_checkout"
+    assert malformed.json()["error"]["fields"] == ["idempotency_key"]
+    assert c6_counts(owner_id) == (0, 0)
+
+
+def test_checkout_fails_closed_without_postgres(monkeypatch: pytest.MonkeyPatch) -> None:
+    import app.order_service as order_service
+
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("ORDERLY_TEST_DATABASE_URL", raising=False)
+
+    with pytest.raises(order_service.OrderStorageUnavailableError):
+        order_service.submit_order("guest-no-postgres", IDEMPOTENCY_KEY, static_submission())
