@@ -58,6 +58,19 @@ class CartItemModifier(BaseModel):
     option_ids: List[str]
 
 
+class CartItemInput(BaseModel):
+    """Client-authorized C4 cart fields. Catalog labels/prices are output-only."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    restaurant_id: str
+    menu_item_id: str
+    quantity: int = Field(ge=1, le=10, strict=True)
+    modifiers: List[CartItemModifier]
+    special_instructions: Optional[str] = Field(default=None, max_length=500)
+
+
 class CartItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -72,20 +85,37 @@ class CartItem(BaseModel):
 
 
 class Cart(BaseModel):
+    """Legacy pre-C4 cart representation retained for offline compatibility."""
+
     session_id: str
     items: List[CartItem] = Field(default_factory=list)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 
-class CartResponse(BaseModel):
+class RevisionedCart(BaseModel):
+    owner_id: str
+    revision: int = Field(ge=0, strict=True)
     items: List[CartItem] = Field(default_factory=list)
     updated_at: datetime
+
+
+class CartResponse(BaseModel):
+    schema_version: Literal[1] = 1
+    revision: int = Field(ge=0, strict=True)
+    items: List[CartItem] = Field(default_factory=list)
 
 
 class CartUpsertRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    items: List[CartItem] = Field(max_length=50)
+    expected_revision: int = Field(ge=0, strict=True)
+    items: List[CartItemInput] = Field(max_length=50)
+
+
+class CartDeleteRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expected_revision: int = Field(ge=0, strict=True)
 
 
 class OrderCreateRequest(BaseModel):
