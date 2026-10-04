@@ -191,6 +191,18 @@ describe('C2 demo profile storage', () => {
     expect(getSessionProfile(storage).email).toMatch(/example\.com$/);
   });
 
+  it('does not persist the legacy checkout fallback as a C2 profile', () => {
+    const { storage } = createStorage();
+
+    expect(isSignedIn(storage)).toBe(false);
+    expect(getSessionProfile(storage)).toMatchObject({
+      id: 'user-1001',
+      name: 'Jamie Demo',
+      defaultAddressId: 'addr-home',
+    });
+    expect(storage.getItem(DEMO_PROFILE_STORAGE_KEY)).toBeNull();
+  });
+
   it('forgets only the local demo profile namespace', () => {
     const { storage } = createStorage({
       [CART_STORAGE_KEY]: '[{"menuItemId":"pizza"}]',
