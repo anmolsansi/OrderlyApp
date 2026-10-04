@@ -15,7 +15,16 @@ from .catalog import (
     search_snapshot,
 )
 from .database import database_url, get_connection, postgres_available
-from .models import Cart, CartItem, CartPricingResponse, MenuItem, Order, Restaurant
+from .models import (
+    Cart,
+    CartItem,
+    CartItemInput,
+    CartPricingResponse,
+    MenuItem,
+    Order,
+    Restaurant,
+    RevisionedCart,
+)
 from .redis_store import cart_key, redis_client
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
@@ -83,16 +92,23 @@ def _catalog_uses_postgres() -> bool:
     return False
 
 
-def list_restaurants() -> List[Restaurant]:
+def _restaurants_from_connection(conn: Any) -> List[Restaurant]:
+    restaurants = conn.execute("SELECT * FROM restaurants ORDER BY name").fetchall()
+    menu_rows = conn.execute("SELECT * FROM menu_items ORDER BY restaurant_id, name").fetchall()
+    grouped: Dict[str, List[MenuItem]] = {}
+    for row in menu_rows:
+        grouped.setdefault(row["restaurant_id"], []).append(_menu_item_from_row(row))
+    return [_restaurant_from_row(row, grouped.get(row["id"], [])) for row in restaurants]
+
+
+def list_restaurants(connection: Any | None = None) -> List[Restaurant]:
+    if connection is not None:
+        return _restaurants_from_connection(connection)
+
     if _catalog_uses_postgres():
         try:
             with get_connection() as conn:
-                restaurants = conn.execute("SELECT * FROM restaurants ORDER BY name").fetchall()
-                menu_rows = conn.execute("SELECT * FROM menu_items ORDER BY restaurant_id, name").fetchall()
-            grouped: Dict[str, List[MenuItem]] = {}
-            for row in menu_rows:
-                grouped.setdefault(row["restaurant_id"], []).append(_menu_item_from_row(row))
-            return [_restaurant_from_row(row, grouped.get(row["id"], [])) for row in restaurants]
+                return _restaurants_from_connection(conn)
         except CatalogConfigurationError:
             raise
         except Exception as exc:
@@ -101,13 +117,15 @@ def list_restaurants() -> List[Restaurant]:
     return [Restaurant(**item) for item in read_json(RESTAURANTS_FILE, [])]
 
 
-def get_catalog_snapshot() -> CatalogSnapshot:
+def get_catalog_snapshot(connection: Any | None = None) -> CatalogSnapshot:
     """Read and normalize the catalog once for one logical operation."""
     try:
-        return CatalogSnapshot.build(list_restaurants())
+        return CatalogSnapshot.build(list_restaurants(connection=connection))
     except CatalogConfigurationError:
         raise
     except Exception as exc:
+        if connection is not None:
+            raise
         raise CatalogConfigurationError("Canonical catalog data is invalid") from exc
 
 
@@ -157,6 +175,29 @@ def validate_cart_items(
 ) -> CatalogValidationResult:
     catalog = snapshot or get_catalog_snapshot()
     return canonicalize_cart_items(cart_items, catalog)
+
+
+def validate_cart_input_items(
+    cart_items: List[CartItemInput],
+    snapshot: CatalogSnapshot,
+) -> CatalogValidationResult:
+    """Adapt C4 write inputs to the existing C3 validator without trusting client labels/prices."""
+    validation_items: List[CartItem] = []
+    for item in cart_items:
+        canonical_item = snapshot.menu_item(item.restaurant_id, item.menu_item_id)
+        validation_items.append(
+            CartItem(
+                id=item.id,
+                restaurant_id=item.restaurant_id,
+                menu_item_id=item.menu_item_id,
+                name=canonical_item.name if canonical_item is not None else "",
+                quantity=item.quantity,
+                base_price_cents=canonical_item.price_cents if canonical_item is not None else 1,
+                modifiers=item.modifiers,
+                special_instructions=item.special_instructions,
+            )
+        )
+    return canonicalize_cart_items(validation_items, snapshot)
 
 
 def calculate_cart_pricing(
@@ -248,6 +289,64 @@ def write_restaurants(restaurants: List[Restaurant]) -> None:
     )
 
 
+def ensure_guest_cart_row(conn: Any, owner_id: str) -> None:
+    conn.execute(
+        """
+        INSERT INTO guest_carts (owner_id, revision, items)
+        VALUES (%s, 0, '[]'::jsonb)
+        ON CONFLICT (owner_id) DO NOTHING
+        """,
+        (owner_id,),
+    )
+
+
+def get_guest_cart_row(conn: Any, owner_id: str, *, for_update: bool = False) -> RevisionedCart:
+    ensure_guest_cart_row(conn, owner_id)
+    query = "SELECT owner_id, revision, items, updated_at FROM guest_carts WHERE owner_id = %s"
+    if for_update:
+        query += " FOR UPDATE"
+    row = conn.execute(query, (owner_id,)).fetchone()
+    if row is None:
+        raise RuntimeError("guest cart row could not be established")
+    return RevisionedCart(
+        owner_id=row["owner_id"],
+        revision=int(row["revision"]),
+        items=[CartItem.model_validate(item) for item in row["items"]],
+        updated_at=row["updated_at"],
+    )
+
+
+def update_guest_cart_row(
+    conn: Any,
+    owner_id: str,
+    next_revision: int,
+    items: List[CartItem],
+) -> RevisionedCart:
+    row = conn.execute(
+        """
+        UPDATE guest_carts
+        SET revision = %s, items = %s::jsonb, updated_at = now()
+        WHERE owner_id = %s
+        RETURNING owner_id, revision, items, updated_at
+        """,
+        (
+            next_revision,
+            json.dumps([item.model_dump(mode="json") for item in items]),
+            owner_id,
+        ),
+    ).fetchone()
+    if row is None:
+        raise RuntimeError("guest cart row disappeared during update")
+    return RevisionedCart(
+        owner_id=row["owner_id"],
+        revision=int(row["revision"]),
+        items=[CartItem.model_validate(item) for item in row["items"]],
+        updated_at=row["updated_at"],
+    )
+
+
+# Legacy pre-C4 cart helpers remain for old offline/order compatibility only.
+# The versioned /v1/cart API no longer calls them after ST-05.
 def get_cart(session_id: str) -> Cart:
     client = redis_client()
     if client is not None:
