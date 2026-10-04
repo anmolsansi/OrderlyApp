@@ -82,6 +82,16 @@ function SignInContent() {
     setDefaultAddressId(addresses[0]?.id ?? 'demo-address-1');
   }
 
+  function clearInvalidLocalProfile(): void {
+    const result = forgetDemoProfile(window.localStorage);
+    if (!result.ok) {
+      setError(result.message);
+      setStatus('error');
+      return;
+    }
+    loadProfile();
+  }
+
   if (status === 'loading') {
     return (
       <main className="marketplace-page">
@@ -106,7 +116,10 @@ function SignInContent() {
             <span className="kicker">Demo profile unavailable</span>
             <h1>Browser storage needs attention</h1>
             <p>{error}</p>
-            <button className="checkout-button inline-action" type="button" onClick={loadProfile}>Retry</button>
+            <div className="confirmation-actions">
+              <button className="checkout-button inline-action" type="button" onClick={loadProfile}>Retry</button>
+              <button className="ghost-button" type="button" onClick={clearInvalidLocalProfile}>Clear local demo data</button>
+            </div>
           </section>
         </div>
       </main>
