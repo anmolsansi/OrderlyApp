@@ -69,3 +69,5 @@ jobs:
           python -m pip install -r backend/requirements-test.lock
       - name: Apply existing database migrations
         run: python backend/scripts/migrate.py
+      - name: Run BACKEND baseline
+        run: python -m pytest backend/tests -q
