@@ -127,14 +127,16 @@ export function isSignedIn(storage: Storage): boolean {
 
 export function getSessionProfile(storage: Storage): UserProfile {
   const result = getDemoProfile(storage);
-  const profile = result.ok && result.value ? result.value : createDefaultDemoProfile(mockUserProfile.name, mockUserProfile.defaultAddressId);
+  if (!result.ok || !result.value) {
+    return { ...mockUserProfile, favoriteRestaurantIds: [] };
+  }
 
   return {
-    id: profile.id,
-    name: profile.name,
+    id: result.value.id,
+    name: result.value.name,
     email: mockUserProfile.email,
     phone: mockUserProfile.phone,
-    defaultAddressId: profile.defaultAddressId,
+    defaultAddressId: result.value.defaultAddressId,
     favoriteRestaurantIds: [],
   };
 }
