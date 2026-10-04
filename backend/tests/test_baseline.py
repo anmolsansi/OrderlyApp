@@ -12,6 +12,7 @@ from app.main import app
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 CONTRACT_FIXTURE_DIR = REPOSITORY_ROOT / "tests" / "fixtures" / "contracts"
 CONTRACT_NAMES = tuple(f"C{index}" for index in range(9))
+FORBIDDEN_FIXTURE_TERMS = ("password", "card_number", "cvv", "authorization")
 
 
 def load_contract_fixture(contract: str) -> dict[str, Any]:
@@ -73,3 +74,11 @@ def test_contract_schema_versions_are_stable() -> None:
         positive = fixture["positive"]
         if "schema_version" in positive:
             assert positive["schema_version"] == 1
+
+
+def test_contract_fixtures_are_marked_synthetic_and_contain_no_secrets() -> None:
+    for contract in CONTRACT_NAMES:
+        fixture = load_contract_fixture(contract)
+        serialized = json.dumps(fixture).lower()
+        for forbidden in FORBIDDEN_FIXTURE_TERMS:
+            assert forbidden not in serialized, f"{contract} contains forbidden term: {forbidden}"
