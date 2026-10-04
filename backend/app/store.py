@@ -383,15 +383,13 @@ def get_order_snapshot_for_owner(order_id: str, owner_id: str) -> Optional[Recei
     try:
         with get_connection() as conn:
             row = conn.execute(
-                "SELECT snapshot FROM guest_orders WHERE id = %s::uuid AND owner_id = %s",
+                "SELECT snapshot FROM guest_orders WHERE id::text = %s AND owner_id = %s",
                 (order_id, owner_id),
             ).fetchone()
         return _receipt_from_row(row) if row else None
     except ReceiptStorageUnavailableError:
         raise
     except Exception as exc:
-        if exc.__class__.__name__ in {"InvalidTextRepresentation", "DataError"}:
-            return None
         raise ReceiptStorageUnavailableError() from exc
 
 
@@ -412,7 +410,7 @@ def list_order_snapshots_for_owner(
             where = "owner_id = %s"
             if cursor:
                 cursor_row = conn.execute(
-                    "SELECT id, created_at FROM guest_orders WHERE id = %s::uuid AND owner_id = %s",
+                    "SELECT id, created_at FROM guest_orders WHERE id::text = %s AND owner_id = %s",
                     (cursor, owner_id),
                 ).fetchone()
                 if cursor_row is None:
@@ -435,8 +433,6 @@ def list_order_snapshots_for_owner(
     except InvalidReceiptCursorError:
         raise
     except Exception as exc:
-        if cursor and exc.__class__.__name__ in {"InvalidTextRepresentation", "DataError"}:
-            raise InvalidReceiptCursorError() from exc
         raise ReceiptStorageUnavailableError() from exc
 
 
