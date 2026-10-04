@@ -86,6 +86,16 @@ export default function AccountPage() {
     setMessage('Local demo profile forgotten. Your private server guest was not changed.');
   }
 
+  function clearInvalidLocalProfile(): void {
+    const result = forgetDemoProfile(window.localStorage);
+    if (!result.ok) {
+      setError(result.message);
+      setStatus('error');
+      return;
+    }
+    loadProfile();
+  }
+
   async function startFreshGuest(): Promise<void> {
     setResettingGuest(true);
     setError('');
@@ -135,7 +145,10 @@ export default function AccountPage() {
             <span className="kicker">Demo profile unavailable</span>
             <h1>Browser storage needs attention</h1>
             <p>{error}</p>
-            <button className="checkout-button inline-action" type="button" onClick={loadProfile}>Retry</button>
+            <div className="confirmation-actions">
+              <button className="checkout-button inline-action" type="button" onClick={loadProfile}>Retry</button>
+              <button className="ghost-button" type="button" onClick={clearInvalidLocalProfile}>Clear local demo data</button>
+            </div>
           </section>
         </div>
       </main>
