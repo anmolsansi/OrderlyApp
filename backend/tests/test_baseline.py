@@ -1,11 +1,26 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any
 
 from fastapi.testclient import TestClient
 
 from app.main import app
+
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+CONTRACT_FIXTURE_DIR = REPOSITORY_ROOT / "tests" / "fixtures" / "contracts"
+CONTRACT_NAMES = tuple(f"C{index}" for index in range(9))
+
+
+def load_contract_fixture(contract: str) -> dict[str, Any]:
+    path = CONTRACT_FIXTURE_DIR / f"{contract.lower()}.json"
+    with path.open(encoding="utf-8") as fixture_file:
+        payload = json.load(fixture_file)
+    assert payload["contract"] == contract
+    assert payload["synthetic"] is True
+    return payload
 
 
 def test_health_request_runs_without_external_services(isolated_environment: None) -> None:
