@@ -57,6 +57,14 @@ export function createDefaultDemoProfile(
   };
 }
 
+export function getPreferredDemoAddress(
+  profile: Pick<DemoProfile, 'defaultAddressId'> | undefined,
+  addresses: readonly DemoAddress[],
+): DemoAddress | undefined {
+  if (addresses.length === 0) return undefined;
+  return addresses.find(address => address.id === profile?.defaultAddressId) ?? addresses[0];
+}
+
 export function getDemoProfile(storage: Storage): DemoProfileResult<DemoProfile | undefined> {
   const migrated = removeLegacyProfileStorage(storage);
   if (!migrated.ok) return migrated;
