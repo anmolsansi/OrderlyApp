@@ -10,7 +10,6 @@ import {
   CART_STORAGE_KEY,
   ORDER_HISTORY_STORAGE_KEY,
   ORDER_STORAGE_KEY,
-  getOrCreateBackendSessionId,
   getSelectedModifierLabels,
   updateCartItemQuantity,
   validateCart,
@@ -56,10 +55,9 @@ export default function CheckoutPage() {
   useEffect(() => {
     let active = true;
     async function loadCart(): Promise<void> {
-      const sessionId = getOrCreateBackendSessionId(window.localStorage);
       const stored = window.localStorage.getItem(CART_STORAGE_KEY);
       const fallbackCart = stored ? JSON.parse(stored) as CartItem[] : [];
-      const backendCart = await fetchCart(sessionId);
+      const backendCart = await fetchCart();
       const nextCart = backendCart ?? fallbackCart;
       if (!active) return;
       setCart(nextCart);
@@ -81,18 +79,16 @@ export default function CheckoutPage() {
   }, []);
 
   async function updateQuantity(cartItemId: string, delta: number): Promise<void> {
-    const sessionId = getOrCreateBackendSessionId(window.localStorage);
     const nextCart = updateCartItemQuantity(cart, cartItemId, delta);
     setCart(nextCart);
     window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(nextCart));
-    await saveCart(sessionId, nextCart);
+    await saveCart(nextCart);
   }
 
   async function clearCart(): Promise<void> {
-    const sessionId = getOrCreateBackendSessionId(window.localStorage);
     setCart([]);
     window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify([]));
-    await clearBackendCart(sessionId);
+    await clearBackendCart();
   }
 
   function updateDetails(field: keyof CheckoutDetails, value: string): void {
@@ -118,8 +114,7 @@ export default function CheckoutPage() {
     }
 
     setSubmitting(true);
-    const sessionId = getOrCreateBackendSessionId(window.localStorage);
-    const backendOrder = await createBackendOrder(sessionId, cart, subtotal, details);
+    const backendOrder = await createBackendOrder(cart, subtotal, details);
     const order: Order = backendOrder ? {
       ...backendOrder,
       totals,
@@ -138,7 +133,7 @@ export default function CheckoutPage() {
     window.localStorage.setItem(ORDER_STORAGE_KEY, JSON.stringify(order));
     window.localStorage.setItem(ORDER_HISTORY_STORAGE_KEY, JSON.stringify([order, ...history.filter(candidate => candidate.id !== order.id)]));
     window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify([]));
-    if (!backendOrder) await clearBackendCart(sessionId);
+    if (!backendOrder) await clearBackendCart();
     router.push(routes.orderConfirmation(order.id));
   }
 
