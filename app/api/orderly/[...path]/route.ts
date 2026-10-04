@@ -21,6 +21,7 @@ const ALLOWED_ROUTES: AllowedRoute[] = [
   { pattern: /^restaurants\/[A-Za-z0-9._~-]+$/, methods: new Set(['GET']) },
   { pattern: /^cart$/, methods: new Set(['GET', 'PUT', 'DELETE']) },
   { pattern: /^cart\/pricing$/, methods: new Set(['POST']) },
+  { pattern: /^checkout\/quote$/, methods: new Set(['POST']) },
   { pattern: /^orders$/, methods: new Set(['GET', 'POST']) },
   { pattern: /^orders\/[A-Za-z0-9._~-]+$/, methods: new Set(['GET']) },
 ];
