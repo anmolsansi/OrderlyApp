@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 ModifierType = Literal["single", "multiple"]
 OrderStatus = Literal["Placed", "Confirmed", "Preparing", "Out for delivery", "Delivered"]
@@ -13,6 +13,7 @@ class ModifierOption(BaseModel):
     id: str
     name: str
     price_delta_cents: int = Field(ge=0)
+    available: bool = True
 
 
 class ModifierGroup(BaseModel):
@@ -22,6 +23,7 @@ class ModifierGroup(BaseModel):
     required: bool = False
     min_selected: Optional[int] = Field(default=None, ge=0)
     max_selected: Optional[int] = Field(default=None, ge=1)
+    default_option_id: Optional[str] = None
     options: List[ModifierOption]
 
 
@@ -32,6 +34,7 @@ class MenuItem(BaseModel):
     price_cents: int = Field(gt=0)
     image_emoji: str
     popular: bool = False
+    available: bool = True
     modifier_groups: List[ModifierGroup]
 
 
@@ -43,24 +46,29 @@ class Restaurant(BaseModel):
     delivery_minutes: str
     delivery_fee_cents: int = Field(ge=0)
     image_emoji: str
+    is_open: bool = True
     tags: List[str]
     menu: List[MenuItem]
 
 
 class CartItemModifier(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     group_id: str
     option_ids: List[str]
 
 
 class CartItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     id: str
     restaurant_id: str
     menu_item_id: str
     name: str
-    quantity: int = Field(ge=1)
+    quantity: int = Field(ge=1, le=10, strict=True)
     base_price_cents: int = Field(gt=0)
     modifiers: List[CartItemModifier]
-    special_instructions: Optional[str] = None
+    special_instructions: Optional[str] = Field(default=None, max_length=500)
 
 
 class Cart(BaseModel):
@@ -75,11 +83,15 @@ class CartResponse(BaseModel):
 
 
 class CartUpsertRequest(BaseModel):
-    items: List[CartItem]
+    model_config = ConfigDict(extra="forbid")
+
+    items: List[CartItem] = Field(max_length=50)
 
 
 class OrderCreateRequest(BaseModel):
-    cart_items: List[CartItem]
+    model_config = ConfigDict(extra="forbid")
+
+    cart_items: List[CartItem] = Field(max_length=50)
     subtotal_cents: int = Field(ge=0)
     delivery_address: Optional[str] = None
     customer_name: Optional[str] = None
@@ -89,7 +101,9 @@ class OrderCreateRequest(BaseModel):
 
 
 class CartPricingRequest(BaseModel):
-    cart_items: List[CartItem]
+    model_config = ConfigDict(extra="forbid")
+
+    cart_items: List[CartItem] = Field(max_length=50)
     restaurant_id: Optional[str] = None
     discount_cents: int = Field(default=0, ge=0)
     tip_cents: int = Field(default=0, ge=0)

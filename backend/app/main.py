@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from typing import List
+from typing import List, Optional
 from uuid import uuid4
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
@@ -9,6 +9,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from .catalog import CatalogConfigurationError, CatalogValidationResult
 from .database import database_url, get_connection
 from .identity import (
     COOKIE_NAME,
@@ -37,6 +38,7 @@ from .store import (
     clear_cart,
     create_order,
     get_cart,
+    get_catalog_snapshot,
     get_order_for_session,
     get_restaurant,
     list_orders_for_session,
@@ -46,6 +48,21 @@ from .store import (
 )
 
 app = FastAPI(title="OrderlyApp API", version="0.2.0")
+
+
+class ApiContractError(Exception):
+    def __init__(
+        self,
+        status_code: int,
+        code: str,
+        message: str,
+        fields: Optional[List[str]] = None,
+    ) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.code = code
+        self.message = message
+        self.fields = fields or []
 
 
 def cors_origins() -> List[str]:
@@ -76,7 +93,13 @@ def _request_id(request: Request) -> str:
     return getattr(request.state, "request_id", uuid4().hex)
 
 
-def _error_response(request: Request, status_code: int, code: str, message: str, fields: list[str] | None = None) -> JSONResponse:
+def _error_response(
+    request: Request,
+    status_code: int,
+    code: str,
+    message: str,
+    fields: Optional[List[str]] = None,
+) -> JSONResponse:
     return JSONResponse(
         status_code=status_code,
         content={
@@ -90,9 +113,46 @@ def _error_response(request: Request, status_code: int, code: str, message: str,
     )
 
 
+def _invalid_cart(result: CatalogValidationResult) -> None:
+    if result.issues:
+        raise ApiContractError(
+            422,
+            "invalid_cart",
+            "Cart contains invalid catalog choices",
+            result.fields,
+        )
+
+
+def _validation_field(error: dict) -> str:
+    location = [str(part) for part in error.get("loc", ())]
+    if location and location[0] in {"body", "query", "path"}:
+        location = location[1:]
+    if location and location[0] == "cart_items":
+        location[0] = "items"
+    return ".".join(location)
+
+
 @app.exception_handler(IdentityError)
 def identity_exception_handler(request: Request, exc: IdentityError) -> JSONResponse:
     return _error_response(request, exc.status_code, exc.code, exc.message, exc.fields)
+
+
+@app.exception_handler(ApiContractError)
+def api_contract_exception_handler(request: Request, exc: ApiContractError) -> JSONResponse:
+    return _error_response(request, exc.status_code, exc.code, exc.message, exc.fields)
+
+
+@app.exception_handler(CatalogConfigurationError)
+def catalog_configuration_exception_handler(
+    request: Request,
+    _exc: CatalogConfigurationError,
+) -> JSONResponse:
+    return _error_response(
+        request,
+        503,
+        "catalog_unavailable",
+        "Canonical catalog is unavailable",
+    )
 
 
 @app.exception_handler(HTTPException)
@@ -104,10 +164,22 @@ def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse
 
 @app.exception_handler(RequestValidationError)
 def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
-    fields = [
-        f"{'.'.join(str(part) for part in error['loc'])}: {error['msg']}"
-        for error in exc.errors()
-    ]
+    fields = list(
+        dict.fromkeys(
+            field
+            for field in (_validation_field(error) for error in exc.errors())
+            if field
+        )
+    )
+    cart_fields = [field for field in fields if field == "items" or field.startswith("items.")]
+    if cart_fields and len(cart_fields) == len(fields):
+        return _error_response(
+            request,
+            422,
+            "invalid_cart",
+            "Cart contains invalid catalog choices",
+            cart_fields,
+        )
     return _error_response(request, 422, "validation_error", "Invalid request payload", fields)
 
 
@@ -148,20 +220,35 @@ def session_reset(request: Request, response: Response) -> SessionResponse:
 @app.get("/restaurants", response_model=List[Restaurant])
 @app.get("/v1/restaurants", response_model=List[Restaurant])
 def restaurants_index(
-    query: str = "",
-    cuisine: str = "",
+    q: str = Query(default="", max_length=100),
+    query: Optional[str] = Query(default=None, max_length=100),
+    cuisine: str = Query(default="", max_length=100),
     sort: str = Query(default="recommended", pattern="^(recommended|rating|fee)$"),
     open_now: bool = False,
 ) -> List[Restaurant]:
-    return search_restaurants(query=query, cuisine=cuisine, sort=sort, open_now=open_now)
+    snapshot = get_catalog_snapshot()
+    effective_query = q if q else (query or "")
+    return search_restaurants(
+        query=effective_query,
+        cuisine=cuisine,
+        sort=sort,
+        open_now=open_now,
+        snapshot=snapshot,
+    )
 
 
 @app.get("/restaurants/{restaurant_id}", response_model=Restaurant)
 @app.get("/v1/restaurants/{restaurant_id}", response_model=Restaurant)
 def restaurants_show(restaurant_id: str) -> Restaurant:
-    restaurant = get_restaurant(restaurant_id)
+    snapshot = get_catalog_snapshot()
+    restaurant = get_restaurant(restaurant_id, snapshot=snapshot)
     if not restaurant:
-        raise HTTPException(status_code=404, detail="Restaurant not found")
+        raise ApiContractError(
+            404,
+            "restaurant_not_found",
+            "Restaurant was not found",
+            [],
+        )
     return restaurant
 
 
@@ -177,10 +264,13 @@ def carts_upsert(
     guest: VerifiedGuest = Depends(verify_request_guest),
 ) -> CartResponse:
     require_allowed_origin(request)
-    errors = validate_cart_items(payload.items)
-    if errors:
-        raise HTTPException(status_code=400, detail="; ".join(errors))
-    return CartResponse.model_validate(write_cart(guest.guest_id, payload.items), from_attributes=True)
+    snapshot = get_catalog_snapshot()
+    validation = validate_cart_items(payload.items, snapshot=snapshot)
+    _invalid_cart(validation)
+    return CartResponse.model_validate(
+        write_cart(guest.guest_id, validation.items),
+        from_attributes=True,
+    )
 
 
 @app.delete("/v1/cart", response_model=CartResponse)
@@ -200,14 +290,25 @@ def orders_create(
 ) -> OrderResponse:
     require_allowed_origin(request)
     if not payload.cart_items:
-        raise HTTPException(status_code=400, detail="Cannot create order from an empty cart")
-    errors = validate_cart_items(payload.cart_items)
-    if errors:
-        raise HTTPException(status_code=400, detail="; ".join(errors))
-    pricing = calculate_cart_pricing(payload.cart_items, discount_cents=0, tip_cents=payload.tip_cents)
+        raise ApiContractError(422, "invalid_cart", "Cart cannot be empty", ["items"])
+
+    snapshot = get_catalog_snapshot()
+    validation = validate_cart_items(payload.cart_items, snapshot=snapshot)
+    _invalid_cart(validation)
+    pricing = calculate_cart_pricing(
+        validation.items,
+        discount_cents=0,
+        tip_cents=payload.tip_cents,
+        snapshot=snapshot,
+    )
     if pricing.subtotal_cents != payload.subtotal_cents:
-        raise HTTPException(status_code=400, detail="Submitted subtotal does not match authoritative pricing")
-    order = create_order(guest.guest_id, payload.cart_items, payload.subtotal_cents)
+        raise ApiContractError(
+            422,
+            "invalid_cart",
+            "Submitted subtotal does not match canonical catalog pricing",
+            ["subtotal_cents"],
+        )
+    order = create_order(guest.guest_id, validation.items, pricing.subtotal_cents)
     return OrderResponse.model_validate(order, from_attributes=True)
 
 
@@ -218,10 +319,29 @@ def cart_pricing(
     _guest: VerifiedGuest = Depends(verify_request_guest),
 ) -> CartPricingResponse:
     require_allowed_origin(request)
-    errors = validate_cart_items(payload.cart_items)
-    if errors:
-        raise HTTPException(status_code=400, detail="; ".join(errors))
-    return calculate_cart_pricing(payload.cart_items, payload.restaurant_id, payload.discount_cents, payload.tip_cents)
+    snapshot = get_catalog_snapshot()
+    validation = validate_cart_items(payload.cart_items, snapshot=snapshot)
+    _invalid_cart(validation)
+
+    if (
+        payload.restaurant_id
+        and validation.items
+        and payload.restaurant_id != validation.items[0].restaurant_id
+    ):
+        raise ApiContractError(
+            422,
+            "invalid_cart",
+            "Pricing restaurant does not match cart restaurant",
+            ["restaurant_id"],
+        )
+
+    return calculate_cart_pricing(
+        validation.items,
+        validation.items[0].restaurant_id if validation.items else None,
+        payload.discount_cents,
+        payload.tip_cents,
+        snapshot=snapshot,
+    )
 
 
 @app.get("/v1/orders", response_model=List[OrderResponse])

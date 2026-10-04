@@ -1,11 +1,20 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
-from .database import get_connection, postgres_available
+from .catalog import (
+    CatalogConfigurationError,
+    CatalogSnapshot,
+    CatalogValidationResult,
+    calculate_canonical_item_unit_cents,
+    canonicalize_cart_items,
+    search_snapshot,
+)
+from .database import database_url, get_connection, postgres_available
 from .models import Cart, CartItem, CartPricingResponse, MenuItem, Order, Restaurant
 from .redis_store import cart_key, redis_client
 
@@ -45,6 +54,7 @@ def _restaurant_from_row(row: Dict[str, Any], menu_items: List[MenuItem]) -> Res
         delivery_minutes=row["delivery_minutes"],
         delivery_fee_cents=row["delivery_fee_cents"],
         image_emoji=row["image_emoji"],
+        is_open=row.get("is_open", True),
         tags=row.get("tags") or [],
         menu=menu_items,
     )
@@ -58,97 +68,112 @@ def _menu_item_from_row(row: Dict[str, Any]) -> MenuItem:
         price_cents=row["price_cents"],
         image_emoji=row["image_emoji"],
         popular=row.get("popular", False),
+        available=row.get("available", True),
         modifier_groups=row.get("modifier_groups") or [],
     )
 
 
+def _catalog_uses_postgres() -> bool:
+    if database_url():
+        return True
+    if os.getenv("ORDERLY_FORCE_JSON_STORE") == "1":
+        return False
+    if os.getenv("ORDERLY_DATA_MODE", "").strip().lower() == "api":
+        raise CatalogConfigurationError("DATABASE_URL is required for the API-mode canonical catalog")
+    return False
+
+
 def list_restaurants() -> List[Restaurant]:
-    if postgres_available():
-        with get_connection() as conn:
-            restaurants = conn.execute("SELECT * FROM restaurants ORDER BY name").fetchall()
-            menu_rows = conn.execute("SELECT * FROM menu_items ORDER BY restaurant_id, name").fetchall()
-        grouped: Dict[str, List[MenuItem]] = {}
-        for row in menu_rows:
-            grouped.setdefault(row["restaurant_id"], []).append(_menu_item_from_row(row))
-        return [_restaurant_from_row(row, grouped.get(row["id"], [])) for row in restaurants]
+    if _catalog_uses_postgres():
+        try:
+            with get_connection() as conn:
+                restaurants = conn.execute("SELECT * FROM restaurants ORDER BY name").fetchall()
+                menu_rows = conn.execute("SELECT * FROM menu_items ORDER BY restaurant_id, name").fetchall()
+            grouped: Dict[str, List[MenuItem]] = {}
+            for row in menu_rows:
+                grouped.setdefault(row["restaurant_id"], []).append(_menu_item_from_row(row))
+            return [_restaurant_from_row(row, grouped.get(row["id"], [])) for row in restaurants]
+        except CatalogConfigurationError:
+            raise
+        except Exception as exc:
+            raise CatalogConfigurationError("Canonical catalog storage is unavailable") from exc
 
     return [Restaurant(**item) for item in read_json(RESTAURANTS_FILE, [])]
 
 
-def search_restaurants(query: str = "", cuisine: str = "", sort: str = "recommended", open_now: bool = False) -> List[Restaurant]:
-    normalized_query = query.strip().lower()
-    normalized_cuisine = cuisine.strip().lower()
-
-    def matches(restaurant: Restaurant) -> bool:
-        menu_match = any(normalized_query in item.name.lower() or normalized_query in item.description.lower() for item in restaurant.menu)
-        query_match = not normalized_query or normalized_query in restaurant.name.lower() or normalized_query in restaurant.cuisine.lower() or menu_match
-        cuisine_match = not normalized_cuisine or normalized_cuisine in {"all", "all pizza", "all restaurants"} or restaurant.cuisine.lower() == normalized_cuisine or normalized_cuisine in [tag.lower() for tag in restaurant.tags]
-        open_match = not open_now or len(restaurant.menu) > 0
-        return query_match and cuisine_match and open_match
-
-    filtered = [restaurant for restaurant in list_restaurants() if matches(restaurant)]
-    if sort == "rating":
-        return sorted(filtered, key=lambda restaurant: restaurant.rating, reverse=True)
-    if sort == "fee":
-        return sorted(filtered, key=lambda restaurant: restaurant.delivery_fee_cents)
-    return filtered
+def get_catalog_snapshot() -> CatalogSnapshot:
+    """Read and normalize the catalog once for one logical operation."""
+    try:
+        return CatalogSnapshot.build(list_restaurants())
+    except CatalogConfigurationError:
+        raise
+    except Exception as exc:
+        raise CatalogConfigurationError("Canonical catalog data is invalid") from exc
 
 
-def get_restaurant(restaurant_id: str) -> Optional[Restaurant]:
-    return next((restaurant for restaurant in list_restaurants() if restaurant.id == restaurant_id), None)
+def search_restaurants(
+    query: str = "",
+    cuisine: str = "",
+    sort: str = "recommended",
+    open_now: bool = False,
+    snapshot: Optional[CatalogSnapshot] = None,
+) -> List[Restaurant]:
+    catalog = snapshot or get_catalog_snapshot()
+    return search_snapshot(catalog, query=query, cuisine=cuisine, sort=sort, open_now=open_now)
 
 
-def get_menu_item(restaurant_id: str, menu_item_id: str) -> Optional[MenuItem]:
-    restaurant = get_restaurant(restaurant_id)
-    if not restaurant:
-        return None
-    return next((item for item in restaurant.menu if item.id == menu_item_id), None)
+def get_restaurant(
+    restaurant_id: str,
+    snapshot: Optional[CatalogSnapshot] = None,
+) -> Optional[Restaurant]:
+    catalog = snapshot or get_catalog_snapshot()
+    return catalog.restaurant(restaurant_id)
 
 
-def calculate_item_total(item: MenuItem, cart_item: CartItem) -> int:
-    modifier_total = 0
-    for modifier in cart_item.modifiers:
-        group = next((candidate for candidate in item.modifier_groups if candidate.id == modifier.group_id), None)
-        if not group:
-            continue
-        modifier_total += sum(option.price_delta_cents for option in group.options if option.id in modifier.option_ids)
-    return item.price_cents + modifier_total
+def get_menu_item(
+    restaurant_id: str,
+    menu_item_id: str,
+    snapshot: Optional[CatalogSnapshot] = None,
+) -> Optional[MenuItem]:
+    catalog = snapshot or get_catalog_snapshot()
+    return catalog.menu_item(restaurant_id, menu_item_id)
 
 
-def validate_cart_items(cart_items: List[CartItem]) -> List[str]:
-    errors: List[str] = []
-    restaurant_ids = {item.restaurant_id for item in cart_items}
-    if len(restaurant_ids) > 1:
-        errors.append("Cart can only contain items from one restaurant.")
-
-    for cart_item in cart_items:
-        item = get_menu_item(cart_item.restaurant_id, cart_item.menu_item_id)
-        if not item:
-            errors.append(f"{cart_item.name} is no longer available.")
-            continue
-        for group in item.modifier_groups:
-            selected = next((modifier.option_ids for modifier in cart_item.modifiers if modifier.group_id == group.id), [])
-            if group.required and len(selected) == 0:
-                errors.append(f"{item.name} needs a {group.name.lower()} selection.")
-            if group.min_selected is not None and len(selected) < group.min_selected:
-                errors.append(f"{item.name} needs at least {group.min_selected} {group.name.lower()} option.")
-            if group.max_selected is not None and len(selected) > group.max_selected:
-                errors.append(f"{item.name} allows at most {group.max_selected} {group.name.lower()} options.")
-            valid_option_ids = {option.id for option in group.options}
-            invalid = [option_id for option_id in selected if option_id not in valid_option_ids]
-            if invalid:
-                errors.append(f"{item.name} has invalid {group.name.lower()} options: {', '.join(invalid)}.")
-    return errors
+def calculate_item_total(
+    item: MenuItem,
+    cart_item: CartItem,
+    snapshot: Optional[CatalogSnapshot] = None,
+) -> int:
+    catalog = snapshot or get_catalog_snapshot()
+    canonical_item = catalog.menu_item(cart_item.restaurant_id, item.id)
+    if canonical_item is None:
+        raise ValueError("Menu item is not present in canonical catalog")
+    return calculate_canonical_item_unit_cents(catalog, cart_item)
 
 
-def calculate_cart_pricing(cart_items: List[CartItem], restaurant_id: Optional[str] = None, discount_cents: int = 0, tip_cents: int = 0) -> CartPricingResponse:
-    subtotal_cents = 0
-    for cart_item in cart_items:
-        item = get_menu_item(cart_item.restaurant_id, cart_item.menu_item_id)
-        line_unit = calculate_item_total(item, cart_item) if item else cart_item.base_price_cents
-        subtotal_cents += line_unit * cart_item.quantity
+def validate_cart_items(
+    cart_items: List[CartItem],
+    snapshot: Optional[CatalogSnapshot] = None,
+) -> CatalogValidationResult:
+    catalog = snapshot or get_catalog_snapshot()
+    return canonicalize_cart_items(cart_items, catalog)
 
-    restaurant = get_restaurant(restaurant_id or (cart_items[0].restaurant_id if cart_items else ""))
+
+def calculate_cart_pricing(
+    cart_items: List[CartItem],
+    restaurant_id: Optional[str] = None,
+    discount_cents: int = 0,
+    tip_cents: int = 0,
+    snapshot: Optional[CatalogSnapshot] = None,
+) -> CartPricingResponse:
+    catalog = snapshot or get_catalog_snapshot()
+    subtotal_cents = sum(
+        calculate_canonical_item_unit_cents(catalog, cart_item) * cart_item.quantity
+        for cart_item in cart_items
+    )
+
+    resolved_restaurant_id = restaurant_id or (cart_items[0].restaurant_id if cart_items else "")
+    restaurant = catalog.restaurant(resolved_restaurant_id)
     delivery_fee_cents = restaurant.delivery_fee_cents if restaurant and subtotal_cents > 0 else 0
     service_fee_cents = 249 if subtotal_cents > 0 else 0
     taxable_cents = max(subtotal_cents - discount_cents, 0)
@@ -166,16 +191,21 @@ def calculate_cart_pricing(cart_items: List[CartItem], restaurant_id: Optional[s
 
 
 def write_restaurants(restaurants: List[Restaurant]) -> None:
-    if postgres_available():
+    normalized_restaurants = CatalogSnapshot.build(restaurants).restaurants
+
+    if _catalog_uses_postgres():
         with get_connection() as conn:
             with conn.transaction():
                 conn.execute("DELETE FROM menu_items")
                 conn.execute("DELETE FROM restaurants")
-                for restaurant in restaurants:
+                for restaurant in normalized_restaurants:
                     conn.execute(
                         """
-                        INSERT INTO restaurants (id, name, cuisine, rating, delivery_minutes, delivery_fee_cents, image_emoji, tags)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s::jsonb)
+                        INSERT INTO restaurants (
+                            id, name, cuisine, rating, delivery_minutes,
+                            delivery_fee_cents, image_emoji, is_open, tags
+                        )
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb)
                         """,
                         (
                             restaurant.id,
@@ -185,14 +215,18 @@ def write_restaurants(restaurants: List[Restaurant]) -> None:
                             restaurant.delivery_minutes,
                             restaurant.delivery_fee_cents,
                             restaurant.image_emoji,
+                            restaurant.is_open,
                             json.dumps(restaurant.tags),
                         ),
                     )
                     for item in restaurant.menu:
                         conn.execute(
                             """
-                            INSERT INTO menu_items (id, restaurant_id, name, description, price_cents, image_emoji, popular, modifier_groups)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s::jsonb)
+                            INSERT INTO menu_items (
+                                id, restaurant_id, name, description, price_cents,
+                                image_emoji, popular, available, modifier_groups
+                            )
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb)
                             """,
                             (
                                 item.id,
@@ -202,12 +236,16 @@ def write_restaurants(restaurants: List[Restaurant]) -> None:
                                 item.price_cents,
                                 item.image_emoji,
                                 item.popular,
+                                item.available,
                                 json.dumps([group.model_dump(mode="json") for group in item.modifier_groups]),
                             ),
                         )
         return
 
-    write_json(RESTAURANTS_FILE, [restaurant.model_dump(mode="json") for restaurant in restaurants])
+    write_json(
+        RESTAURANTS_FILE,
+        [restaurant.model_dump(mode="json") for restaurant in normalized_restaurants],
+    )
 
 
 def get_cart(session_id: str) -> Cart:

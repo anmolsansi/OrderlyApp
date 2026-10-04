@@ -8,6 +8,7 @@
       {
         "id": "fixture-r1",
         "name": "Fixture cafe",
+        "cuisine": "Synthetic",
         "is_open": true,
         "delivery_fee_cents": 199,
         "menu": [
@@ -16,11 +17,89 @@
             "name": "Fixture meal",
             "price_cents": 1000,
             "available": true,
-            "modifier_groups": []
+            "modifier_groups": [
+              {
+                "id": "size",
+                "name": "Size",
+                "type": "single",
+                "required": true,
+                "min_selected": 1,
+                "max_selected": 1,
+                "default_option_id": "small",
+                "options": [
+                  {
+                    "id": "small",
+                    "name": "Small",
+                    "price_delta_cents": 0,
+                    "available": true
+                  },
+                  {
+                    "id": "large",
+                    "name": "Large",
+                    "price_delta_cents": 300,
+                    "available": true
+                  }
+                ]
+              },
+              {
+                "id": "extras",
+                "name": "Extras",
+                "type": "multiple",
+                "required": false,
+                "min_selected": 0,
+                "max_selected": 2,
+                "default_option_id": null,
+                "options": [
+                  {
+                    "id": "sauce",
+                    "name": "Sauce",
+                    "price_delta_cents": 100,
+                    "available": true
+                  },
+                  {
+                    "id": "sold-out",
+                    "name": "Sold out extra",
+                    "price_delta_cents": 200,
+                    "available": false
+                  }
+                ]
+              }
+            ]
           }
         ]
       }
-    ]
+    ],
+    "authority_case": {
+      "submitted": {
+        "id": "line-1",
+        "restaurant_id": "fixture-r1",
+        "menu_item_id": "fixture-i1",
+        "name": "Client supplied name",
+        "base_price_cents": 1,
+        "quantity": 1,
+        "modifiers": [
+          {
+            "group_id": "size",
+            "option_ids": ["large"]
+          }
+        ]
+      },
+      "canonical": {
+        "id": "line-1",
+        "restaurant_id": "fixture-r1",
+        "menu_item_id": "fixture-i1",
+        "name": "Fixture meal",
+        "base_price_cents": 1000,
+        "quantity": 1,
+        "modifiers": [
+          {
+            "group_id": "size",
+            "option_ids": ["large"]
+          }
+        ],
+        "unit_price_cents": 1300
+      }
+    }
   },
   "negative": [
     {
@@ -34,13 +113,143 @@
       }
     },
     {
-      "name": "invalid_cart",
+      "name": "unknown_menu_item",
       "status": 422,
       "error": {
         "code": "invalid_cart",
         "message": "Cart contains invalid catalog choices",
         "request_id": "synthetic-request-2",
         "fields": ["items.0.menu_item_id"]
+      }
+    },
+    {
+      "name": "closed_restaurant",
+      "status": 422,
+      "error": {
+        "code": "invalid_cart",
+        "message": "Cart contains invalid catalog choices",
+        "request_id": "synthetic-request-3",
+        "fields": ["items.0.restaurant_id"]
+      }
+    },
+    {
+      "name": "unavailable_item",
+      "status": 422,
+      "error": {
+        "code": "invalid_cart",
+        "message": "Cart contains invalid catalog choices",
+        "request_id": "synthetic-request-4",
+        "fields": ["items.0.menu_item_id"]
+      }
+    },
+    {
+      "name": "required_group_below_minimum",
+      "status": 422,
+      "error": {
+        "code": "invalid_cart",
+        "message": "Cart contains invalid catalog choices",
+        "request_id": "synthetic-request-5",
+        "fields": ["items.0.modifiers"]
+      }
+    },
+    {
+      "name": "group_above_maximum",
+      "status": 422,
+      "error": {
+        "code": "invalid_cart",
+        "message": "Cart contains invalid catalog choices",
+        "request_id": "synthetic-request-6",
+        "fields": ["items.0.modifiers.1.option_ids"]
+      }
+    },
+    {
+      "name": "duplicate_line_id",
+      "status": 422,
+      "error": {
+        "code": "invalid_cart",
+        "message": "Cart contains invalid catalog choices",
+        "request_id": "synthetic-request-7",
+        "fields": ["items.1.id"]
+      }
+    },
+    {
+      "name": "duplicate_modifier_group",
+      "status": 422,
+      "error": {
+        "code": "invalid_cart",
+        "message": "Cart contains invalid catalog choices",
+        "request_id": "synthetic-request-8",
+        "fields": ["items.0.modifiers.1.group_id"]
+      }
+    },
+    {
+      "name": "unknown_modifier_group",
+      "status": 422,
+      "error": {
+        "code": "invalid_cart",
+        "message": "Cart contains invalid catalog choices",
+        "request_id": "synthetic-request-9",
+        "fields": ["items.0.modifiers.0.group_id"]
+      }
+    },
+    {
+      "name": "duplicate_modifier_option",
+      "status": 422,
+      "error": {
+        "code": "invalid_cart",
+        "message": "Cart contains invalid catalog choices",
+        "request_id": "synthetic-request-10",
+        "fields": ["items.0.modifiers.0.option_ids.1"]
+      }
+    },
+    {
+      "name": "unknown_modifier_option",
+      "status": 422,
+      "error": {
+        "code": "invalid_cart",
+        "message": "Cart contains invalid catalog choices",
+        "request_id": "synthetic-request-11",
+        "fields": ["items.0.modifiers.0.option_ids.0"]
+      }
+    },
+    {
+      "name": "unavailable_modifier_option",
+      "status": 422,
+      "error": {
+        "code": "invalid_cart",
+        "message": "Cart contains invalid catalog choices",
+        "request_id": "synthetic-request-12",
+        "fields": ["items.0.modifiers.1.option_ids.0"]
+      }
+    },
+    {
+      "name": "mixed_restaurants",
+      "status": 422,
+      "error": {
+        "code": "invalid_cart",
+        "message": "Cart contains invalid catalog choices",
+        "request_id": "synthetic-request-13",
+        "fields": ["items.1.restaurant_id"]
+      }
+    },
+    {
+      "name": "quantity_out_of_range",
+      "status": 422,
+      "error": {
+        "code": "invalid_cart",
+        "message": "Cart contains invalid catalog choices",
+        "request_id": "synthetic-request-14",
+        "fields": ["items.0.quantity"]
+      }
+    },
+    {
+      "name": "special_instructions_too_long",
+      "status": 422,
+      "error": {
+        "code": "invalid_cart",
+        "message": "Cart contains invalid catalog choices",
+        "request_id": "synthetic-request-15",
+        "fields": ["items.0.special_instructions"]
       }
     }
   ]
