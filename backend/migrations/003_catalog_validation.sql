@@ -52,7 +52,18 @@ SET modifier_groups = COALESCE(
                     AND jsonb_array_length(COALESCE(groups.group_value -> 'options', '[]'::jsonb)) > 0 THEN
                  jsonb_build_object(
                    'default_option_id',
-                   groups.group_value -> 'options' -> 0 ->> 'id'
+                   (
+                     SELECT default_option.option_value ->> 'id'
+                     FROM jsonb_array_elements(
+                       COALESCE(groups.group_value -> 'options', '[]'::jsonb)
+                     ) WITH ORDINALITY AS default_option(option_value, option_ordinality)
+                     WHERE COALESCE(
+                       (default_option.option_value ->> 'available')::boolean,
+                       TRUE
+                     )
+                     ORDER BY default_option.option_ordinality
+                     LIMIT 1
+                   )
                  )
                ELSE '{}'::jsonb
              END
