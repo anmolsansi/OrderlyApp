@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 from .catalog import (
+    CatalogConfigurationError,
     CatalogSnapshot,
     CatalogValidationResult,
     calculate_canonical_item_unit_cents,
@@ -78,26 +79,36 @@ def _catalog_uses_postgres() -> bool:
     if os.getenv("ORDERLY_FORCE_JSON_STORE") == "1":
         return False
     if os.getenv("ORDERLY_DATA_MODE", "").strip().lower() == "api":
-        raise RuntimeError("DATABASE_URL is required for the API-mode canonical catalog")
+        raise CatalogConfigurationError("DATABASE_URL is required for the API-mode canonical catalog")
     return False
 
 
 def list_restaurants() -> List[Restaurant]:
     if _catalog_uses_postgres():
-        with get_connection() as conn:
-            restaurants = conn.execute("SELECT * FROM restaurants ORDER BY name").fetchall()
-            menu_rows = conn.execute("SELECT * FROM menu_items ORDER BY restaurant_id, name").fetchall()
-        grouped: Dict[str, List[MenuItem]] = {}
-        for row in menu_rows:
-            grouped.setdefault(row["restaurant_id"], []).append(_menu_item_from_row(row))
-        return [_restaurant_from_row(row, grouped.get(row["id"], [])) for row in restaurants]
+        try:
+            with get_connection() as conn:
+                restaurants = conn.execute("SELECT * FROM restaurants ORDER BY name").fetchall()
+                menu_rows = conn.execute("SELECT * FROM menu_items ORDER BY restaurant_id, name").fetchall()
+            grouped: Dict[str, List[MenuItem]] = {}
+            for row in menu_rows:
+                grouped.setdefault(row["restaurant_id"], []).append(_menu_item_from_row(row))
+            return [_restaurant_from_row(row, grouped.get(row["id"], [])) for row in restaurants]
+        except CatalogConfigurationError:
+            raise
+        except Exception as exc:
+            raise CatalogConfigurationError("Canonical catalog storage is unavailable") from exc
 
     return [Restaurant(**item) for item in read_json(RESTAURANTS_FILE, [])]
 
 
 def get_catalog_snapshot() -> CatalogSnapshot:
     """Read and normalize the catalog once for one logical operation."""
-    return CatalogSnapshot.build(list_restaurants())
+    try:
+        return CatalogSnapshot.build(list_restaurants())
+    except CatalogConfigurationError:
+        raise
+    except Exception as exc:
+        raise CatalogConfigurationError("Canonical catalog data is invalid") from exc
 
 
 def search_restaurants(
@@ -182,7 +193,7 @@ def calculate_cart_pricing(
 def write_restaurants(restaurants: List[Restaurant]) -> None:
     normalized_restaurants = CatalogSnapshot.build(restaurants).restaurants
 
-    if postgres_available():
+    if _catalog_uses_postgres():
         with get_connection() as conn:
             with conn.transaction():
                 conn.execute("DELETE FROM menu_items")
