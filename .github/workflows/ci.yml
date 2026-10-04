@@ -26,6 +26,8 @@ jobs:
         run: npm install --global npm@11.20.0
       - name: Install locked frontend dependencies
         run: npm ci --ignore-scripts
+      - name: Fail on high or critical dependency advisories
+        run: npm audit --audit-level=high
       - name: Validate contract fixtures in TypeScript
         run: npm run test:contracts
       - name: Run frontend unit suite
