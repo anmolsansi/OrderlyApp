@@ -8,28 +8,32 @@ async function mockBackendCartAndOrders(page: import('@playwright/test').Page) {
     const request = route.request();
     const url = new URL(request.url());
 
-    if (url.pathname.match(/^\/sessions\/[^/]+\/cart$/)) {
+    if (url.pathname === '/api/orderly/session' && request.method() === 'POST') {
+      await route.fulfill({ json: { schema_version: 1, expires_at: '2030-01-31T00:00:00Z' } });
+      return;
+    }
+
+    if (url.pathname === '/api/orderly/cart') {
       if (request.method() === 'GET') {
-        await route.fulfill({ json: { session_id: 'session-e2e', items: backendCart, updated_at: new Date().toISOString() } });
+        await route.fulfill({ json: { items: backendCart, updated_at: new Date().toISOString() } });
         return;
       }
       if (request.method() === 'PUT') {
         backendCart = JSON.parse(request.postData() ?? '{"items":[]}').items;
-        await route.fulfill({ json: { session_id: 'session-e2e', items: backendCart, updated_at: new Date().toISOString() } });
+        await route.fulfill({ json: { items: backendCart, updated_at: new Date().toISOString() } });
         return;
       }
       if (request.method() === 'DELETE') {
         backendCart = [];
-        await route.fulfill({ json: { session_id: 'session-e2e', items: backendCart, updated_at: new Date().toISOString() } });
+        await route.fulfill({ json: { items: backendCart, updated_at: new Date().toISOString() } });
         return;
       }
     }
 
-    if (url.pathname === '/orders' && request.method() === 'POST') {
+    if (url.pathname === '/api/orderly/orders' && request.method() === 'POST') {
       const payload = JSON.parse(request.postData() ?? '{}');
       const order = {
         id: 'ORD-BACKEND',
-        session_id: payload.session_id,
         cart_items: payload.cart_items,
         subtotal_cents: payload.subtotal_cents,
         status: 'Placed',
@@ -41,12 +45,12 @@ async function mockBackendCartAndOrders(page: import('@playwright/test').Page) {
       return;
     }
 
-    if (url.pathname === '/orders' && request.method() === 'GET') {
+    if (url.pathname === '/api/orderly/orders' && request.method() === 'GET') {
       await route.fulfill({ json: Object.values(backendOrders) });
       return;
     }
 
-    const orderMatch = url.pathname.match(/^\/orders\/([^/]+)$/);
+    const orderMatch = url.pathname.match(/^\/api\/orderly\/orders\/([^/]+)$/);
     if (orderMatch && request.method() === 'GET') {
       const order = backendOrders[orderMatch[1]];
       await route.fulfill(order ? { json: order } : { status: 404, json: { error: { code: 'not_found', message: 'Order not found' } } });
@@ -142,4 +146,45 @@ test('restaurant discovery shows sort, no-results, and error states', async ({ p
   await page.goto('/restaurants?state=error');
   await expect(page.locator('.discovery-state-card[role="alert"]')).toContainText(/temporarily unavailable/i);
   await expect(page.getByRole('link', { name: /retry/i })).toBeVisible();
+});
+
+test('guest session is HttpOnly, opaque, stable on bootstrap, and rotated on reset', async ({ page, context }) => {
+  await page.goto('/');
+
+  const first = await page.evaluate(async () => {
+    const response = await fetch('/api/orderly/session', { method: 'POST' });
+    return { status: response.status, body: await response.json() };
+  });
+  expect(first.status).toBe(200);
+  expect(first.body).toMatchObject({ schema_version: 1 });
+  expect(first.body).not.toHaveProperty('guest_id');
+  expect(first.body).not.toHaveProperty('session_id');
+
+  const [firstCookie] = (await context.cookies()).filter(cookie => cookie.name === 'orderly_guest');
+  expect(firstCookie).toBeTruthy();
+  expect(firstCookie.httpOnly).toBe(true);
+  expect(firstCookie.sameSite).toBe('Lax');
+  expect(firstCookie.path).toBe('/api/orderly');
+  expect(firstCookie.secure).toBe(false);
+  expect(firstCookie.value).toMatch(/^v1\.[A-Za-z0-9_-]+\.\d+\.[A-Za-z0-9_-]+$/);
+
+  await page.evaluate(async () => {
+    await fetch('/api/orderly/session', { method: 'POST' });
+  });
+  const [stableCookie] = (await context.cookies()).filter(cookie => cookie.name === 'orderly_guest');
+  expect(stableCookie.value).toBe(firstCookie.value);
+
+  const localStorageKeys = await page.evaluate(() => Object.keys(localStorage));
+  expect(localStorageKeys).not.toContain('orderlyapp.marketplace.backendSession.v1');
+
+  const reset = await page.evaluate(async () => {
+    const response = await fetch('/api/orderly/session/reset', { method: 'POST' });
+    return response.status;
+  });
+  expect(reset).toBe(200);
+
+  const [resetCookie] = (await context.cookies()).filter(cookie => cookie.name === 'orderly_guest');
+  expect(resetCookie.value).not.toBe(firstCookie.value);
+  expect(resetCookie.httpOnly).toBe(true);
+  expect(resetCookie.path).toBe('/api/orderly');
 });
