@@ -353,3 +353,31 @@ def test_different_keys_same_revision_yield_one_commit_and_one_cart_conflict(
     assert conflicts[0].current_cart.items == []
     assert c6_counts(owner_id) == (1, 1)
     assert current_cart(owner_id).revision == 2
+
+
+@pytest.mark.parametrize(
+    "failure_stage",
+    ["insert_order_snapshot", "insert_order_idempotency_record", "update_guest_cart_row"],
+)
+def test_checkout_precommit_failure_rolls_back_all_writes(
+    checkout_environment: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+    failure_stage: str,
+) -> None:
+    import app.order_service as order_service
+
+    owner_id = checkout_environment["owner_id"]
+    request = submission_for(owner_id)
+
+    def fail(*_args, **_kwargs):
+        raise RuntimeError(f"injected failure at {failure_stage}")
+
+    monkeypatch.setattr(order_service, failure_stage, fail)
+
+    with pytest.raises(order_service.OrderStorageUnavailableError):
+        order_service.submit_order(owner_id, IDEMPOTENCY_KEY, request)
+
+    cart = current_cart(owner_id)
+    assert cart.revision == 1
+    assert len(cart.items) == 1
+    assert c6_counts(owner_id) == (0, 0)
