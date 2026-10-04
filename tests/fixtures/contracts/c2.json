@@ -12,12 +12,40 @@
     "addresses": [
       {
         "id": "demo-address-1",
-        "label": "Demo address",
+        "label": "Demo home",
         "street": "100 Demo Street",
         "city": "Demo City",
         "state": "CA",
-        "postal_code": "94105"
+        "postalCode": "94105",
+        "deliveryInstructions": "Synthetic demo address only."
+      },
+      {
+        "id": "demo-address-2",
+        "label": "Demo office",
+        "street": "200 Sample Avenue",
+        "city": "Demo City",
+        "state": "CA",
+        "postalCode": "94107",
+        "deliveryInstructions": "Synthetic demo address only."
       }
+    ],
+    "storage_snapshot": {
+      "orderlyapp.marketplace.demoProfile.v1": "{\"schemaVersion\":1,\"id\":\"demo-profile-1\",\"name\":\"Demo visitor\",\"defaultAddressId\":\"demo-address-1\"}",
+      "orderlyapp.marketplace.demoAddresses.v1": "[{\"id\":\"demo-address-1\",\"label\":\"Demo home\",\"street\":\"100 Demo Street\",\"city\":\"Demo City\",\"state\":\"CA\",\"postalCode\":\"94105\",\"deliveryInstructions\":\"Synthetic demo address only.\"},{\"id\":\"demo-address-2\",\"label\":\"Demo office\",\"street\":\"200 Sample Avenue\",\"city\":\"Demo City\",\"state\":\"CA\",\"postalCode\":\"94107\",\"deliveryInstructions\":\"Synthetic demo address only.\"}]"
+    },
+    "legacy_keys_removed": [
+      "orderlyapp.marketplace.authAccounts.v1",
+      "orderlyapp.marketplace.session.v1",
+      "orderlyapp.marketplace.profile.v1",
+      "orderlyapp.marketplace.addresses.v1"
+    ],
+    "forbidden_fields": [
+      "password",
+      "email",
+      "phone",
+      "session_id",
+      "owner_id",
+      "guest_id"
     ]
   },
   "negative": [
@@ -32,12 +60,32 @@
       }
     },
     {
+      "name": "unknown_profile_field",
+      "status": 422,
+      "error": {
+        "code": "invalid_profile",
+        "message": "Demo profile is invalid",
+        "request_id": "synthetic-request-2",
+        "fields": ["profile"]
+      }
+    },
+    {
+      "name": "invalid_default_address",
+      "status": 422,
+      "error": {
+        "code": "invalid_profile",
+        "message": "Demo profile is invalid",
+        "request_id": "synthetic-request-3",
+        "fields": ["defaultAddressId"]
+      }
+    },
+    {
       "name": "storage_unavailable",
       "status": 0,
       "error": {
         "code": "storage_unavailable",
         "message": "Demo profile storage is unavailable",
-        "request_id": "synthetic-request-2",
+        "request_id": "synthetic-request-4",
         "fields": []
       }
     }
