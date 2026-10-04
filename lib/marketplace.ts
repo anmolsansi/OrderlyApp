@@ -1,4 +1,4 @@
-import { mockUserProfile } from './mock-data';
+import { mockUserProfile, restaurants as localDemoRestaurants } from './mock-data';
 import type { CartItem, CartItemModifier, MenuItem, Restaurant } from './types';
 
 export const quickFilters = ['All pizza', 'Fast delivery', 'Top rated', 'Wood fired', 'Open late', 'Open now'];
@@ -47,12 +47,27 @@ export const themeOptions = [
 
 export const favoriteRestaurantIds = mockUserProfile.favoriteRestaurantIds;
 
-export function getRestaurant(restaurants: Restaurant[], restaurantId: string): Restaurant | undefined {
-  return restaurants.find(restaurant => restaurant.id === restaurantId);
+// ST-08 callers always pass the selected canonical catalog. The one/two-argument
+// overloads preserve ST-09-owned legacy checkout/history consumers until their cutover.
+export function getRestaurant(restaurantId: string): Restaurant | undefined;
+export function getRestaurant(restaurants: Restaurant[], restaurantId: string): Restaurant | undefined;
+export function getRestaurant(restaurantsOrId: Restaurant[] | string, maybeRestaurantId?: string): Restaurant | undefined {
+  const catalog = Array.isArray(restaurantsOrId) ? restaurantsOrId : localDemoRestaurants;
+  const restaurantId = Array.isArray(restaurantsOrId) ? maybeRestaurantId : restaurantsOrId;
+  return catalog.find(restaurant => restaurant.id === restaurantId);
 }
 
-export function getMenuItem(restaurants: Restaurant[], restaurantId: string, itemId: string): MenuItem | undefined {
-  return getRestaurant(restaurants, restaurantId)?.menu.find(item => item.id === itemId);
+export function getMenuItem(restaurantId: string, itemId: string): MenuItem | undefined;
+export function getMenuItem(restaurants: Restaurant[], restaurantId: string, itemId: string): MenuItem | undefined;
+export function getMenuItem(
+  restaurantsOrId: Restaurant[] | string,
+  restaurantOrItemId: string,
+  maybeItemId?: string,
+): MenuItem | undefined {
+  const catalog = Array.isArray(restaurantsOrId) ? restaurantsOrId : localDemoRestaurants;
+  const restaurantId = Array.isArray(restaurantsOrId) ? restaurantOrItemId : restaurantsOrId;
+  const itemId = Array.isArray(restaurantsOrId) ? maybeItemId : restaurantOrItemId;
+  return catalog.find(restaurant => restaurant.id === restaurantId)?.menu.find(item => item.id === itemId);
 }
 
 function parseDeliveryMinutes(deliveryMinutes: string): number {
