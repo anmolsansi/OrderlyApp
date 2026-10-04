@@ -73,3 +73,31 @@ On Windows, activate the virtual environment using the shell-specific `.venv` ac
 The Postgres integration test may skip when run locally without `DATABASE_URL`/`ORDERLY_TEST_DATABASE_URL`. It does **not** skip in hosted CI. When `CI=true`, a missing database URL fails the fixture because hosted baseline evidence must prove a real database connection.
 
 The unit-style health check uses `ORDERLY_FORCE_JSON_STORE=1` and removes external database/Redis variables through pytest's monkeypatch fixture. That keeps the unit baseline isolated from a developer's services and credentials.
+
+## Chromium and product E2E verification
+
+Install the exact frontend dependency graph first, then provision Chromium:
+
+```bash
+npm ci --ignore-scripts
+npm run test:e2e:install
+npm run test:e2e
+```
+
+The hosted workflow deliberately separates two questions:
+
+1. `browser-runtime` installs Chromium and launches/closes a headless browser without running product assertions.
+2. `e2e` provisions its own Postgres database, applies migrations, seeds the current catalog, starts the FastAPI server, waits for `/health`, and then runs the existing Playwright product suite against the Next.js app.
+
+This separation is important. A Chromium install/launch failure is a foundation failure owned by ST-01. Once Chromium launches, a failed selector, navigation, cart, checkout, or receipt assertion is a product baseline failure and must remain visible for its owning stabilization ticket.
+
+The E2E job sets:
+
+- `NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000`
+- `NEXT_PUBLIC_APP_URL=http://127.0.0.1:3200`
+- `PLAYWRIGHT_BASE_URL=http://127.0.0.1:3200`
+- `NEXT_PUBLIC_VOICE_MODE=mock`
+- `NEXT_PUBLIC_CHECKOUT_MODE=mock`
+- `NEXT_PUBLIC_AUTH_PROVIDER=none`
+
+`playwright.config.ts` uses `PLAYWRIGHT_BASE_URL` when supplied and otherwise defaults to `http://127.0.0.1:3200`.
