@@ -1,4 +1,4 @@
-import { calculateCartTotals, mockUserProfile, restaurants as localDemoRestaurants } from './mock-data';
+import { restaurants as localDemoRestaurants } from './mock-data';
 import type {
   ApiErrorKind,
   ApiFailure,
@@ -10,7 +10,6 @@ import type {
   DataMode,
   MenuItem,
   ModifierGroup,
-  Order,
   OrderReceipt,
   OrderSubmission,
   ReceiptItemSnapshot,
@@ -636,7 +635,8 @@ export async function submitCheckoutOrder(
   if (getOrderlyDataMode() === 'local_demo') {
     return failure('validation', 'local_demo_checkout_unavailable', 'Checkout is unavailable in fixture preview');
   }
-  return requestJson(
+
+  const result = await requestJson(
     `${getApiBaseUrl()}/orders`,
     normalizeOrderReceipt,
     {
@@ -650,6 +650,11 @@ export async function submitCheckoutOrder(
     },
     true,
   );
+
+  if (!result.ok && (result.error.code === 'upstream_timeout' || result.error.code === 'upstream_unavailable')) {
+    return { ...result, kind: 'network' };
+  }
+  return result;
 }
 
 export async function fetchOrderReceipt(orderId: string): Promise<ApiResult<OrderReceipt>> {
@@ -730,27 +735,6 @@ export function clearCheckoutRecovery(storage: Storage): boolean {
   }
 }
 
-// Temporary compatibility adapters for ST-09-owned checkout code. ST-08 pages use
-// the typed revisioned functions above and never use local data as API fallback.
-export async function fetchCart(): Promise<CartItem[] | undefined> {
-  const result = await fetchRevisionedCart();
-  return result.ok ? result.data.items : undefined;
-}
-
-export async function saveCart(items: CartItem[]): Promise<boolean> {
-  const current = await fetchRevisionedCart();
-  if (!current.ok) return false;
-  const saved = await saveRevisionedCart(current.data.revision, items);
-  return saved.ok;
-}
-
-export async function clearBackendCart(): Promise<boolean> {
-  const current = await fetchRevisionedCart();
-  if (!current.ok) return false;
-  const cleared = await clearRevisionedCart(current.data.revision);
-  return cleared.ok;
-}
-
 export async function resetGuestSession(): Promise<boolean> {
   if (getOrderlyDataMode() === 'local_demo') return false;
   const bootstrap = await bootstrapGuestSession();
@@ -766,110 +750,4 @@ export async function resetGuestSession(): Promise<boolean> {
     sessionBootstrap = undefined;
     return false;
   }
-}
-
-interface ApiOrder {
-  id: string;
-  cart_items: Array<{
-    id: string;
-    restaurant_id: string;
-    menu_item_id: string;
-    name: string;
-    quantity: number;
-    base_price_cents: number;
-    modifiers: Array<{ group_id: string; option_ids: string[] }>;
-    special_instructions?: string;
-  }>;
-  subtotal_cents: number;
-  status: Order['status'];
-  created_at: string;
-}
-
-function normalizeLegacyOrderCartItem(input: ApiOrder['cart_items'][number]): CartItem {
-  return {
-    id: input.id,
-    restaurantId: input.restaurant_id,
-    menuItemId: input.menu_item_id,
-    name: input.name,
-    quantity: input.quantity,
-    basePriceCents: input.base_price_cents,
-    modifiers: input.modifiers.map(modifier => ({ groupId: modifier.group_id, optionIds: modifier.option_ids })),
-    specialInstructions: input.special_instructions,
-  };
-}
-
-export async function createBackendOrder(cartItems: CartItem[], subtotalCents: number, checkoutDetails?: CheckoutDetails): Promise<Order | undefined> {
-  if (getOrderlyDataMode() === 'local_demo') return undefined;
-  const responseResult = await fetchProtectedResponse(`${getApiBaseUrl()}/orders`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      cart_items: cartItems.map(item => ({
-        id: item.id,
-        restaurant_id: item.restaurantId,
-        menu_item_id: item.menuItemId,
-        name: item.name,
-        quantity: item.quantity,
-        base_price_cents: item.basePriceCents,
-        modifiers: item.modifiers.map(modifier => ({ group_id: modifier.groupId, option_ids: modifier.optionIds })),
-        special_instructions: item.specialInstructions,
-      })),
-      subtotal_cents: subtotalCents,
-      delivery_address: checkoutDetails?.street,
-      customer_name: checkoutDetails?.name,
-      customer_phone: checkoutDetails?.phone,
-      customer_email: checkoutDetails?.email,
-      tip_cents: checkoutDetails?.tipCents ?? 0,
-    }),
-  });
-  if (!responseResult.ok || !responseResult.data.ok) return undefined;
-  const payload = await readJson(responseResult.data);
-  if (!isRecord(payload) || typeof payload.id !== 'string' || !Array.isArray(payload.cart_items)) return undefined;
-  return normalizeOrder(payload as unknown as ApiOrder, checkoutDetails);
-}
-
-export async function fetchOrder(orderId: string): Promise<Order | undefined> {
-  if (getOrderlyDataMode() === 'local_demo') return undefined;
-  const responseResult = await fetchProtectedResponse(`${getApiBaseUrl()}/orders/${encodeURIComponent(orderId)}`, { cache: 'no-store' });
-  if (!responseResult.ok || !responseResult.data.ok) return undefined;
-  const payload = await readJson(responseResult.data);
-  if (!isRecord(payload)) return undefined;
-  return normalizeOrder(payload as unknown as ApiOrder);
-}
-
-export async function fetchOrders(): Promise<Order[] | undefined> {
-  if (getOrderlyDataMode() === 'local_demo') return undefined;
-  const responseResult = await fetchProtectedResponse(`${getApiBaseUrl()}/orders`, { cache: 'no-store' });
-  if (!responseResult.ok || !responseResult.data.ok) return undefined;
-  const payload = await readJson(responseResult.data);
-  if (!Array.isArray(payload)) return undefined;
-  return payload.map(order => normalizeOrder(order as ApiOrder));
-}
-
-function normalizeOrder(input: ApiOrder, checkoutDetails?: CheckoutDetails): Order {
-  const cartItems = input.cart_items.map(normalizeLegacyOrderCartItem);
-  const restaurantId = cartItems[0]?.restaurantId ?? localDemoRestaurants[0].id;
-  const totals = calculateCartTotals(cartItems, restaurantId);
-  const tipCents = checkoutDetails?.tipCents ?? 0;
-  const totalsWithTip = {
-    ...totals,
-    tipCents,
-    subtotalCents: input.subtotal_cents,
-    totalCents: totals.totalCents + tipCents,
-  };
-  const createdAt = new Date(input.created_at);
-  return {
-    id: input.id,
-    userId: mockUserProfile.id,
-    restaurantId,
-    cartItems,
-    totals: totalsWithTip,
-    subtotalCents: input.subtotal_cents,
-    status: input.status,
-    createdAt: createdAt.toISOString(),
-    updatedAt: createdAt.toISOString(),
-    deliveryAddressId: mockUserProfile.defaultAddressId,
-    estimatedDeliveryAt: new Date(createdAt.getTime() + 35 * 60 * 1000).toISOString(),
-    checkoutDetails,
-  };
 }
