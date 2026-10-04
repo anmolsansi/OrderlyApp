@@ -1,24 +1,39 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { MarketplaceNav } from '@/app/components/MarketplaceNav';
 import {
+  clearCheckoutRecovery,
   clearRevisionedCart,
   fetchCheckoutQuote,
   fetchRevisionedCart,
   getOrderlyDataMode,
+  loadCheckoutRecovery,
+  saveCheckoutRecovery,
   saveRevisionedCart,
+  submitCheckoutOrder,
 } from '@/lib/api';
 import { getDemoAddresses, getDemoProfile, SYNTHETIC_DEMO_ADDRESSES } from '@/lib/auth';
-import { updateCartItemQuantity } from '@/lib/cart';
+import { updateCartItemQuantity, validateCheckoutDetails } from '@/lib/cart';
 import { routes } from '@/lib/routes';
-import type { CheckoutDetails, CheckoutQuote, DemoAddress, RevisionedCart } from '@/lib/types';
+import type {
+  ApiResult,
+  CheckoutDetails,
+  CheckoutQuote,
+  CheckoutRecovery,
+  CheckoutState,
+  DemoAddress,
+  OrderReceipt,
+  RevisionedCart,
+} from '@/lib/types';
 import { formatMoney } from '@/lib/types';
 
 const SYNTHETIC_PHONE = '+1-555-0100';
 const SYNTHETIC_EMAIL = 'demo@example.test';
 const PROMOTION_CODE = 'DEMO5' as const;
+const CUSTOM_ADDRESS_ID = 'custom';
 
 function detailsFromAddress(name: string, address: DemoAddress, tipCents: number): CheckoutDetails {
   return {
@@ -36,7 +51,19 @@ function detailsFromAddress(name: string, address: DemoAddress, tipCents: number
   };
 }
 
+function matchingAddressId(addresses: DemoAddress[], details: CheckoutDetails): string {
+  return addresses.find(address => (
+    address.street === details.street
+    && (address.apartment ?? '') === (details.apartment ?? '')
+    && address.city === details.city
+    && address.state === details.state
+    && address.postalCode === details.postalCode
+    && (address.deliveryInstructions ?? '') === (details.deliveryInstructions ?? '')
+  ))?.id ?? CUSTOM_ADDRESS_ID;
+}
+
 export default function CheckoutPage() {
+  const router = useRouter();
   const mode = getOrderlyDataMode();
   const defaultAddress = SYNTHETIC_DEMO_ADDRESSES[0];
   const [cart, setCart] = useState<RevisionedCart | null>(null);
@@ -44,12 +71,16 @@ export default function CheckoutPage() {
   const [addresses, setAddresses] = useState<DemoAddress[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState(defaultAddress.id);
   const [profileAvailable, setProfileAvailable] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
   const [loading, setLoading] = useState(mode === 'api');
   const [loadError, setLoadError] = useState<string | null>(null);
   const [quoteError, setQuoteError] = useState<string | null>(null);
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [mutationPending, setMutationPending] = useState(false);
   const [quoteRefresh, setQuoteRefresh] = useState(0);
+  const [checkoutState, setCheckoutState] = useState<CheckoutState>('idle');
+  const [checkoutErrors, setCheckoutErrors] = useState<string[]>([]);
+  const [recovery, setRecovery] = useState<CheckoutRecovery | undefined>();
   const [details, setDetails] = useState<CheckoutDetails>(() => detailsFromAddress('Demo visitor', defaultAddress, 500));
   const deliberateInput = useRef(false);
   const quoteSequence = useRef(0);
@@ -58,20 +89,35 @@ export default function CheckoutPage() {
     if (mode !== 'api') return;
     let active = true;
     async function load(): Promise<void> {
+      const storedRecovery = loadCheckoutRecovery(window.sessionStorage);
+      if (storedRecovery) {
+        deliberateInput.current = true;
+        setRecovery(storedRecovery);
+        setCheckoutState('uncertain');
+        setDetails(storedRecovery.submission.checkout);
+      }
+
       const profileResult = getDemoProfile(window.localStorage);
       const addressesResult = getDemoAddresses(window.localStorage);
       if (!active) return;
 
-      if (!profileResult.ok || !addressesResult.ok) {
-        setLoadError(!profileResult.ok ? profileResult.message : addressesResult.ok ? null : addressesResult.message);
-        setLoading(false);
-        return;
+      let availableAddresses: DemoAddress[] = [];
+      if (!addressesResult.ok) {
+        setProfileError(addressesResult.message);
+      } else {
+        availableAddresses = addressesResult.value;
+        setAddresses(availableAddresses);
       }
 
-      const availableAddresses = addressesResult.value;
-      setAddresses(availableAddresses);
-      setProfileAvailable(Boolean(profileResult.value));
-      if (profileResult.value && !deliberateInput.current) {
+      if (!profileResult.ok) {
+        setProfileError(profileResult.message);
+      } else {
+        setProfileAvailable(Boolean(profileResult.value));
+      }
+
+      if (storedRecovery && availableAddresses.length > 0) {
+        setSelectedAddressId(matchingAddressId(availableAddresses, storedRecovery.submission.checkout));
+      } else if (profileResult.ok && profileResult.value && availableAddresses.length > 0 && !deliberateInput.current) {
         const address = availableAddresses.find(candidate => candidate.id === profileResult.value?.defaultAddressId) ?? availableAddresses[0];
         if (address) {
           setSelectedAddressId(address.id);
@@ -96,9 +142,18 @@ export default function CheckoutPage() {
   }, [mode]);
 
   useEffect(() => {
-    if (mode !== 'api' || loading || !cart || cart.items.length === 0) {
-      setQuote(null);
-      setQuoteError(null);
+    if (
+      mode !== 'api'
+      || loading
+      || !cart
+      || cart.items.length === 0
+      || checkoutState === 'submitting'
+      || checkoutState === 'uncertain'
+    ) {
+      if (checkoutState !== 'uncertain') {
+        setQuote(null);
+        setQuoteError(null);
+      }
       return;
     }
     const sequence = ++quoteSequence.current;
@@ -112,12 +167,20 @@ export default function CheckoutPage() {
       }
       setQuote(result.data);
     });
-  }, [cart, details.tipCents, loading, mode, quoteRefresh]);
+  }, [cart, checkoutState, details.tipCents, loading, mode, quoteRefresh]);
+
+  function resetResolvedCheckoutState(): void {
+    if (checkoutState === 'rejected') {
+      setCheckoutState('idle');
+      setCheckoutErrors([]);
+    }
+  }
 
   async function mutateCart(nextItems: RevisionedCart['items']): Promise<void> {
-    if (!cart || mutationPending) return;
+    if (!cart || mutationPending || checkoutState === 'submitting' || checkoutState === 'uncertain') return;
     setMutationPending(true);
     setMutationError(null);
+    resetResolvedCheckoutState();
     const result = await saveRevisionedCart(cart.revision, nextItems);
     if (result.ok) {
       setCart(result.data);
@@ -134,9 +197,10 @@ export default function CheckoutPage() {
   }
 
   async function clearCart(): Promise<void> {
-    if (!cart || mutationPending) return;
+    if (!cart || mutationPending || checkoutState === 'submitting' || checkoutState === 'uncertain') return;
     setMutationPending(true);
     setMutationError(null);
+    resetResolvedCheckoutState();
     const result = await clearRevisionedCart(cart.revision);
     if (result.ok) {
       setCart(result.data);
@@ -148,8 +212,13 @@ export default function CheckoutPage() {
   }
 
   function updateDetails(field: keyof CheckoutDetails, value: string): void {
+    if (checkoutState === 'submitting' || checkoutState === 'uncertain') return;
     deliberateInput.current = true;
+    resetResolvedCheckoutState();
     setMutationError(null);
+    if (['street', 'apartment', 'city', 'state', 'postalCode', 'deliveryInstructions'].includes(field)) {
+      setSelectedAddressId(CUSTOM_ADDRESS_ID);
+    }
     setDetails(previous => ({
       ...previous,
       [field]: field === 'tipCents' ? Number.parseInt(value, 10) || 0 : value,
@@ -157,15 +226,108 @@ export default function CheckoutPage() {
   }
 
   function selectAddress(addressId: string): void {
+    if (checkoutState === 'submitting' || checkoutState === 'uncertain') return;
     const address = addresses.find(candidate => candidate.id === addressId);
     if (!address) return;
     deliberateInput.current = true;
+    resetResolvedCheckoutState();
     setSelectedAddressId(address.id);
     setDetails(previous => ({
       ...detailsFromAddress(previous.name, address, previous.tipCents),
       phone: previous.phone,
       email: previous.email,
     }));
+  }
+
+  async function reconcileDefinitiveFailure(result: Extract<ApiResult<OrderReceipt>, { ok: false }>): Promise<void> {
+    clearCheckoutRecovery(window.sessionStorage);
+    setRecovery(undefined);
+    setCheckoutState('rejected');
+    setCheckoutErrors([result.error.message]);
+
+    if (result.error.currentCart) {
+      setCart(result.error.currentCart);
+      setQuoteRefresh(value => value + 1);
+      return;
+    }
+
+    if (result.error.code === 'cart_conflict' || result.error.code === 'catalog_changed') {
+      const currentCart = await fetchRevisionedCart();
+      if (currentCart.ok) setCart(currentCart.data);
+      setQuoteRefresh(value => value + 1);
+    }
+  }
+
+  async function resolveSubmission(result: ApiResult<OrderReceipt>): Promise<void> {
+    if (result.ok) {
+      clearCheckoutRecovery(window.sessionStorage);
+      setRecovery(undefined);
+      setCheckoutState('accepted');
+      setCheckoutErrors([]);
+      const durableCart = await fetchRevisionedCart();
+      if (durableCart.ok) setCart(durableCart.data);
+      router.push(routes.orderConfirmation(result.data.id));
+      return;
+    }
+
+    if (result.kind === 'network') {
+      setCheckoutState('uncertain');
+      setCheckoutErrors([
+        'We could not confirm whether the server saved this order. Retry the same order to safely recover the result.',
+      ]);
+      return;
+    }
+
+    await reconcileDefinitiveFailure(result);
+  }
+
+  async function placeOrder(): Promise<void> {
+    if (!cart || cart.items.length === 0 || !quote || !profileAvailable) return;
+    if (checkoutState === 'submitting' || checkoutState === 'uncertain') return;
+
+    const validation = validateCheckoutDetails(details);
+    if (!validation.ok) {
+      setCheckoutState('rejected');
+      setCheckoutErrors(validation.errors);
+      return;
+    }
+    if (quote.cartRevision !== cart.revision) {
+      setCheckoutState('rejected');
+      setCheckoutErrors(['Your basket changed after the quote. Review the latest quote before submitting.']);
+      setQuoteRefresh(value => value + 1);
+      return;
+    }
+
+    const nextRecovery: CheckoutRecovery = {
+      schemaVersion: 1,
+      idempotencyKey: window.crypto.randomUUID(),
+      submission: {
+        expectedRevision: quote.cartRevision,
+        catalogFingerprint: quote.catalogFingerprint,
+        checkout: { ...details, paymentMethod: 'mock' },
+        promotionCode: PROMOTION_CODE,
+      },
+    };
+
+    if (!saveCheckoutRecovery(window.sessionStorage, nextRecovery)) {
+      setCheckoutState('rejected');
+      setCheckoutErrors(['Checkout recovery storage is unavailable. No order was submitted.']);
+      return;
+    }
+
+    setRecovery(nextRecovery);
+    setCheckoutState('submitting');
+    setCheckoutErrors([]);
+    const result = await submitCheckoutOrder(nextRecovery.idempotencyKey, nextRecovery.submission);
+    await resolveSubmission(result);
+  }
+
+  async function retryUncertainOrder(): Promise<void> {
+    if (!recovery || checkoutState !== 'uncertain') return;
+    setCheckoutState('submitting');
+    setCheckoutErrors([]);
+    const result = await submitCheckoutOrder(recovery.idempotencyKey, recovery.submission);
+    await resolveSubmission(result);
   }
 
   if (mode === 'local_demo') {
@@ -186,6 +348,20 @@ export default function CheckoutPage() {
 
   const cartItems = cart?.items ?? [];
   const totals = quote?.totals;
+  const formLocked = checkoutState === 'submitting' || checkoutState === 'uncertain';
+  const canSubmit = Boolean(
+    !loading
+    && !loadError
+    && !profileError
+    && profileAvailable
+    && cart
+    && cart.items.length > 0
+    && quote
+    && quote.cartRevision === cart.revision
+    && !mutationPending
+    && checkoutState !== 'submitting'
+    && checkoutState !== 'uncertain'
+  );
 
   return (
     <main className="marketplace-page">
@@ -209,7 +385,7 @@ export default function CheckoutPage() {
                   <h1>Your cart</h1>
                 </div>
                 {cartItems.length > 0 && (
-                  <button className="ghost-button" type="button" disabled={mutationPending} onClick={() => void clearCart()}>
+                  <button className="ghost-button" type="button" disabled={mutationPending || formLocked} onClick={() => void clearCart()}>
                     Clear cart
                   </button>
                 )}
@@ -219,8 +395,8 @@ export default function CheckoutPage() {
                 <div className="empty-state"><p>Loading your server basket…</p></div>
               ) : cartItems.length === 0 ? (
                 <div className="empty-state">
-                  <p>Your cart is empty. Pick a restaurant and customize an item to start checkout.</p>
-                  <Link className="pill" href={routes.restaurants()}>Browse restaurants</Link>
+                  <p>{recovery ? 'The server basket is empty while this earlier checkout is unresolved.' : 'Your cart is empty. Pick a restaurant and customize an item to start checkout.'}</p>
+                  {!recovery && <Link className="pill" href={routes.restaurants()}>Browse restaurants</Link>}
                 </div>
               ) : (
                 <div className="cart-lines">
@@ -231,9 +407,9 @@ export default function CheckoutPage() {
                         {cartItem.specialInstructions && <p>Note: {cartItem.specialInstructions}</p>}
                       </div>
                       <div className="quantity-controls">
-                        <button type="button" disabled={mutationPending} onClick={() => void updateQuantity(cartItem.id, -1)}>-</button>
+                        <button type="button" disabled={mutationPending || formLocked} onClick={() => void updateQuantity(cartItem.id, -1)}>-</button>
                         <span>{cartItem.quantity}</span>
-                        <button type="button" disabled={mutationPending} onClick={() => void updateQuantity(cartItem.id, 1)}>+</button>
+                        <button type="button" disabled={mutationPending || formLocked} onClick={() => void updateQuantity(cartItem.id, 1)}>+</button>
                       </div>
                     </div>
                   ))}
@@ -242,8 +418,8 @@ export default function CheckoutPage() {
 
               {mutationError && <div className="validation-panel" role="alert"><p>{mutationError}</p><Link href={routes.cart}>Review current basket</Link></div>}
 
-              {cartItems.length > 0 && !totals && !quoteError && <div className="empty-state"><p>Getting the latest server quote…</p></div>}
-              {quoteError && (
+              {cartItems.length > 0 && !totals && !quoteError && checkoutState !== 'uncertain' && <div className="empty-state"><p>Getting the latest server quote…</p></div>}
+              {quoteError && checkoutState !== 'uncertain' && (
                 <div className="validation-panel" role="alert">
                   <p>{quoteError}</p>
                   <button className="ghost-button" type="button" onClick={() => setQuoteRefresh(value => value + 1)}>Retry quote</button>
@@ -265,7 +441,29 @@ export default function CheckoutPage() {
             <aside className="card payment-review-panel">
               <span className="kicker">Mock checkout</span>
               <h2>Confirm delivery details</h2>
-              {!profileAvailable && !loading && (
+
+              {checkoutState === 'uncertain' && recovery && (
+                <div className="validation-panel" role="alert">
+                  <strong>Order result is uncertain</strong>
+                  {checkoutErrors.map(error => <p key={error}>{error}</p>)}
+                  <p>Your original submission is locked until its result is reconciled.</p>
+                  <button className="checkout-button inline-action" type="button" onClick={() => void retryUncertainOrder()}>
+                    Retry same order safely
+                  </button>
+                </div>
+              )}
+
+              {checkoutState !== 'uncertain' && checkoutErrors.length > 0 && (
+                <div className="validation-panel" role="alert">
+                  {checkoutErrors.map(error => <p key={error}>{error}</p>)}
+                </div>
+              )}
+
+              {profileError && checkoutState !== 'uncertain' && (
+                <div className="validation-panel" role="alert"><p>{profileError}</p></div>
+              )}
+
+              {!profileAvailable && !profileError && !loading && checkoutState !== 'uncertain' && (
                 <div className="validation-panel" role="alert">
                   <p>Create a password-free demo profile before placing an order.</p>
                   <Link className="ghost-button" href={routes.signIn(routes.checkout)}>Create demo profile</Link>
@@ -275,7 +473,8 @@ export default function CheckoutPage() {
               {addresses.length > 0 && (
                 <label className="full-field">
                   <span>Saved synthetic address</span>
-                  <select value={selectedAddressId} onChange={event => selectAddress(event.target.value)}>
+                  <select value={selectedAddressId} disabled={formLocked} onChange={event => selectAddress(event.target.value)}>
+                    {selectedAddressId === CUSTOM_ADDRESS_ID && <option value={CUSTOM_ADDRESS_ID}>Edited address</option>}
                     {addresses.map(address => <option key={address.id} value={address.id}>{address.label}</option>)}
                   </select>
                 </label>
@@ -284,39 +483,39 @@ export default function CheckoutPage() {
               <div className="checkout-form-grid" aria-label="Mock checkout details">
                 <label>
                   <span>Name</span>
-                  <input type="text" value={details.name} onChange={event => updateDetails('name', event.target.value)} />
+                  <input disabled={formLocked} type="text" value={details.name} onChange={event => updateDetails('name', event.target.value)} />
                 </label>
                 <label>
                   <span>Phone</span>
-                  <input type="tel" value={details.phone} onChange={event => updateDetails('phone', event.target.value)} />
+                  <input disabled={formLocked} type="tel" value={details.phone} onChange={event => updateDetails('phone', event.target.value)} />
                 </label>
                 <label className="full-field">
                   <span>Email</span>
-                  <input type="email" value={details.email} onChange={event => updateDetails('email', event.target.value)} />
+                  <input disabled={formLocked} type="email" value={details.email} onChange={event => updateDetails('email', event.target.value)} />
                 </label>
                 <label className="full-field">
                   <span>Delivery address</span>
-                  <input type="text" value={details.street} onChange={event => updateDetails('street', event.target.value)} />
+                  <input disabled={formLocked} type="text" value={details.street} onChange={event => updateDetails('street', event.target.value)} />
                 </label>
                 <label>
                   <span>Unit</span>
-                  <input type="text" value={details.apartment ?? ''} onChange={event => updateDetails('apartment', event.target.value)} />
+                  <input disabled={formLocked} type="text" value={details.apartment ?? ''} onChange={event => updateDetails('apartment', event.target.value)} />
                 </label>
                 <label>
                   <span>City</span>
-                  <input type="text" value={details.city} onChange={event => updateDetails('city', event.target.value)} />
+                  <input disabled={formLocked} type="text" value={details.city} onChange={event => updateDetails('city', event.target.value)} />
                 </label>
                 <label>
                   <span>State</span>
-                  <input type="text" maxLength={2} value={details.state} onChange={event => updateDetails('state', event.target.value.toUpperCase())} />
+                  <input disabled={formLocked} type="text" maxLength={2} value={details.state} onChange={event => updateDetails('state', event.target.value.toUpperCase())} />
                 </label>
                 <label>
                   <span>ZIP code</span>
-                  <input type="text" value={details.postalCode} onChange={event => updateDetails('postalCode', event.target.value)} />
+                  <input disabled={formLocked} type="text" value={details.postalCode} onChange={event => updateDetails('postalCode', event.target.value)} />
                 </label>
                 <label>
                   <span>Tip</span>
-                  <select value={details.tipCents} onChange={event => updateDetails('tipCents', event.target.value)}>
+                  <select disabled={formLocked} value={details.tipCents} onChange={event => updateDetails('tipCents', event.target.value)}>
                     <option value="0">No tip</option>
                     <option value="300">$3.00</option>
                     <option value="500">$5.00</option>
@@ -325,7 +524,7 @@ export default function CheckoutPage() {
                 </label>
                 <label className="full-field">
                   <span>Delivery instructions</span>
-                  <textarea value={details.deliveryInstructions ?? ''} onChange={event => updateDetails('deliveryInstructions', event.target.value)} />
+                  <textarea disabled={formLocked} value={details.deliveryInstructions ?? ''} onChange={event => updateDetails('deliveryInstructions', event.target.value)} />
                 </label>
               </div>
 
@@ -333,12 +532,14 @@ export default function CheckoutPage() {
                 <div><span>Delivery address</span><strong>{details.street}</strong></div>
                 <div><span>Drop-off</span><strong>{details.deliveryInstructions || 'Hand to me'}</strong></div>
                 <div><span>Payment</span><strong>Mock payment, no card details collected</strong></div>
-                <div><span>Quote</span><strong>{quote ? `Revision ${quote.cartRevision}` : 'Waiting for server quote'}</strong></div>
+                <div><span>Quote</span><strong>{quote ? `Revision ${quote.cartRevision}` : recovery ? `Recovery revision ${recovery.submission.expectedRevision}` : 'Waiting for server quote'}</strong></div>
               </div>
 
-              <button className="checkout-button" type="button" disabled>
-                Checkout recovery wiring in progress
-              </button>
+              {checkoutState !== 'uncertain' && (
+                <button className="checkout-button" type="button" disabled={!canSubmit} onClick={() => void placeOrder()}>
+                  {checkoutState === 'submitting' ? 'Placing order…' : checkoutState === 'accepted' ? 'Order saved' : 'Place mock order'}
+                </button>
+              )}
             </aside>
           </section>
         )}
