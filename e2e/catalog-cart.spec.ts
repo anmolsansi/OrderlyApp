@@ -187,19 +187,21 @@ test('API discovery, customization, add, edit, and reload use canonical prices',
   await page.getByLabel('Large').check();
   await page.getByRole('button', { name: /add to cart/i }).click();
 
+  const cartLine = page.getByRole('article').filter({ hasText: 'Server Pie' });
+
   await expect(page).toHaveURL(/\/cart/);
   await expect(page.getByText('Server Pie', { exact: true })).toBeVisible();
-  await expect(page.getByText('$15.00', { exact: true })).toBeVisible();
+  await expect(cartLine.getByText('$15.00', { exact: true })).toBeVisible();
   await expect(page.getByText('$16.99', { exact: true })).toBeVisible();
   await expect(page.getByText(/basket revision 1/i)).toBeVisible();
 
   await page.getByRole('button', { name: '+', exact: true }).click();
   await expect(page.getByText(/basket revision 2/i)).toBeVisible();
-  await expect(page.getByText('$30.00', { exact: true })).toBeVisible();
+  await expect(cartLine.getByText('$30.00', { exact: true })).toBeVisible();
 
   await page.reload();
   await expect(page.getByText(/basket revision 2/i)).toBeVisible();
-  await expect(page.getByText('$30.00', { exact: true })).toBeVisible();
+  await expect(page.getByRole('article').filter({ hasText: 'Server Pie' }).getByText('$30.00', { exact: true })).toBeVisible();
   expect(harness.cart.revision).toBe(2);
   expect(harness.cart.items[0].quantity).toBe(2);
 });
@@ -232,7 +234,7 @@ test('two-tab style conflict shows current server basket and requires explicit r
 
   await page.getByRole('button', { name: /reapply my change/i }).click();
   await expect(page.getByText(/basket revision 3/i)).toBeVisible();
-  await expect(page.getByText('$24.00', { exact: true })).toBeVisible();
+  await expect(page.getByRole('article').filter({ hasText: 'Server Pie' }).getByText('$24.00', { exact: true })).toBeVisible();
   expect(harness.cart.items[0].quantity).toBe(2);
 });
 
