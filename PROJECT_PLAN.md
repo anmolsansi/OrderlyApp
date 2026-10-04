@@ -1,5 +1,7 @@
 # OrderlyApp — Restart Plan
 
+> **Superseded for execution — October 4, 2026:** Use [development.md](development.md) for the current stabilization scope, dependencies and acceptance gates. This restart plan is retained as historical context; voice is deferred in the current plan.
+
 ## Status
 Restarted from scratch. New development root: `~/Documents/Projects/OrderlyApp`
 
