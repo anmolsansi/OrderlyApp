@@ -51,3 +51,16 @@ def test_health_baseline_does_not_expose_connection_secrets(isolated_environment
     assert "redis_url" not in serialized
     assert "postgresql://" not in serialized
     assert "redis://" not in serialized
+
+
+def test_contract_negative_envelopes_are_explicit() -> None:
+    for contract in CONTRACT_NAMES:
+        fixture = load_contract_fixture(contract)
+        assert fixture["negative"], f"{contract} must define at least one negative case"
+        for case in fixture["negative"]:
+            assert case["name"]
+            error = case["error"]
+            assert error["code"]
+            assert error["message"]
+            assert error["request_id"].startswith("synthetic-request-")
+            assert isinstance(error["fields"], list)
