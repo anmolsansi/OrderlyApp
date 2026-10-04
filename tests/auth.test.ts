@@ -139,7 +139,10 @@ describe('C2 demo profile storage', () => {
     expect(clearCalls()).toBe(0);
   });
 
-  it('rejects tampered synthetic address storage', () => {
+  it('rejects malformed or tampered synthetic address storage', () => {
+    const malformed = createStorage({ [DEMO_ADDRESSES_STORAGE_KEY]: '{bad-json' }).storage;
+    expect(getDemoAddresses(malformed)).toMatchObject({ ok: false, code: 'invalid_profile' });
+
     const { storage } = createStorage({
       [DEMO_ADDRESSES_STORAGE_KEY]: JSON.stringify([
         { ...SYNTHETIC_DEMO_ADDRESSES[0], street: 'User supplied street' },
@@ -216,6 +219,27 @@ describe('C2 demo profile storage', () => {
     expect(storage.getItem(DEMO_ADDRESSES_STORAGE_KEY)).toBeNull();
     expect(storage.getItem(CART_STORAGE_KEY)).toContain('pizza');
     expect(storage.getItem(ORDER_HISTORY_STORAGE_KEY)).toContain('ORD-KEEP');
+  });
+
+  it('reports remove failures without clearing or claiming profile reset success', () => {
+    const profile = createDefaultDemoProfile('Keep Me');
+    const { storage, snapshot, clearCalls } = createStorage({
+      [DEMO_PROFILE_STORAGE_KEY]: JSON.stringify(profile),
+      [DEMO_ADDRESSES_STORAGE_KEY]: JSON.stringify(SYNTHETIC_DEMO_ADDRESSES),
+      [CART_STORAGE_KEY]: '[{"menuItemId":"pizza"}]',
+      [ORDER_HISTORY_STORAGE_KEY]: '[{"id":"ORD-KEEP"}]',
+    }, ['remove']);
+
+    expect(forgetDemoProfile(storage)).toEqual({
+      ok: false,
+      code: 'storage_unavailable',
+      message: 'Demo profile storage is unavailable',
+    });
+    expect(snapshot()[DEMO_PROFILE_STORAGE_KEY]).toBe(JSON.stringify(profile));
+    expect(snapshot()[DEMO_ADDRESSES_STORAGE_KEY]).toBe(JSON.stringify(SYNTHETIC_DEMO_ADDRESSES));
+    expect(snapshot()[CART_STORAGE_KEY]).toContain('pizza');
+    expect(snapshot()[ORDER_HISTORY_STORAGE_KEY]).toContain('ORD-KEEP');
+    expect(clearCalls()).toBe(0);
   });
 });
 
