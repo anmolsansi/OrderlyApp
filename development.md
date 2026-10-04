@@ -1599,7 +1599,7 @@ Summed implementation estimates are 35 engineer-days; integration/release verifi
 
 ## 15. Risks and true blockers
 
-**Current execution prerequisites, not unanswered product design:** Obtain working isolated PG/Docker or supported equivalent for ST-01/ST-11, matching browser runtime for real E2E, authorized workflow publication and hosted CI execution access for ST-01, and deployment read access for release proof. The previous audit could not run Docker or browser cases. These are not solved by saving a plan. Public deployment configuration/credentials and existing platform aggregate rate limiting must be verified before exposing checkout; if unavailable, keep public checkout disabled until the supported mechanism is configured. No spending or infrastructure purchase is authorized here.
+**Current execution prerequisites, not unanswered product design:** ST-01 has now verified isolated PostgreSQL, browser runtime, workflow publication, and hosted CI execution. ST-11 still requires its own isolation proof, and later release work still requires deployment read access. Public deployment configuration/credentials and existing platform aggregate rate limiting must be verified before exposing checkout; if unavailable, keep public checkout disabled until the supported mechanism is configured. No spending or infrastructure purchase is authorized here.
 
 **Data compatibility risk:** Legacy carts/orders have insufficient verified ownership and incomplete receipt fields. Preserve them offline and explicitly classify legacy data; do not migrate guesses into a new guest. For a demo this is a defensible reset of reachable data, but backups still matter.
 
@@ -1613,7 +1613,7 @@ No additional user product decision blocks this document: audience, profiles and
 
 ## 16. Delegation readiness report
 
-The guide is a **documented handoff plan**, not executable-ready work already tested. **Execution readiness: NOT READY until ST-01 establishes the environment and provider contracts are frozen at the relevant wave.** This protects the distinction between an implementation plan and completed setup. No issue creation is part of this deliverable.
+The guide remains a **staged handoff plan**. **Execution readiness: ST-01 is complete; later waves remain gated by their named dependencies and provider conformance/freeze points.** ST-01 now proves the executable baseline, while the remaining stabilization tickets are not complete until their own evidence gates pass.
 
 | Readiness check | Document state | Execution condition |
 |---|---|---|
@@ -1625,10 +1625,10 @@ The guide is a **documented handoff plan**, not executable-ready work already te
 | Retry, order, money, identity and retention semantics | Specified | Negative/concurrency/lifecycle tests pass |
 | DAG, start/merge/runtime semantics and shared-file release gates | Specified | Enforce wave ownership and documented handoff |
 | Every invariant and named defect has verification route | Specified in test matrix | Tests run on same candidate |
-| Backend runner and clean-install reproduction | Planned, not verified | ST-01 proves exact pinned commands |
+| Backend runner and clean-install reproduction | Verified by ST-01 | Preserve the pinned commands and rerun them on each assessed candidate |
 | Cross-component integration and public release proof | Planned, not verified | INT-01, INT-02, ST-13 and RELEASE-GATE pass |
-| True blockers/product ambiguity disclosed | Specified | Runtime/hosted access obtained; product scope already confirmed |
-| Completion/publishing claims truthful | No implementation/release claimed | Keep all unproved tasks Not completed |
+| True blockers/product ambiguity disclosed | ST-01 runtime/hosted baseline resolved; later deployment access remains | Product scope is confirmed; satisfy each later ticket's explicit runtime/release prerequisites |
+| Completion/publishing claims truthful | ST-01 implementation evidence is recorded; no release claimed | Keep ST-02 through ST-13 and release gates incomplete until their own proof passes |
 
 **Provider→consumer test:** Section6 records schema, positive/negative errors, fixtures, retry/security/lifecycle and conformance for every named interface. Section7 records each consumer gate. Consumers do not need private SQL or pricing code; they need the public contracts and executable fixtures ST-01 supplies. A provider may not freeze incomplete examples and ask the consumer to guess missing fields. If fixture/conformance fails, repair it in the provider before releasing the dependent wave.
 
