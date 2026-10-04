@@ -90,7 +90,7 @@ test('customizes an item, reviews payment, and places order', async ({ page }) =
   await expect(page).toHaveURL(/\/checkout/);
   await expect(page.getByText(/mock visa/i)).toBeVisible();
   await page.getByRole('complementary').getByRole('link', { name: /^sign in$/i }).click();
-  await page.locator('form').getByRole('button', { name: /^sign in$/i }).click();
+  await page.getByRole('button', { name: /use demo profile/i }).click();
   await expect(page).toHaveURL(/\/checkout/);
   await page.getByRole('button', { name: /place order/i }).click();
   await expect(page).toHaveURL(/\/order-confirmation\?orderId=ORD-BACKEND/);
@@ -100,26 +100,53 @@ test('customizes an item, reviews payment, and places order', async ({ page }) =
   await expect(page.getByText('ORD-BACKEND', { exact: true })).toBeVisible();
 });
 
-test('supports local signup, signout, and returning sign in', async ({ page }) => {
+test('demo profile is password-free and cannot silently change guest ownership', async ({ page, context }) => {
   await page.goto('/sign-in?next=%2Faccount');
-  await page.getByRole('button', { name: /^sign up$/i }).click();
-  await page.getByLabel('Name').fill('Riley Local');
-  await page.getByLabel('Email').fill('riley.local@example.com');
-  await page.getByLabel('Phone').fill('+1-555-0199');
-  await page.getByLabel('Password').fill('password-1');
-  await page.getByRole('button', { name: /create account/i }).click();
-  await expect(page).toHaveURL(/\/account/);
-  await expect(page.locator('input[value="Riley Local"]')).toBeVisible();
-  await page.getByRole('button', { name: /sign out/i }).click();
-  await expect(page.getByRole('heading', { name: /sign in required/i })).toBeVisible();
 
-  await page.getByRole('link', { name: /^sign in$/i }).click();
-  await page.getByLabel('Email').fill('riley.local@example.com');
-  await page.getByLabel('Password').fill('password-1');
-  await page.locator('form').getByRole('button', { name: /^sign in$/i }).click();
+  await page.evaluate(async () => {
+    await fetch('/api/orderly/session', { method: 'POST' });
+  });
+  const [guestBeforeProfile] = (await context.cookies()).filter(cookie => cookie.name === 'orderly_guest');
+  expect(guestBeforeProfile).toBeTruthy();
+
+  await expect(page.getByLabel(/password/i)).toHaveCount(0);
+  await expect(page.getByLabel(/email/i)).toHaveCount(0);
+  await page.getByLabel('Demo name').fill('Riley Demo');
+  await page.locator('input[name="demo-address"][value="demo-address-2"]').check();
+  await page.getByRole('button', { name: /use demo profile/i }).click();
 
   await expect(page).toHaveURL(/\/account/);
-  await expect(page.locator('input[value="Riley Local"]')).toBeVisible();
+  await expect(page.getByLabel('Display name')).toHaveValue('Riley Demo');
+  await page.getByLabel('Display name').fill('Riley Renamed');
+  await page.getByRole('button', { name: /save display name/i }).click();
+  await expect(page.getByRole('status')).toContainText(/demo name saved/i);
+
+  const [guestAfterRename] = (await context.cookies()).filter(cookie => cookie.name === 'orderly_guest');
+  expect(guestAfterRename.value).toBe(guestBeforeProfile.value);
+
+  await page.getByRole('button', { name: /forget local profile/i }).click();
+  await expect(page.getByRole('heading', { name: /choose a demo profile/i })).toBeVisible();
+  const [guestAfterForget] = (await context.cookies()).filter(cookie => cookie.name === 'orderly_guest');
+  expect(guestAfterForget.value).toBe(guestBeforeProfile.value);
+});
+
+test('explicit fresh guest reset rotates ownership separately from the demo profile', async ({ page, context }) => {
+  await page.goto('/sign-in?next=%2Faccount');
+  await page.getByRole('button', { name: /use demo profile/i }).click();
+  await expect(page).toHaveURL(/\/account/);
+
+  await page.evaluate(async () => {
+    await fetch('/api/orderly/session', { method: 'POST' });
+  });
+  const [guestBeforeReset] = (await context.cookies()).filter(cookie => cookie.name === 'orderly_guest');
+  expect(guestBeforeReset).toBeTruthy();
+
+  await page.getByRole('button', { name: /start fresh guest session/i }).click();
+  await expect(page.getByRole('heading', { name: /choose a demo profile/i })).toBeVisible();
+  await expect(page.getByRole('status')).toContainText(/fresh guest session started/i);
+
+  const [guestAfterReset] = (await context.cookies()).filter(cookie => cookie.name === 'orderly_guest');
+  expect(guestAfterReset.value).not.toBe(guestBeforeReset.value);
 });
 
 test('restaurant filters open the list page and checkout is disabled when empty', async ({ page }) => {
