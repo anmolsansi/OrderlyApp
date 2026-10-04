@@ -60,7 +60,7 @@ function sameOriginAllowed(request: NextRequest): boolean {
   return origin === request.nextUrl.origin;
 }
 
-async function boundedBody(request: NextRequest): Promise<Uint8Array | undefined> {
+async function boundedBody(request: NextRequest): Promise<ArrayBuffer | undefined> {
   if (!UNSAFE_METHODS.has(request.method)) return undefined;
 
   const contentLength = request.headers.get('content-length');
@@ -68,7 +68,7 @@ async function boundedBody(request: NextRequest): Promise<Uint8Array | undefined
     throw new RangeError('request_body_too_large');
   }
 
-  const data = new Uint8Array(await request.arrayBuffer());
+  const data = await request.arrayBuffer();
   if (data.byteLength > MAX_BODY_BYTES) {
     throw new RangeError('request_body_too_large');
   }
@@ -116,7 +116,7 @@ async function proxy(request: NextRequest, context: RouteContext): Promise<NextR
     return errorResponse(403, 'origin_forbidden', 'Request origin is not allowed');
   }
 
-  let body: Uint8Array | undefined;
+  let body: ArrayBuffer | undefined;
   try {
     body = await boundedBody(request);
   } catch (error) {
