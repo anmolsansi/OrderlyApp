@@ -101,3 +101,14 @@ The E2E job sets:
 - `NEXT_PUBLIC_AUTH_PROVIDER=none`
 
 `playwright.config.ts` uses `PLAYWRIGHT_BASE_URL` when supplied and otherwise defaults to `http://127.0.0.1:3200`.
+
+## Baseline failure ownership
+
+The hosted run for commit `ca097fe195f30fbab198e3b635a72b6d47788d41` passed WEB, BACKEND with real PostgreSQL, Chromium launch, and the existing product E2E suite. No current product assertion failure needs a downstream owner from this run.
+
+Two foundation problems were found and resolved inside ST-01 instead of being hidden:
+
+- The pre-ST-01 environment could not launch Playwright because Chromium was not provisioned. ST-01 now installs the browser explicitly and proves launch in its own job.
+- npm 10.9.9 crashed inside Arborist with `Cannot read properties of null (reading 'edgesOut')` while updating the old lockfile. The lock was regenerated with npm 11.20.0 and hosted CI uses that resolver consistently.
+
+Later stabilization tickets still own the product/security changes described in `development.md`. A green ST-01 baseline means the test foundation can execute; it does not mark ST-02 through ST-13 complete or claim the existing app is production-ready.
