@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Iterator
+from typing import Any
 
 import pytest
 
@@ -25,3 +26,12 @@ def postgres_database_url() -> str:
     if os.getenv("CI", "").lower() == "true":
         pytest.fail("Hosted backend baseline requires ORDERLY_TEST_DATABASE_URL or DATABASE_URL")
     pytest.skip("Postgres baseline requires ORDERLY_TEST_DATABASE_URL or DATABASE_URL")
+
+
+@pytest.fixture
+def postgres_connection(postgres_database_url: str) -> Iterator[Any]:
+    """Open and close one real database connection for integration baseline tests."""
+    import psycopg
+
+    with psycopg.connect(postgres_database_url) as connection:
+        yield connection
