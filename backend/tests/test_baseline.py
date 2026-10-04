@@ -82,3 +82,21 @@ def test_contract_fixtures_are_marked_synthetic_and_contain_no_secrets() -> None
         serialized = json.dumps(fixture).lower()
         for forbidden in FORBIDDEN_FIXTURE_TERMS:
             assert forbidden not in serialized, f"{contract} contains forbidden term: {forbidden}"
+
+
+def test_c5_mock_v1_fixture_total_is_1192_cents() -> None:
+    fixture = load_contract_fixture("C5")
+    quote_totals = fixture["positive"]["quote"]["totals"]
+    receipt_totals = fixture["positive"]["receipt"]["totals"]
+
+    expected_total = (
+        quote_totals["subtotal_cents"]
+        - quote_totals["discount_cents"]
+        + quote_totals["delivery_fee_cents"]
+        + quote_totals["service_fee_cents"]
+        + quote_totals["tax_cents"]
+        + quote_totals["tip_cents"]
+    )
+    assert expected_total == 1192
+    assert quote_totals["total_cents"] == expected_total
+    assert receipt_totals == quote_totals
