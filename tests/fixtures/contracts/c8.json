@@ -1,0 +1,32 @@
+{
+  "contract": "C8",
+  "schema_version": 1,
+  "synthetic": true,
+  "positive": {
+    "status": 200,
+    "body": {
+      "schema_version": 1,
+      "ready": true,
+      "mode": "api",
+      "source_sha": "fixture-source-sha"
+    }
+  },
+  "negative": [
+    {
+      "name": "postgres_unavailable",
+      "status": 503,
+      "body": {
+        "schema_version": 1,
+        "ready": false,
+        "mode": "api",
+        "source_sha": "fixture-source-sha"
+      },
+      "error": {
+        "code": "not_ready",
+        "message": "Required storage is unavailable",
+        "request_id": "synthetic-request-1",
+        "fields": []
+      }
+    }
+  ]
+}
