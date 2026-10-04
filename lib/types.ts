@@ -103,6 +103,24 @@ export interface CheckoutDetails {
   tipCents: number;
 }
 
+export interface DemoProfile {
+  schemaVersion: 1;
+  id: string;
+  name: string;
+  defaultAddressId: string;
+}
+
+export interface DemoAddress {
+  id: string;
+  label: string;
+  street: string;
+  apartment?: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  deliveryInstructions?: string;
+}
+
 export interface UserProfile {
   id: string;
   name: string;
