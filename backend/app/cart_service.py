@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
 
+from pydantic import ValidationError
+
 from .catalog import CatalogConfigurationError
 from .database import database_url, get_connection
 from .models import CartItemInput, CartResponse, RevisionedCart
@@ -73,7 +75,11 @@ def put_cart(
                 if current.revision != expected_revision:
                     raise CartConflictError(_response(current))
 
-                snapshot = get_catalog_snapshot(connection=conn)
+                try:
+                    snapshot = get_catalog_snapshot(connection=conn)
+                except ValidationError as exc:
+                    raise CatalogConfigurationError("Canonical catalog data is invalid") from exc
+
                 validation = validate_cart_input_items(items, snapshot)
                 if validation.issues:
                     raise CartValidationError(validation.fields)
