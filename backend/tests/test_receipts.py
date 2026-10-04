@@ -20,6 +20,7 @@ from app.pricing import (
     PricingStorageUnavailableError,
     build_receipt_snapshot,
     calculate_mock_v1_totals,
+    catalog_fingerprint,
     promotion_discount_cents,
     quote_current_cart,
     round_half_up_fraction,
@@ -210,6 +211,32 @@ def test_money_rounding_promotion_and_tip_boundaries(receipt_environment: dict[s
         CheckoutQuoteRequest.model_validate({**valid, "promotion_code": "SAVE5"})
 
 
+def test_catalog_fingerprint_covers_menu_policy_not_cart_only_fields(
+    receipt_environment: dict[str, str],
+    postgres_connection,
+) -> None:
+    owner_id = receipt_environment["owner_id"]
+    cart, snapshot = current_cart_and_catalog(owner_id)
+    original = catalog_fingerprint(snapshot, cart.items)
+
+    changed_cart_only = cart.items[0].model_copy(
+        update={
+            "id": "different-line-id",
+            "quantity": 2,
+            "special_instructions": "Different cart-only note",
+        }
+    )
+    assert catalog_fingerprint(snapshot, [changed_cart_only]) == original
+
+    postgres_connection.execute(
+        "UPDATE menu_items SET price_cents = price_cents + 1 WHERE id = %s",
+        (receipt_environment["item_id"],),
+    )
+    postgres_connection.commit()
+    _cart, changed_snapshot = current_cart_and_catalog(owner_id)
+    assert catalog_fingerprint(changed_snapshot, cart.items) != original
+
+
 def test_quote_uses_current_revision_and_maps_failures(receipt_environment: dict[str, str]) -> None:
     owner_id = receipt_environment["owner_id"]
     quote = quote_current_cart(
@@ -345,6 +372,8 @@ def test_owner_scoped_order_reads_are_newest_first_and_cursor_bounded(
     second_page = list_order_snapshots_for_owner(owner_id, cursor=receipts[1].id, limit=2)
     assert [receipt.id for receipt in second_page] == [receipts[0].id]
     assert get_order_snapshot_for_owner(foreign.id, owner_id) is None
+    with pytest.raises(ValueError):
+        list_order_snapshots_for_owner(owner_id, limit=51)
 
     app.dependency_overrides[verify_request_guest] = lambda: VerifiedGuest(
         guest_id=owner_id,
@@ -355,10 +384,17 @@ def test_owner_scoped_order_reads_are_newest_first_and_cursor_bounded(
     assert listed.status_code == 200
     assert [receipt["id"] for receipt in listed.json()] == [receipts[2].id, receipts[1].id]
 
+    over_limit = client.get("/v1/orders?limit=51")
+    assert over_limit.status_code == 422
+
     missing = client.get(f"/v1/orders/{foreign.id}")
     assert missing.status_code == 404
     assert missing.json()["error"]["code"] == "order_not_found"
     assert missing.json()["error"]["message"] == "Order not found"
+
+    malformed = client.get("/v1/orders/ORD-LEGACY-NOT-A-UUID")
+    assert malformed.status_code == 404
+    assert malformed.json()["error"]["code"] == "order_not_found"
 
     foreign_cursor = client.get(f"/v1/orders?cursor={foreign.id}")
     assert foreign_cursor.status_code == 422
