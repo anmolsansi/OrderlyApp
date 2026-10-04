@@ -286,6 +286,18 @@ def list_orders() -> List[Order]:
     return [Order(**item) for item in read_json(ORDERS_FILE, [])]
 
 
+def list_orders_for_session(session_id: str) -> List[Order]:
+    if postgres_available():
+        with get_connection() as conn:
+            rows = conn.execute(
+                "SELECT * FROM orders WHERE session_id = %s ORDER BY created_at DESC",
+                (session_id,),
+            ).fetchall()
+        return [Order(**_order_row_to_payload(row)) for row in rows]
+
+    return [order for order in list_orders() if order.session_id == session_id]
+
+
 def create_order(session_id: str, cart_items: List[CartItem], subtotal_cents: int) -> Order:
     order = Order(
         id=f"ORD-{uuid4().hex[:8].upper()}",
@@ -323,6 +335,21 @@ def create_order(session_id: str, cart_items: List[CartItem], subtotal_cents: in
 
 def get_order(order_id: str) -> Optional[Order]:
     return next((order for order in list_orders() if order.id == order_id), None)
+
+
+def get_order_for_session(order_id: str, session_id: str) -> Optional[Order]:
+    if postgres_available():
+        with get_connection() as conn:
+            row = conn.execute(
+                "SELECT * FROM orders WHERE id = %s AND session_id = %s",
+                (order_id, session_id),
+            ).fetchone()
+        return Order(**_order_row_to_payload(row)) if row else None
+
+    return next(
+        (order for order in list_orders() if order.id == order_id and order.session_id == session_id),
+        None,
+    )
 
 
 def _order_row_to_payload(row: Dict[str, Any]) -> Dict[str, Any]:
