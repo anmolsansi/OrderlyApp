@@ -41,6 +41,7 @@ export interface CustomizationGroup {
   required?: boolean;
   minSelected?: number;
   maxSelected?: number;
+  defaultOptionId?: string;
   options: CustomizationOption[];
 }
 
