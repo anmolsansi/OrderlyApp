@@ -1,0 +1,41 @@
+name: ST-01 Baseline
+
+on:
+  push:
+    branches:
+      - chore/st-01-baseline-contracts
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  refresh-lockfile:
+    if: github.event_name == 'push' && github.ref_name == 'chore/st-01-baseline-contracts'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Use Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Refresh package lock from package manifest
+        run: npm install --package-lock-only --ignore-scripts
+      - name: Commit generated lock when required
+        shell: bash
+        run: |
+          if git diff --quiet -- package-lock.json; then
+            echo "package-lock.json already matches package.json"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          git commit -m "chore(deps): refresh package lock [30/50] (#20)"
+          git push origin HEAD:${GITHUB_REF_NAME}
