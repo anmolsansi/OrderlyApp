@@ -4,7 +4,7 @@ import os
 from typing import List, Optional
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -38,11 +38,15 @@ from .models import (
     CheckoutQuoteRequest,
     CheckoutQuoteResponse,
     HealthResponse,
-    OrderCreateRequest,
-    OrderResponse,
+    OrderSubmissionRequest,
     ReceiptResponse,
     Restaurant,
     SessionResponse,
+)
+from .order_service import (
+    IdempotencyConflictError,
+    OrderStorageUnavailableError,
+    submit_order,
 )
 from .pricing import (
     CatalogChangedError,
@@ -55,7 +59,6 @@ from .store import (
     InvalidReceiptCursorError,
     ReceiptStorageUnavailableError,
     calculate_cart_pricing,
-    create_order,
     get_catalog_snapshot,
     get_order_snapshot_for_owner,
     get_restaurant,
@@ -94,7 +97,7 @@ app.add_middleware(
     allow_origins=cors_origins(),
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Accept", "Content-Type"],
+    allow_headers=["Accept", "Content-Type", "Idempotency-Key"],
 )
 
 
@@ -142,10 +145,12 @@ def _invalid_cart(result: CatalogValidationResult) -> None:
 
 def _validation_field(error: dict) -> str:
     location = [str(part) for part in error.get("loc", ())]
-    if location and location[0] in {"body", "query", "path"}:
+    if location and location[0] in {"body", "query", "path", "header"}:
         location = location[1:]
     if location and location[0] == "cart_items":
         location[0] = "items"
+    if len(location) == 1 and location[0].lower() == "idempotency-key":
+        location[0] = "idempotency_key"
     return ".".join(location)
 
 
@@ -207,6 +212,32 @@ def invalid_checkout_exception_handler(request: Request, exc: InvalidCheckoutErr
         "invalid_checkout",
         "Checkout details are invalid",
         exc.fields,
+    )
+
+
+@app.exception_handler(IdempotencyConflictError)
+def idempotency_conflict_exception_handler(
+    request: Request,
+    _exc: IdempotencyConflictError,
+) -> JSONResponse:
+    return _error_response(
+        request,
+        409,
+        "idempotency_conflict",
+        "Idempotency key was reused with a different payload",
+    )
+
+
+@app.exception_handler(OrderStorageUnavailableError)
+def order_storage_exception_handler(
+    request: Request,
+    _exc: OrderStorageUnavailableError,
+) -> JSONResponse:
+    return _error_response(
+        request,
+        503,
+        "storage_unavailable",
+        "Order storage is unavailable",
     )
 
 
@@ -289,7 +320,7 @@ def validation_exception_handler(request: Request, exc: RequestValidationError) 
             if field
         )
     )
-    if request.url.path == "/v1/checkout/quote":
+    if request.url.path in {"/v1/checkout/quote", "/v1/orders"}:
         return _error_response(
             request,
             422,
@@ -417,35 +448,19 @@ def checkout_quote(
     return quote_current_cart(guest.guest_id, payload)
 
 
-@app.post("/v1/orders", response_model=OrderResponse, status_code=201)
+@app.post("/v1/orders", response_model=ReceiptResponse, status_code=201)
 def orders_create(
     request: Request,
-    payload: OrderCreateRequest,
+    response: Response,
+    payload: OrderSubmissionRequest,
+    idempotency_key: str = Header(alias="Idempotency-Key", min_length=1, max_length=64),
     guest: VerifiedGuest = Depends(verify_request_guest),
-) -> OrderResponse:
-    """Legacy pre-C6 submit endpoint retained until ST-07 replaces it atomically."""
+) -> ReceiptResponse:
     require_allowed_origin(request)
-    if not payload.cart_items:
-        raise ApiContractError(422, "invalid_cart", "Cart cannot be empty", ["items"])
-
-    snapshot = get_catalog_snapshot()
-    validation = validate_cart_items(payload.cart_items, snapshot=snapshot)
-    _invalid_cart(validation)
-    pricing = calculate_cart_pricing(
-        validation.items,
-        discount_cents=0,
-        tip_cents=payload.tip_cents,
-        snapshot=snapshot,
-    )
-    if pricing.subtotal_cents != payload.subtotal_cents:
-        raise ApiContractError(
-            422,
-            "invalid_cart",
-            "Submitted subtotal does not match canonical catalog pricing",
-            ["subtotal_cents"],
-        )
-    order = create_order(guest.guest_id, validation.items, pricing.subtotal_cents)
-    return OrderResponse.model_validate(order, from_attributes=True)
+    result = submit_order(guest.guest_id, idempotency_key, payload)
+    if result.replayed:
+        response.status_code = 200
+    return result.receipt
 
 
 @app.post("/v1/cart/pricing", response_model=CartPricingResponse)
