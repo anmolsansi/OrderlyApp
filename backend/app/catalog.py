@@ -80,12 +80,25 @@ class CatalogSnapshot:
 def normalize_restaurant(restaurant: Restaurant) -> Restaurant:
     normalized_items: List[MenuItem] = []
     for item in restaurant.menu:
-        normalized_groups = [normalize_modifier_group(group, item.id) for group in item.modifier_groups]
+        normalized_groups: List[ModifierGroup] = []
+        seen_group_ids: set[str] = set()
+        for group in item.modifier_groups:
+            if group.id in seen_group_ids:
+                raise CatalogConfigurationError(
+                    f"Duplicate modifier group id {group.id} in menu item {item.id}"
+                )
+            seen_group_ids.add(group.id)
+            normalized_groups.append(normalize_modifier_group(group, item.id))
         normalized_items.append(item.model_copy(update={"modifier_groups": normalized_groups}))
     return restaurant.model_copy(update={"menu": normalized_items})
 
 
 def normalize_modifier_group(group: ModifierGroup, menu_item_id: str) -> ModifierGroup:
+    if not group.options:
+        raise CatalogConfigurationError(
+            f"Modifier group has no options in {menu_item_id}/{group.id}"
+        )
+
     option_ids: set[str] = set()
     for option in group.options:
         if option.id in option_ids:
@@ -132,7 +145,12 @@ def normalize_modifier_group(group: ModifierGroup, menu_item_id: str) -> Modifie
 
     min_selected = group.min_selected if group.min_selected is not None else (1 if group.required else 0)
     max_selected = group.max_selected if group.max_selected is not None else len(group.options)
-    if min_selected < 0 or max_selected < 0 or min_selected > max_selected:
+    if (
+        min_selected < 0
+        or max_selected < 0
+        or min_selected > max_selected
+        or max_selected > len(group.options)
+    ):
         raise CatalogConfigurationError(
             f"Invalid multiple-choice bounds in {menu_item_id}/{group.id}"
         )
