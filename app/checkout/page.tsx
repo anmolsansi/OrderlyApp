@@ -41,10 +41,24 @@ const SYNTHETIC_PHONE = '+1-555-0100';
 const SYNTHETIC_EMAIL = 'demo@example.test';
 const PROMOTION_CODE = 'DEMO5' as const;
 const CUSTOM_ADDRESS_ID = 'custom';
+const CHECKOUT_VALIDATION_SUMMARY_ID = 'checkout-validation-summary';
 
 type ProfileStorageError = {
   code: DemoProfileErrorCode;
   message: string;
+};
+
+type CheckoutValidationField = 'name' | 'phone' | 'email' | 'street' | 'city' | 'state' | 'postalCode' | 'tipCents';
+
+const CHECKOUT_ERROR_FIELDS: Record<string, CheckoutValidationField> = {
+  'Name is required.': 'name',
+  'Enter a valid phone number.': 'phone',
+  'Enter a valid email address.': 'email',
+  'Delivery address is required.': 'street',
+  'City is required.': 'city',
+  'State is required.': 'state',
+  'Enter a valid ZIP code.': 'postalCode',
+  'Tip cannot be negative.': 'tipCents',
 };
 
 function detailsFromAddress(name: string, address: DemoAddress, tipCents: number): CheckoutDetails {
@@ -74,6 +88,10 @@ function matchingAddressId(addresses: DemoAddress[], details: CheckoutDetails): 
   ))?.id ?? CUSTOM_ADDRESS_ID;
 }
 
+function validationFields(errors: string[]): CheckoutValidationField[] {
+  return errors.flatMap(error => CHECKOUT_ERROR_FIELDS[error] ? [CHECKOUT_ERROR_FIELDS[error]] : []);
+}
+
 export default function CheckoutPage() {
   const router = useRouter();
   const mode = getOrderlyDataMode();
@@ -94,10 +112,12 @@ export default function CheckoutPage() {
   const [quoteRefresh, setQuoteRefresh] = useState(0);
   const [checkoutState, setCheckoutState] = useState<CheckoutState>('idle');
   const [checkoutErrors, setCheckoutErrors] = useState<string[]>([]);
+  const [invalidFields, setInvalidFields] = useState<CheckoutValidationField[]>([]);
   const [recovery, setRecovery] = useState<CheckoutRecovery | undefined>();
   const [details, setDetails] = useState<CheckoutDetails>(() => detailsFromAddress('Demo visitor', defaultAddress, 500));
   const deliberateInput = useRef(false);
   const quoteSequence = useRef(0);
+  const validationSummaryRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (mode !== 'api') return;
@@ -194,6 +214,7 @@ export default function CheckoutPage() {
     if (checkoutState === 'rejected') {
       setCheckoutState('idle');
       setCheckoutErrors([]);
+      setInvalidFields([]);
     }
   }
 
@@ -264,18 +285,28 @@ export default function CheckoutPage() {
     setMutationPending(false);
   }
 
+  function refreshClientValidation(nextDetails: CheckoutDetails): void {
+    if (invalidFields.length === 0) return;
+    const validation = validateCheckoutDetails(nextDetails);
+    setCheckoutErrors(validation.errors);
+    setInvalidFields(validationFields(validation.errors));
+    if (validation.ok) setCheckoutState('idle');
+  }
+
   function updateDetails(field: keyof CheckoutDetails, value: string): void {
     if (checkoutState === 'submitting' || checkoutState === 'uncertain') return;
     deliberateInput.current = true;
-    resetResolvedCheckoutState();
     setMutationError(null);
+    if (invalidFields.length === 0) resetResolvedCheckoutState();
     if (['street', 'apartment', 'city', 'state', 'postalCode', 'deliveryInstructions'].includes(field)) {
       setSelectedAddressId(CUSTOM_ADDRESS_ID);
     }
-    setDetails(previous => ({
-      ...previous,
+    const nextDetails = {
+      ...details,
       [field]: field === 'tipCents' ? Number.parseInt(value, 10) || 0 : value,
-    }));
+    };
+    setDetails(nextDetails);
+    refreshClientValidation(nextDetails);
   }
 
   function selectAddress(addressId: string): void {
@@ -283,18 +314,26 @@ export default function CheckoutPage() {
     const address = addresses.find(candidate => candidate.id === addressId);
     if (!address) return;
     deliberateInput.current = true;
-    resetResolvedCheckoutState();
+    setMutationError(null);
+    if (invalidFields.length === 0) resetResolvedCheckoutState();
     setSelectedAddressId(address.id);
-    setDetails(previous => ({
-      ...detailsFromAddress(previous.name, address, previous.tipCents),
-      phone: previous.phone,
-      email: previous.email,
-    }));
+    const nextDetails = {
+      ...detailsFromAddress(details.name, address, details.tipCents),
+      phone: details.phone,
+      email: details.email,
+    };
+    setDetails(nextDetails);
+    refreshClientValidation(nextDetails);
+  }
+
+  function fieldError(field: CheckoutValidationField): string | undefined {
+    return checkoutErrors.find(error => CHECKOUT_ERROR_FIELDS[error] === field);
   }
 
   async function reconcileDefinitiveFailure(result: Extract<ApiResult<OrderReceipt>, { ok: false }>): Promise<void> {
     clearCheckoutRecovery(window.sessionStorage);
     setRecovery(undefined);
+    setInvalidFields([]);
     setCheckoutState('rejected');
     setCheckoutErrors([result.error.message]);
 
@@ -315,6 +354,7 @@ export default function CheckoutPage() {
     if (result.ok) {
       clearCheckoutRecovery(window.sessionStorage);
       setRecovery(undefined);
+      setInvalidFields([]);
       setCheckoutState('accepted');
       setCheckoutErrors([]);
       const durableCart = await fetchRevisionedCart();
@@ -323,6 +363,7 @@ export default function CheckoutPage() {
       return;
     }
 
+    setInvalidFields([]);
     if (result.kind === 'network') {
       setCheckoutState('uncertain');
       setCheckoutErrors([
@@ -335,15 +376,18 @@ export default function CheckoutPage() {
   }
 
   async function placeOrder(): Promise<void> {
-    if (!cart || cart.items.length === 0 || !quote || !profileAvailable) return;
+    if (!cart || cart.items.length === 0 || !quote || !profileAvailable || profileError || loadError || mutationPending) return;
     if (checkoutState === 'submitting' || checkoutState === 'uncertain') return;
 
     const validation = validateCheckoutDetails(details);
     if (!validation.ok) {
       setCheckoutState('rejected');
       setCheckoutErrors(validation.errors);
+      setInvalidFields(validationFields(validation.errors));
+      window.requestAnimationFrame(() => validationSummaryRef.current?.focus());
       return;
     }
+    setInvalidFields([]);
     if (quote.cartRevision !== cart.revision) {
       setCheckoutState('rejected');
       setCheckoutErrors(['Your basket changed after the quote. Review the latest quote before submitting.']);
@@ -507,7 +551,14 @@ export default function CheckoutPage() {
               )}
 
               {checkoutState !== 'uncertain' && checkoutErrors.length > 0 && (
-                <div className="validation-panel" role="alert">
+                <div
+                  id={CHECKOUT_VALIDATION_SUMMARY_ID}
+                  className="validation-panel"
+                  ref={validationSummaryRef}
+                  role="alert"
+                  tabIndex={-1}
+                >
+                  <strong>{invalidFields.length > 0 ? 'Check the highlighted checkout fields' : 'Checkout needs attention'}</strong>
                   {checkoutErrors.map(error => <p key={error}>{error}</p>)}
                 </div>
               )}
@@ -541,62 +592,142 @@ export default function CheckoutPage() {
               )}
 
               {addresses.length > 0 && (
-                <label className="full-field">
+                <label className="full-field" htmlFor="checkout-saved-address">
                   <span>Saved synthetic address</span>
-                  <select value={selectedAddressId} disabled={formLocked} onChange={event => selectAddress(event.target.value)}>
+                  <select id="checkout-saved-address" value={selectedAddressId} disabled={formLocked} onChange={event => selectAddress(event.target.value)}>
                     {selectedAddressId === CUSTOM_ADDRESS_ID && <option value={CUSTOM_ADDRESS_ID}>Edited address</option>}
                     {addresses.map(address => <option key={address.id} value={address.id}>{address.label}</option>)}
                   </select>
                 </label>
               )}
 
-              <div className="checkout-form-grid" aria-label="Mock checkout details">
-                <label>
+              <form
+                id="checkout-form"
+                className="checkout-form-grid"
+                aria-label="Mock checkout details"
+                onSubmit={event => {
+                  event.preventDefault();
+                  void placeOrder();
+                }}
+              >
+                <label htmlFor="checkout-name">
                   <span>Name</span>
-                  <input disabled={formLocked} type="text" value={details.name} onChange={event => updateDetails('name', event.target.value)} />
+                  <input
+                    id="checkout-name"
+                    aria-describedby={fieldError('name') ? 'checkout-name-error' : undefined}
+                    aria-invalid={fieldError('name') ? true : undefined}
+                    disabled={formLocked}
+                    type="text"
+                    value={details.name}
+                    onChange={event => updateDetails('name', event.target.value)}
+                  />
+                  {fieldError('name') && <span id="checkout-name-error">{fieldError('name')}</span>}
                 </label>
-                <label>
+                <label htmlFor="checkout-phone">
                   <span>Phone</span>
-                  <input disabled={formLocked} type="tel" value={details.phone} onChange={event => updateDetails('phone', event.target.value)} />
+                  <input
+                    id="checkout-phone"
+                    aria-describedby={fieldError('phone') ? 'checkout-phone-error' : undefined}
+                    aria-invalid={fieldError('phone') ? true : undefined}
+                    disabled={formLocked}
+                    type="tel"
+                    value={details.phone}
+                    onChange={event => updateDetails('phone', event.target.value)}
+                  />
+                  {fieldError('phone') && <span id="checkout-phone-error">{fieldError('phone')}</span>}
                 </label>
-                <label className="full-field">
+                <label className="full-field" htmlFor="checkout-email">
                   <span>Email</span>
-                  <input disabled={formLocked} type="email" value={details.email} onChange={event => updateDetails('email', event.target.value)} />
+                  <input
+                    id="checkout-email"
+                    aria-describedby={fieldError('email') ? 'checkout-email-error' : undefined}
+                    aria-invalid={fieldError('email') ? true : undefined}
+                    disabled={formLocked}
+                    type="email"
+                    value={details.email}
+                    onChange={event => updateDetails('email', event.target.value)}
+                  />
+                  {fieldError('email') && <span id="checkout-email-error">{fieldError('email')}</span>}
                 </label>
-                <label className="full-field">
+                <label className="full-field" htmlFor="checkout-street">
                   <span>Delivery address</span>
-                  <input disabled={formLocked} type="text" value={details.street} onChange={event => updateDetails('street', event.target.value)} />
+                  <input
+                    id="checkout-street"
+                    aria-describedby={fieldError('street') ? 'checkout-street-error' : undefined}
+                    aria-invalid={fieldError('street') ? true : undefined}
+                    disabled={formLocked}
+                    type="text"
+                    value={details.street}
+                    onChange={event => updateDetails('street', event.target.value)}
+                  />
+                  {fieldError('street') && <span id="checkout-street-error">{fieldError('street')}</span>}
                 </label>
-                <label>
+                <label htmlFor="checkout-apartment">
                   <span>Unit</span>
-                  <input disabled={formLocked} type="text" value={details.apartment ?? ''} onChange={event => updateDetails('apartment', event.target.value)} />
+                  <input id="checkout-apartment" disabled={formLocked} type="text" value={details.apartment ?? ''} onChange={event => updateDetails('apartment', event.target.value)} />
                 </label>
-                <label>
+                <label htmlFor="checkout-city">
                   <span>City</span>
-                  <input disabled={formLocked} type="text" value={details.city} onChange={event => updateDetails('city', event.target.value)} />
+                  <input
+                    id="checkout-city"
+                    aria-describedby={fieldError('city') ? 'checkout-city-error' : undefined}
+                    aria-invalid={fieldError('city') ? true : undefined}
+                    disabled={formLocked}
+                    type="text"
+                    value={details.city}
+                    onChange={event => updateDetails('city', event.target.value)}
+                  />
+                  {fieldError('city') && <span id="checkout-city-error">{fieldError('city')}</span>}
                 </label>
-                <label>
+                <label htmlFor="checkout-state">
                   <span>State</span>
-                  <input disabled={formLocked} type="text" maxLength={2} value={details.state} onChange={event => updateDetails('state', event.target.value.toUpperCase())} />
+                  <input
+                    id="checkout-state"
+                    aria-describedby={fieldError('state') ? 'checkout-state-error' : undefined}
+                    aria-invalid={fieldError('state') ? true : undefined}
+                    disabled={formLocked}
+                    type="text"
+                    maxLength={2}
+                    value={details.state}
+                    onChange={event => updateDetails('state', event.target.value.toUpperCase())}
+                  />
+                  {fieldError('state') && <span id="checkout-state-error">{fieldError('state')}</span>}
                 </label>
-                <label>
+                <label htmlFor="checkout-postal-code">
                   <span>ZIP code</span>
-                  <input disabled={formLocked} type="text" value={details.postalCode} onChange={event => updateDetails('postalCode', event.target.value)} />
+                  <input
+                    id="checkout-postal-code"
+                    aria-describedby={fieldError('postalCode') ? 'checkout-postal-code-error' : undefined}
+                    aria-invalid={fieldError('postalCode') ? true : undefined}
+                    disabled={formLocked}
+                    type="text"
+                    value={details.postalCode}
+                    onChange={event => updateDetails('postalCode', event.target.value)}
+                  />
+                  {fieldError('postalCode') && <span id="checkout-postal-code-error">{fieldError('postalCode')}</span>}
                 </label>
-                <label>
+                <label htmlFor="checkout-tip">
                   <span>Tip</span>
-                  <select disabled={formLocked} value={details.tipCents} onChange={event => updateDetails('tipCents', event.target.value)}>
+                  <select
+                    id="checkout-tip"
+                    aria-describedby={fieldError('tipCents') ? 'checkout-tip-error' : undefined}
+                    aria-invalid={fieldError('tipCents') ? true : undefined}
+                    disabled={formLocked}
+                    value={details.tipCents}
+                    onChange={event => updateDetails('tipCents', event.target.value)}
+                  >
                     <option value="0">No tip</option>
                     <option value="300">$3.00</option>
                     <option value="500">$5.00</option>
                     <option value="800">$8.00</option>
                   </select>
+                  {fieldError('tipCents') && <span id="checkout-tip-error">{fieldError('tipCents')}</span>}
                 </label>
-                <label className="full-field">
+                <label className="full-field" htmlFor="checkout-instructions">
                   <span>Delivery instructions</span>
-                  <textarea disabled={formLocked} value={details.deliveryInstructions ?? ''} onChange={event => updateDetails('deliveryInstructions', event.target.value)} />
+                  <textarea id="checkout-instructions" disabled={formLocked} value={details.deliveryInstructions ?? ''} onChange={event => updateDetails('deliveryInstructions', event.target.value)} />
                 </label>
-              </div>
+              </form>
 
               <div className="payment-breakdown">
                 <div><span>Delivery address</span><strong>{details.street}</strong></div>
@@ -606,7 +737,7 @@ export default function CheckoutPage() {
               </div>
 
               {checkoutState !== 'uncertain' && (
-                <button className="checkout-button" type="button" disabled={!canSubmit} onClick={() => void placeOrder()}>
+                <button className="checkout-button" type="submit" form="checkout-form" disabled={!canSubmit}>
                   {checkoutState === 'submitting' ? 'Placing order…' : checkoutState === 'accepted' ? 'Order saved' : 'Place mock order'}
                 </button>
               )}
