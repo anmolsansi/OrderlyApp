@@ -24,6 +24,7 @@ import {
   type DemoProfileErrorCode,
 } from '@/lib/auth';
 import { updateCartItemQuantity, validateCheckoutDetails } from '@/lib/cart';
+import { getBrowserStorage } from '@/lib/browser-storage';
 import { routes } from '@/lib/routes';
 import type {
   ApiResult,
@@ -104,6 +105,7 @@ export default function CheckoutPage() {
   const [profileError, setProfileError] = useState<ProfileStorageError | null>(null);
   const [ephemeralProfile, setEphemeralProfile] = useState(false);
   const [profileReloadKey, setProfileReloadKey] = useState(0);
+  const [recoveryStorageAvailable, setRecoveryStorageAvailable] = useState(false);
   const [loading, setLoading] = useState(mode === 'api');
   const [loadError, setLoadError] = useState<string | null>(null);
   const [quoteError, setQuoteError] = useState<string | null>(null);
@@ -128,7 +130,9 @@ export default function CheckoutPage() {
       setEphemeralProfile(false);
       setAddresses([]);
 
-      const storedRecovery = loadCheckoutRecovery(window.sessionStorage);
+      const recoveryStorage = getBrowserStorage('sessionStorage');
+      setRecoveryStorageAvailable(Boolean(recoveryStorage));
+      const storedRecovery = loadCheckoutRecovery(recoveryStorage);
       if (storedRecovery) {
         deliberateInput.current = true;
         setRecovery(storedRecovery);
@@ -136,8 +140,8 @@ export default function CheckoutPage() {
         setDetails(storedRecovery.submission.checkout);
       }
 
-      const profileResult = getDemoProfile(window.localStorage);
-      const addressesResult = getDemoAddresses(window.localStorage);
+      const profileResult = getDemoProfile(getBrowserStorage('localStorage'));
+      const addressesResult = getDemoAddresses(getBrowserStorage('localStorage'));
       if (!active) return;
 
       if (!addressesResult.ok) {
@@ -223,7 +227,7 @@ export default function CheckoutPage() {
   }
 
   function clearInvalidProfileStorage(): void {
-    const result = forgetDemoProfile(window.localStorage);
+    const result = forgetDemoProfile(getBrowserStorage('localStorage'));
     if (!result.ok) {
       setProfileError({ code: result.code, message: result.message });
       return;
@@ -331,7 +335,7 @@ export default function CheckoutPage() {
   }
 
   async function reconcileDefinitiveFailure(result: Extract<ApiResult<OrderReceipt>, { ok: false }>): Promise<void> {
-    clearCheckoutRecovery(window.sessionStorage);
+    clearCheckoutRecovery(getBrowserStorage('sessionStorage'));
     setRecovery(undefined);
     setInvalidFields([]);
     setCheckoutState('rejected');
@@ -352,7 +356,7 @@ export default function CheckoutPage() {
 
   async function resolveSubmission(result: ApiResult<OrderReceipt>): Promise<void> {
     if (result.ok) {
-      clearCheckoutRecovery(window.sessionStorage);
+      clearCheckoutRecovery(getBrowserStorage('sessionStorage'));
       setRecovery(undefined);
       setInvalidFields([]);
       setCheckoutState('accepted');
@@ -378,6 +382,7 @@ export default function CheckoutPage() {
   async function placeOrder(): Promise<void> {
     if (!cart || cart.items.length === 0 || !quote || !profileAvailable || profileError || loadError || mutationPending) return;
     if (checkoutState === 'submitting' || checkoutState === 'uncertain') return;
+    if (!recoveryStorageAvailable) return;
 
     const validation = validateCheckoutDetails(details);
     if (!validation.ok) {
@@ -406,7 +411,7 @@ export default function CheckoutPage() {
       },
     };
 
-    if (!saveCheckoutRecovery(window.sessionStorage, nextRecovery)) {
+    if (!saveCheckoutRecovery(getBrowserStorage('sessionStorage'), nextRecovery)) {
       setCheckoutState('rejected');
       setCheckoutErrors(['Checkout recovery storage is unavailable. No order was submitted.']);
       return;
@@ -447,7 +452,7 @@ export default function CheckoutPage() {
   const totals = quote?.totals;
   const formLocked = checkoutState === 'submitting' || checkoutState === 'uncertain';
   const canSubmit = Boolean(
-    !loading
+    recoveryStorageAvailable && !loading
     && !loadError
     && !profileError
     && profileAvailable
@@ -560,6 +565,12 @@ export default function CheckoutPage() {
                 >
                   <strong>{invalidFields.length > 0 ? 'Check the highlighted checkout fields' : 'Checkout needs attention'}</strong>
                   {checkoutErrors.map(error => <p key={error}>{error}</p>)}
+                </div>
+              )}
+
+              {!loading && !recoveryStorageAvailable && (
+                <div className="validation-panel" role="alert">
+                  <p>Checkout recovery storage is unavailable. Enable browser storage and reload before submitting. No new order was submitted.</p>
                 </div>
               )}
 

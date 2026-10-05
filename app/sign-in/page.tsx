@@ -11,6 +11,7 @@ import {
   saveDemoProfile,
   type DemoProfileErrorCode,
 } from '@/lib/auth';
+import { getBrowserStorage } from '@/lib/browser-storage';
 import { routes, sanitizeAppReturnPath } from '@/lib/routes';
 import type { DemoAddress, DemoProfile } from '@/lib/types';
 
@@ -31,7 +32,7 @@ function SignInContent() {
     setError('');
     setErrorCode(null);
 
-    const profileResult = getDemoProfile(window.localStorage);
+    const profileResult = getDemoProfile(getBrowserStorage('localStorage'));
     if (!profileResult.ok) {
       setError(profileResult.message);
       setErrorCode(profileResult.code);
@@ -39,7 +40,7 @@ function SignInContent() {
       return;
     }
 
-    const addressResult = getDemoAddresses(window.localStorage);
+    const addressResult = getDemoAddresses(getBrowserStorage('localStorage'));
     if (!addressResult.ok) {
       setError(addressResult.message);
       setErrorCode(addressResult.code);
@@ -62,7 +63,7 @@ function SignInContent() {
     const candidate = profile
       ? { ...profile, name, defaultAddressId }
       : createDefaultDemoProfile(name, defaultAddressId);
-    const result = saveDemoProfile(window.localStorage, candidate);
+    const result = saveDemoProfile(getBrowserStorage('localStorage'), candidate);
 
     if (!result.ok) {
       setError(result.message);
@@ -77,7 +78,7 @@ function SignInContent() {
   }
 
   function forgetLocalProfile(): void {
-    const result = forgetDemoProfile(window.localStorage);
+    const result = forgetDemoProfile(getBrowserStorage('localStorage'));
     if (!result.ok) {
       setError(result.message);
       setErrorCode(result.code);
@@ -92,7 +93,7 @@ function SignInContent() {
   }
 
   function clearInvalidLocalProfile(): void {
-    const result = forgetDemoProfile(window.localStorage);
+    const result = forgetDemoProfile(getBrowserStorage('localStorage'));
     if (!result.ok) {
       setError(result.message);
       setErrorCode(result.code);

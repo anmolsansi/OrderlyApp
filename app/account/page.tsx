@@ -13,6 +13,7 @@ import {
   type DemoProfileErrorCode,
 } from '@/lib/auth';
 import { resetGuestSession } from '@/lib/api';
+import { getBrowserStorage } from '@/lib/browser-storage';
 import { routes } from '@/lib/routes';
 import type { DemoAddress, DemoProfile } from '@/lib/types';
 
@@ -34,7 +35,7 @@ export default function AccountPage() {
     setMessage('');
     setEphemeralProfile(false);
 
-    const profileResult = getDemoProfile(window.localStorage);
+    const profileResult = getDemoProfile(getBrowserStorage('localStorage'));
     if (!profileResult.ok) {
       setError(profileResult.message);
       setErrorCode(profileResult.code);
@@ -42,7 +43,7 @@ export default function AccountPage() {
       return;
     }
 
-    const addressResult = getDemoAddresses(window.localStorage);
+    const addressResult = getDemoAddresses(getBrowserStorage('localStorage'));
     if (!addressResult.ok) {
       setError(addressResult.message);
       setErrorCode(addressResult.code);
@@ -85,7 +86,7 @@ export default function AccountPage() {
       return;
     }
 
-    const result = saveDemoProfile(window.localStorage, nextProfile);
+    const result = saveDemoProfile(getBrowserStorage('localStorage'), nextProfile);
     if (!result.ok) {
       setError(result.message);
       setErrorCode(result.code);
@@ -119,7 +120,7 @@ export default function AccountPage() {
       return;
     }
 
-    const result = forgetDemoProfile(window.localStorage);
+    const result = forgetDemoProfile(getBrowserStorage('localStorage'));
     if (!result.ok) {
       setError(result.message);
       setErrorCode(result.code);
@@ -131,7 +132,7 @@ export default function AccountPage() {
   }
 
   function clearInvalidLocalProfile(): void {
-    const result = forgetDemoProfile(window.localStorage);
+    const result = forgetDemoProfile(getBrowserStorage('localStorage'));
     if (!result.ok) {
       setError(result.message);
       setErrorCode(result.code);
@@ -155,7 +156,7 @@ export default function AccountPage() {
     }
 
     if (!ephemeralProfile) {
-      const forgotten = forgetDemoProfile(window.localStorage);
+      const forgotten = forgetDemoProfile(getBrowserStorage('localStorage'));
       if (!forgotten.ok) {
         setErrorCode(forgotten.code);
         setError('Fresh guest session started, but the local demo profile could not be cleared. Retry after enabling browser storage.');
