@@ -87,6 +87,23 @@ def _require_postgres() -> None:
         raise OrderStorageUnavailableError()
 
 
+def _lock_active_guest(conn: object, owner_id: str) -> None:
+    """Serialize checkout with ST-11 retention cleanup for the same guest."""
+    row = conn.execute(  # type: ignore[attr-defined]
+        """
+        SELECT id
+        FROM guest_sessions
+        WHERE id = %s
+          AND revoked_at IS NULL
+          AND expires_at > now()
+        FOR UPDATE
+        """,
+        (owner_id,),
+    ).fetchone()
+    if row is None:
+        raise OrderStorageUnavailableError()
+
+
 def submit_order(
     owner_id: str,
     idempotency_key: str,
@@ -100,6 +117,11 @@ def submit_order(
     try:
         with get_connection() as conn:
             with conn.transaction():
+                # Retention cleanup locks the same guest row. If cleanup won the race
+                # after request authentication, this transaction fails safely before
+                # touching idempotency, receipts, or the cart.
+                _lock_active_guest(conn, owner_id)
+
                 # Replay must be checked before cart validation because a successful first
                 # request has already cleared the cart when an unknown-outcome retry arrives.
                 existing = get_order_idempotency_record(conn, owner_id, normalized_key)
