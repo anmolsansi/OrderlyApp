@@ -4,12 +4,16 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { MarketplaceNav } from '@/app/components/MarketplaceNav';
 import {
+  SYNTHETIC_DEMO_ADDRESSES,
+  createDefaultDemoProfile,
   forgetDemoProfile,
   getDemoAddresses,
   getDemoProfile,
   saveDemoProfile,
+  type DemoProfileErrorCode,
 } from '@/lib/auth';
 import { resetGuestSession } from '@/lib/api';
+import { getBrowserStorage } from '@/lib/browser-storage';
 import { routes } from '@/lib/routes';
 import type { DemoAddress, DemoProfile } from '@/lib/types';
 
@@ -19,23 +23,30 @@ export default function AccountPage() {
   const [addresses, setAddresses] = useState<DemoAddress[]>([]);
   const [draftName, setDraftName] = useState('');
   const [error, setError] = useState('');
+  const [errorCode, setErrorCode] = useState<DemoProfileErrorCode | null>(null);
   const [message, setMessage] = useState('');
   const [resettingGuest, setResettingGuest] = useState(false);
+  const [ephemeralProfile, setEphemeralProfile] = useState(false);
 
   function loadProfile(): void {
     setStatus('loading');
     setError('');
+    setErrorCode(null);
+    setMessage('');
+    setEphemeralProfile(false);
 
-    const profileResult = getDemoProfile(window.localStorage);
+    const profileResult = getDemoProfile(getBrowserStorage('localStorage'));
     if (!profileResult.ok) {
       setError(profileResult.message);
+      setErrorCode(profileResult.code);
       setStatus('error');
       return;
     }
 
-    const addressResult = getDemoAddresses(window.localStorage);
+    const addressResult = getDemoAddresses(getBrowserStorage('localStorage'));
     if (!addressResult.ok) {
       setError(addressResult.message);
+      setErrorCode(addressResult.code);
       setStatus('error');
       return;
     }
@@ -50,12 +61,35 @@ export default function AccountPage() {
     loadProfile();
   }, []);
 
+  function useTemporaryProfile(): void {
+    const temporaryAddresses = SYNTHETIC_DEMO_ADDRESSES.map(address => ({ ...address }));
+    const temporaryProfile = createDefaultDemoProfile();
+    setProfile(temporaryProfile);
+    setAddresses(temporaryAddresses);
+    setDraftName(temporaryProfile.name);
+    setError('');
+    setErrorCode(null);
+    setMessage('Using a temporary demo profile. Changes on this page will not be saved after you leave or reload.');
+    setEphemeralProfile(true);
+    setStatus('ready');
+  }
+
   function persistProfile(nextProfile: DemoProfile, successMessage: string): void {
     setError('');
+    setErrorCode(null);
     setMessage('');
-    const result = saveDemoProfile(window.localStorage, nextProfile);
+
+    if (ephemeralProfile) {
+      setProfile(nextProfile);
+      setDraftName(nextProfile.name);
+      setMessage('Temporary profile updated for this page only. Nothing was saved to browser storage.');
+      return;
+    }
+
+    const result = saveDemoProfile(getBrowserStorage('localStorage'), nextProfile);
     if (!result.ok) {
       setError(result.message);
+      setErrorCode(result.code);
       return;
     }
     setProfile(result.value);
@@ -75,10 +109,21 @@ export default function AccountPage() {
 
   function forgetLocalProfile(): void {
     setError('');
+    setErrorCode(null);
     setMessage('');
-    const result = forgetDemoProfile(window.localStorage);
+
+    if (ephemeralProfile) {
+      setProfile(undefined);
+      setDraftName('');
+      setEphemeralProfile(false);
+      setMessage('Temporary demo profile dismissed. Your private server guest was not changed.');
+      return;
+    }
+
+    const result = forgetDemoProfile(getBrowserStorage('localStorage'));
     if (!result.ok) {
       setError(result.message);
+      setErrorCode(result.code);
       return;
     }
     setProfile(undefined);
@@ -87,9 +132,10 @@ export default function AccountPage() {
   }
 
   function clearInvalidLocalProfile(): void {
-    const result = forgetDemoProfile(window.localStorage);
+    const result = forgetDemoProfile(getBrowserStorage('localStorage'));
     if (!result.ok) {
       setError(result.message);
+      setErrorCode(result.code);
       setStatus('error');
       return;
     }
@@ -99,6 +145,7 @@ export default function AccountPage() {
   async function startFreshGuest(): Promise<void> {
     setResettingGuest(true);
     setError('');
+    setErrorCode(null);
     setMessage('');
 
     const reset = await resetGuestSession();
@@ -108,15 +155,19 @@ export default function AccountPage() {
       return;
     }
 
-    const forgotten = forgetDemoProfile(window.localStorage);
-    if (!forgotten.ok) {
-      setError('Fresh guest session started, but the local demo profile could not be cleared. Retry after enabling browser storage.');
-      setResettingGuest(false);
-      return;
+    if (!ephemeralProfile) {
+      const forgotten = forgetDemoProfile(getBrowserStorage('localStorage'));
+      if (!forgotten.ok) {
+        setErrorCode(forgotten.code);
+        setError('Fresh guest session started, but the local demo profile could not be cleared. Retry after enabling browser storage.');
+        setResettingGuest(false);
+        return;
+      }
     }
 
     setProfile(undefined);
     setDraftName('');
+    setEphemeralProfile(false);
     setMessage('Fresh guest session started. Choose a demo profile before continuing.');
     setResettingGuest(false);
   }
@@ -147,7 +198,12 @@ export default function AccountPage() {
             <p>{error}</p>
             <div className="confirmation-actions">
               <button className="checkout-button inline-action" type="button" onClick={loadProfile}>Retry</button>
-              <button className="ghost-button" type="button" onClick={clearInvalidLocalProfile}>Clear local demo data</button>
+              {errorCode === 'invalid_profile' && (
+                <button className="ghost-button" type="button" onClick={clearInvalidLocalProfile}>Clear local demo data</button>
+              )}
+              {errorCode === 'storage_unavailable' && (
+                <button className="ghost-button" type="button" onClick={useTemporaryProfile}>Use temporary demo profile</button>
+              )}
             </div>
           </section>
         </div>
@@ -187,12 +243,17 @@ export default function AccountPage() {
           <article className="card checkout-cart-panel">
             <div className="cart-header">
               <div>
-                <span className="kicker">Demo profile</span>
+                <span className="kicker">{ephemeralProfile ? 'Temporary demo profile' : 'Demo profile'}</span>
                 <h1>Local profile details</h1>
               </div>
             </div>
             <p>This profile changes presentation only. It is not authentication and cannot grant access to another guest&apos;s orders.</p>
 
+            {ephemeralProfile && (
+              <div className="validation-panel" role="status">
+                <p>Browser storage is unavailable. This synthetic profile exists only on this page and will disappear after reload.</p>
+              </div>
+            )}
             {error && <div className="validation-panel" role="alert"><p>{error}</p></div>}
             {message && <p role="status">{message}</p>}
 

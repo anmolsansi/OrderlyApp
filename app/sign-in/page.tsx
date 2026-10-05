@@ -9,35 +9,41 @@ import {
   getDemoAddresses,
   getDemoProfile,
   saveDemoProfile,
+  type DemoProfileErrorCode,
 } from '@/lib/auth';
-import { routes } from '@/lib/routes';
+import { getBrowserStorage } from '@/lib/browser-storage';
+import { routes, sanitizeAppReturnPath } from '@/lib/routes';
 import type { DemoAddress, DemoProfile } from '@/lib/types';
 
 function SignInContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get('next') ?? routes.account;
+  const next = sanitizeAppReturnPath(searchParams.get('next'), routes.account);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [profile, setProfile] = useState<DemoProfile | undefined>();
   const [addresses, setAddresses] = useState<DemoAddress[]>([]);
   const [name, setName] = useState('Demo visitor');
   const [defaultAddressId, setDefaultAddressId] = useState('demo-address-1');
   const [error, setError] = useState('');
+  const [errorCode, setErrorCode] = useState<DemoProfileErrorCode | null>(null);
 
   function loadProfile(): void {
     setStatus('loading');
     setError('');
+    setErrorCode(null);
 
-    const profileResult = getDemoProfile(window.localStorage);
+    const profileResult = getDemoProfile(getBrowserStorage('localStorage'));
     if (!profileResult.ok) {
       setError(profileResult.message);
+      setErrorCode(profileResult.code);
       setStatus('error');
       return;
     }
 
-    const addressResult = getDemoAddresses(window.localStorage);
+    const addressResult = getDemoAddresses(getBrowserStorage('localStorage'));
     if (!addressResult.ok) {
       setError(addressResult.message);
+      setErrorCode(addressResult.code);
       setStatus('error');
       return;
     }
@@ -57,35 +63,40 @@ function SignInContent() {
     const candidate = profile
       ? { ...profile, name, defaultAddressId }
       : createDefaultDemoProfile(name, defaultAddressId);
-    const result = saveDemoProfile(window.localStorage, candidate);
+    const result = saveDemoProfile(getBrowserStorage('localStorage'), candidate);
 
     if (!result.ok) {
       setError(result.message);
-      setStatus('error');
+      setErrorCode(result.code);
       return;
     }
 
+    setError('');
+    setErrorCode(null);
     setProfile(result.value);
     router.push(next);
   }
 
   function forgetLocalProfile(): void {
-    const result = forgetDemoProfile(window.localStorage);
+    const result = forgetDemoProfile(getBrowserStorage('localStorage'));
     if (!result.ok) {
       setError(result.message);
-      setStatus('error');
+      setErrorCode(result.code);
       return;
     }
 
+    setError('');
+    setErrorCode(null);
     setProfile(undefined);
     setName('Demo visitor');
     setDefaultAddressId(addresses[0]?.id ?? 'demo-address-1');
   }
 
   function clearInvalidLocalProfile(): void {
-    const result = forgetDemoProfile(window.localStorage);
+    const result = forgetDemoProfile(getBrowserStorage('localStorage'));
     if (!result.ok) {
       setError(result.message);
+      setErrorCode(result.code);
       setStatus('error');
       return;
     }
@@ -116,9 +127,17 @@ function SignInContent() {
             <span className="kicker">Demo profile unavailable</span>
             <h1>Browser storage needs attention</h1>
             <p>{error}</p>
+            {errorCode === 'storage_unavailable' && (
+              <p>You can continue without saving a profile. Checkout will offer a temporary synthetic profile for this page only.</p>
+            )}
             <div className="confirmation-actions">
               <button className="checkout-button inline-action" type="button" onClick={loadProfile}>Retry</button>
-              <button className="ghost-button" type="button" onClick={clearInvalidLocalProfile}>Clear local demo data</button>
+              {errorCode === 'invalid_profile' && (
+                <button className="ghost-button" type="button" onClick={clearInvalidLocalProfile}>Clear local demo data</button>
+              )}
+              {errorCode === 'storage_unavailable' && (
+                <button className="ghost-button" type="button" onClick={() => router.push(next)}>Continue without saving</button>
+              )}
             </div>
           </section>
         </div>
@@ -136,6 +155,15 @@ function SignInContent() {
             <span className="kicker">Public mock demo</span>
             <h1>{profile ? 'Demo profile ready' : 'Choose a demo profile'}</h1>
             <p>This is a local display profile, not a login. It never controls access to server orders.</p>
+
+            {error && (
+              <div className="validation-panel" role="alert">
+                <p>{error}</p>
+                {errorCode === 'storage_unavailable' && (
+                  <button className="ghost-button" type="button" onClick={() => router.push(next)}>Continue without saving</button>
+                )}
+              </div>
+            )}
 
             <form className="checkout-form-grid" onSubmit={event => { event.preventDefault(); submitProfile(); }}>
               <label className="full-field">

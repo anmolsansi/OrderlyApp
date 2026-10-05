@@ -15,8 +15,16 @@ import {
   saveRevisionedCart,
   submitCheckoutOrder,
 } from '@/lib/api';
-import { getDemoAddresses, getDemoProfile, SYNTHETIC_DEMO_ADDRESSES } from '@/lib/auth';
+import {
+  SYNTHETIC_DEMO_ADDRESSES,
+  forgetDemoProfile,
+  getDemoAddresses,
+  getDemoProfile,
+  getPreferredDemoAddress,
+  type DemoProfileErrorCode,
+} from '@/lib/auth';
 import { updateCartItemQuantity, validateCheckoutDetails } from '@/lib/cart';
+import { getBrowserStorage } from '@/lib/browser-storage';
 import { routes } from '@/lib/routes';
 import type {
   ApiResult,
@@ -34,6 +42,25 @@ const SYNTHETIC_PHONE = '+1-555-0100';
 const SYNTHETIC_EMAIL = 'demo@example.test';
 const PROMOTION_CODE = 'DEMO5' as const;
 const CUSTOM_ADDRESS_ID = 'custom';
+const CHECKOUT_VALIDATION_SUMMARY_ID = 'checkout-validation-summary';
+
+type ProfileStorageError = {
+  code: DemoProfileErrorCode;
+  message: string;
+};
+
+type CheckoutValidationField = 'name' | 'phone' | 'email' | 'street' | 'city' | 'state' | 'postalCode' | 'tipCents';
+
+const CHECKOUT_ERROR_FIELDS: Record<string, CheckoutValidationField> = {
+  'Name is required.': 'name',
+  'Enter a valid phone number.': 'phone',
+  'Enter a valid email address.': 'email',
+  'Delivery address is required.': 'street',
+  'City is required.': 'city',
+  'State is required.': 'state',
+  'Enter a valid ZIP code.': 'postalCode',
+  'Tip cannot be negative.': 'tipCents',
+};
 
 function detailsFromAddress(name: string, address: DemoAddress, tipCents: number): CheckoutDetails {
   return {
@@ -62,6 +89,10 @@ function matchingAddressId(addresses: DemoAddress[], details: CheckoutDetails): 
   ))?.id ?? CUSTOM_ADDRESS_ID;
 }
 
+function validationFields(errors: string[]): CheckoutValidationField[] {
+  return errors.flatMap(error => CHECKOUT_ERROR_FIELDS[error] ? [CHECKOUT_ERROR_FIELDS[error]] : []);
+}
+
 export default function CheckoutPage() {
   const router = useRouter();
   const mode = getOrderlyDataMode();
@@ -71,7 +102,10 @@ export default function CheckoutPage() {
   const [addresses, setAddresses] = useState<DemoAddress[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState(defaultAddress.id);
   const [profileAvailable, setProfileAvailable] = useState(false);
-  const [profileError, setProfileError] = useState<string | null>(null);
+  const [profileError, setProfileError] = useState<ProfileStorageError | null>(null);
+  const [ephemeralProfile, setEphemeralProfile] = useState(false);
+  const [profileReloadKey, setProfileReloadKey] = useState(0);
+  const [recoveryStorageAvailable, setRecoveryStorageAvailable] = useState(false);
   const [loading, setLoading] = useState(mode === 'api');
   const [loadError, setLoadError] = useState<string | null>(null);
   const [quoteError, setQuoteError] = useState<string | null>(null);
@@ -80,16 +114,25 @@ export default function CheckoutPage() {
   const [quoteRefresh, setQuoteRefresh] = useState(0);
   const [checkoutState, setCheckoutState] = useState<CheckoutState>('idle');
   const [checkoutErrors, setCheckoutErrors] = useState<string[]>([]);
+  const [invalidFields, setInvalidFields] = useState<CheckoutValidationField[]>([]);
   const [recovery, setRecovery] = useState<CheckoutRecovery | undefined>();
   const [details, setDetails] = useState<CheckoutDetails>(() => detailsFromAddress('Demo visitor', defaultAddress, 500));
   const deliberateInput = useRef(false);
   const quoteSequence = useRef(0);
+  const validationSummaryRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (mode !== 'api') return;
     let active = true;
     async function load(): Promise<void> {
-      const storedRecovery = loadCheckoutRecovery(window.sessionStorage);
+      setProfileAvailable(false);
+      setProfileError(null);
+      setEphemeralProfile(false);
+      setAddresses([]);
+
+      const recoveryStorage = getBrowserStorage('sessionStorage');
+      setRecoveryStorageAvailable(Boolean(recoveryStorage));
+      const storedRecovery = loadCheckoutRecovery(recoveryStorage);
       if (storedRecovery) {
         deliberateInput.current = true;
         setRecovery(storedRecovery);
@@ -97,31 +140,32 @@ export default function CheckoutPage() {
         setDetails(storedRecovery.submission.checkout);
       }
 
-      const profileResult = getDemoProfile(window.localStorage);
-      const addressesResult = getDemoAddresses(window.localStorage);
+      const profileResult = getDemoProfile(getBrowserStorage('localStorage'));
+      const addressesResult = getDemoAddresses(getBrowserStorage('localStorage'));
       if (!active) return;
 
-      let availableAddresses: DemoAddress[] = [];
       if (!addressesResult.ok) {
-        setProfileError(addressesResult.message);
+        setProfileError({ code: addressesResult.code, message: addressesResult.message });
       } else {
-        availableAddresses = addressesResult.value;
-        setAddresses(availableAddresses);
+        setAddresses(addressesResult.value);
       }
 
       if (!profileResult.ok) {
-        setProfileError(profileResult.message);
-      } else {
-        setProfileAvailable(Boolean(profileResult.value));
+        setProfileError({ code: profileResult.code, message: profileResult.message });
       }
 
-      if (storedRecovery && availableAddresses.length > 0) {
-        setSelectedAddressId(matchingAddressId(availableAddresses, storedRecovery.submission.checkout));
-      } else if (profileResult.ok && profileResult.value && availableAddresses.length > 0 && !deliberateInput.current) {
-        const address = availableAddresses.find(candidate => candidate.id === profileResult.value?.defaultAddressId) ?? availableAddresses[0];
-        if (address) {
-          setSelectedAddressId(address.id);
-          setDetails(previous => detailsFromAddress(profileResult.value?.name ?? previous.name, address, previous.tipCents));
+      if (profileResult.ok && addressesResult.ok) {
+        setProfileAvailable(Boolean(profileResult.value));
+        const availableAddresses = addressesResult.value;
+
+        if (storedRecovery && availableAddresses.length > 0) {
+          setSelectedAddressId(matchingAddressId(availableAddresses, storedRecovery.submission.checkout));
+        } else if (profileResult.value && !deliberateInput.current) {
+          const address = getPreferredDemoAddress(profileResult.value, availableAddresses);
+          if (address) {
+            setSelectedAddressId(address.id);
+            setDetails(previous => detailsFromAddress(profileResult.value?.name ?? previous.name, address, previous.tipCents));
+          }
         }
       }
 
@@ -131,6 +175,7 @@ export default function CheckoutPage() {
         setLoadError(cartResult.error.message);
         setCart(null);
       } else {
+        setLoadError(null);
         setCart(cartResult.data);
       }
       setLoading(false);
@@ -139,7 +184,7 @@ export default function CheckoutPage() {
     return () => {
       active = false;
     };
-  }, [mode]);
+  }, [mode, profileReloadKey]);
 
   useEffect(() => {
     if (
@@ -173,7 +218,40 @@ export default function CheckoutPage() {
     if (checkoutState === 'rejected') {
       setCheckoutState('idle');
       setCheckoutErrors([]);
+      setInvalidFields([]);
     }
+  }
+
+  function retryProfileStorage(): void {
+    setProfileReloadKey(value => value + 1);
+  }
+
+  function clearInvalidProfileStorage(): void {
+    const result = forgetDemoProfile(getBrowserStorage('localStorage'));
+    if (!result.ok) {
+      setProfileError({ code: result.code, message: result.message });
+      return;
+    }
+    retryProfileStorage();
+  }
+
+  function useTemporaryProfile(): void {
+    const temporaryAddresses = SYNTHETIC_DEMO_ADDRESSES.map(address => ({ ...address }));
+    setAddresses(temporaryAddresses);
+    setProfileAvailable(true);
+    setProfileError(null);
+    setEphemeralProfile(true);
+
+    if (!deliberateInput.current) {
+      const address = getPreferredDemoAddress(undefined, temporaryAddresses);
+      if (address) {
+        setSelectedAddressId(address.id);
+        setDetails(previous => detailsFromAddress(previous.name || 'Demo visitor', address, previous.tipCents));
+      }
+      return;
+    }
+
+    setSelectedAddressId(matchingAddressId(temporaryAddresses, details));
   }
 
   async function mutateCart(nextItems: RevisionedCart['items']): Promise<void> {
@@ -211,18 +289,28 @@ export default function CheckoutPage() {
     setMutationPending(false);
   }
 
+  function refreshClientValidation(nextDetails: CheckoutDetails): void {
+    if (invalidFields.length === 0) return;
+    const validation = validateCheckoutDetails(nextDetails);
+    setCheckoutErrors(validation.errors);
+    setInvalidFields(validationFields(validation.errors));
+    if (validation.ok) setCheckoutState('idle');
+  }
+
   function updateDetails(field: keyof CheckoutDetails, value: string): void {
     if (checkoutState === 'submitting' || checkoutState === 'uncertain') return;
     deliberateInput.current = true;
-    resetResolvedCheckoutState();
     setMutationError(null);
+    if (invalidFields.length === 0) resetResolvedCheckoutState();
     if (['street', 'apartment', 'city', 'state', 'postalCode', 'deliveryInstructions'].includes(field)) {
       setSelectedAddressId(CUSTOM_ADDRESS_ID);
     }
-    setDetails(previous => ({
-      ...previous,
+    const nextDetails = {
+      ...details,
       [field]: field === 'tipCents' ? Number.parseInt(value, 10) || 0 : value,
-    }));
+    };
+    setDetails(nextDetails);
+    refreshClientValidation(nextDetails);
   }
 
   function selectAddress(addressId: string): void {
@@ -230,18 +318,26 @@ export default function CheckoutPage() {
     const address = addresses.find(candidate => candidate.id === addressId);
     if (!address) return;
     deliberateInput.current = true;
-    resetResolvedCheckoutState();
+    setMutationError(null);
+    if (invalidFields.length === 0) resetResolvedCheckoutState();
     setSelectedAddressId(address.id);
-    setDetails(previous => ({
-      ...detailsFromAddress(previous.name, address, previous.tipCents),
-      phone: previous.phone,
-      email: previous.email,
-    }));
+    const nextDetails = {
+      ...detailsFromAddress(details.name, address, details.tipCents),
+      phone: details.phone,
+      email: details.email,
+    };
+    setDetails(nextDetails);
+    refreshClientValidation(nextDetails);
+  }
+
+  function fieldError(field: CheckoutValidationField): string | undefined {
+    return checkoutErrors.find(error => CHECKOUT_ERROR_FIELDS[error] === field);
   }
 
   async function reconcileDefinitiveFailure(result: Extract<ApiResult<OrderReceipt>, { ok: false }>): Promise<void> {
-    clearCheckoutRecovery(window.sessionStorage);
+    clearCheckoutRecovery(getBrowserStorage('sessionStorage'));
     setRecovery(undefined);
+    setInvalidFields([]);
     setCheckoutState('rejected');
     setCheckoutErrors([result.error.message]);
 
@@ -260,8 +356,9 @@ export default function CheckoutPage() {
 
   async function resolveSubmission(result: ApiResult<OrderReceipt>): Promise<void> {
     if (result.ok) {
-      clearCheckoutRecovery(window.sessionStorage);
+      clearCheckoutRecovery(getBrowserStorage('sessionStorage'));
       setRecovery(undefined);
+      setInvalidFields([]);
       setCheckoutState('accepted');
       setCheckoutErrors([]);
       const durableCart = await fetchRevisionedCart();
@@ -270,6 +367,7 @@ export default function CheckoutPage() {
       return;
     }
 
+    setInvalidFields([]);
     if (result.kind === 'network') {
       setCheckoutState('uncertain');
       setCheckoutErrors([
@@ -282,15 +380,19 @@ export default function CheckoutPage() {
   }
 
   async function placeOrder(): Promise<void> {
-    if (!cart || cart.items.length === 0 || !quote || !profileAvailable) return;
+    if (!cart || cart.items.length === 0 || !quote || !profileAvailable || profileError || loadError || mutationPending) return;
     if (checkoutState === 'submitting' || checkoutState === 'uncertain') return;
+    if (!recoveryStorageAvailable) return;
 
     const validation = validateCheckoutDetails(details);
     if (!validation.ok) {
       setCheckoutState('rejected');
       setCheckoutErrors(validation.errors);
+      setInvalidFields(validationFields(validation.errors));
+      window.requestAnimationFrame(() => validationSummaryRef.current?.focus());
       return;
     }
+    setInvalidFields([]);
     if (quote.cartRevision !== cart.revision) {
       setCheckoutState('rejected');
       setCheckoutErrors(['Your basket changed after the quote. Review the latest quote before submitting.']);
@@ -309,7 +411,7 @@ export default function CheckoutPage() {
       },
     };
 
-    if (!saveCheckoutRecovery(window.sessionStorage, nextRecovery)) {
+    if (!saveCheckoutRecovery(getBrowserStorage('sessionStorage'), nextRecovery)) {
       setCheckoutState('rejected');
       setCheckoutErrors(['Checkout recovery storage is unavailable. No order was submitted.']);
       return;
@@ -350,7 +452,7 @@ export default function CheckoutPage() {
   const totals = quote?.totals;
   const formLocked = checkoutState === 'submitting' || checkoutState === 'uncertain';
   const canSubmit = Boolean(
-    !loading
+    recoveryStorageAvailable && !loading
     && !loadError
     && !profileError
     && profileAvailable
@@ -454,13 +556,43 @@ export default function CheckoutPage() {
               )}
 
               {checkoutState !== 'uncertain' && checkoutErrors.length > 0 && (
-                <div className="validation-panel" role="alert">
+                <div
+                  id={CHECKOUT_VALIDATION_SUMMARY_ID}
+                  className="validation-panel"
+                  ref={validationSummaryRef}
+                  role="alert"
+                  tabIndex={-1}
+                >
+                  <strong>{invalidFields.length > 0 ? 'Check the highlighted checkout fields' : 'Checkout needs attention'}</strong>
                   {checkoutErrors.map(error => <p key={error}>{error}</p>)}
                 </div>
               )}
 
+              {!loading && !recoveryStorageAvailable && (
+                <div className="validation-panel" role="alert">
+                  <p>Checkout recovery storage is unavailable. Enable browser storage and reload before submitting. No new order was submitted.</p>
+                </div>
+              )}
+
               {profileError && checkoutState !== 'uncertain' && (
-                <div className="validation-panel" role="alert"><p>{profileError}</p></div>
+                <div className="validation-panel" role="alert">
+                  <p>{profileError.message}</p>
+                  <div className="filter-row">
+                    <button className="ghost-button" type="button" onClick={retryProfileStorage}>Retry profile</button>
+                    {profileError.code === 'invalid_profile' && (
+                      <button className="ghost-button" type="button" onClick={clearInvalidProfileStorage}>Clear local demo data</button>
+                    )}
+                    {profileError.code === 'storage_unavailable' && (
+                      <button className="checkout-button" type="button" onClick={useTemporaryProfile}>Use temporary demo profile</button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {ephemeralProfile && checkoutState !== 'uncertain' && (
+                <div className="validation-panel" role="status">
+                  <p>Browser profile storage is unavailable. This temporary synthetic profile is used only for this checkout and does not change server guest ownership.</p>
+                </div>
               )}
 
               {!profileAvailable && !profileError && !loading && checkoutState !== 'uncertain' && (
@@ -471,62 +603,142 @@ export default function CheckoutPage() {
               )}
 
               {addresses.length > 0 && (
-                <label className="full-field">
+                <label className="full-field" htmlFor="checkout-saved-address">
                   <span>Saved synthetic address</span>
-                  <select value={selectedAddressId} disabled={formLocked} onChange={event => selectAddress(event.target.value)}>
+                  <select id="checkout-saved-address" value={selectedAddressId} disabled={formLocked} onChange={event => selectAddress(event.target.value)}>
                     {selectedAddressId === CUSTOM_ADDRESS_ID && <option value={CUSTOM_ADDRESS_ID}>Edited address</option>}
                     {addresses.map(address => <option key={address.id} value={address.id}>{address.label}</option>)}
                   </select>
                 </label>
               )}
 
-              <div className="checkout-form-grid" aria-label="Mock checkout details">
-                <label>
+              <form
+                id="checkout-form"
+                className="checkout-form-grid"
+                aria-label="Mock checkout details"
+                onSubmit={event => {
+                  event.preventDefault();
+                  void placeOrder();
+                }}
+              >
+                <label htmlFor="checkout-name">
                   <span>Name</span>
-                  <input disabled={formLocked} type="text" value={details.name} onChange={event => updateDetails('name', event.target.value)} />
+                  <input
+                    id="checkout-name"
+                    aria-describedby={fieldError('name') ? 'checkout-name-error' : undefined}
+                    aria-invalid={fieldError('name') ? true : undefined}
+                    disabled={formLocked}
+                    type="text"
+                    value={details.name}
+                    onChange={event => updateDetails('name', event.target.value)}
+                  />
+                  {fieldError('name') && <span id="checkout-name-error">{fieldError('name')}</span>}
                 </label>
-                <label>
+                <label htmlFor="checkout-phone">
                   <span>Phone</span>
-                  <input disabled={formLocked} type="tel" value={details.phone} onChange={event => updateDetails('phone', event.target.value)} />
+                  <input
+                    id="checkout-phone"
+                    aria-describedby={fieldError('phone') ? 'checkout-phone-error' : undefined}
+                    aria-invalid={fieldError('phone') ? true : undefined}
+                    disabled={formLocked}
+                    type="tel"
+                    value={details.phone}
+                    onChange={event => updateDetails('phone', event.target.value)}
+                  />
+                  {fieldError('phone') && <span id="checkout-phone-error">{fieldError('phone')}</span>}
                 </label>
-                <label className="full-field">
+                <label className="full-field" htmlFor="checkout-email">
                   <span>Email</span>
-                  <input disabled={formLocked} type="email" value={details.email} onChange={event => updateDetails('email', event.target.value)} />
+                  <input
+                    id="checkout-email"
+                    aria-describedby={fieldError('email') ? 'checkout-email-error' : undefined}
+                    aria-invalid={fieldError('email') ? true : undefined}
+                    disabled={formLocked}
+                    type="email"
+                    value={details.email}
+                    onChange={event => updateDetails('email', event.target.value)}
+                  />
+                  {fieldError('email') && <span id="checkout-email-error">{fieldError('email')}</span>}
                 </label>
-                <label className="full-field">
+                <label className="full-field" htmlFor="checkout-street">
                   <span>Delivery address</span>
-                  <input disabled={formLocked} type="text" value={details.street} onChange={event => updateDetails('street', event.target.value)} />
+                  <input
+                    id="checkout-street"
+                    aria-describedby={fieldError('street') ? 'checkout-street-error' : undefined}
+                    aria-invalid={fieldError('street') ? true : undefined}
+                    disabled={formLocked}
+                    type="text"
+                    value={details.street}
+                    onChange={event => updateDetails('street', event.target.value)}
+                  />
+                  {fieldError('street') && <span id="checkout-street-error">{fieldError('street')}</span>}
                 </label>
-                <label>
+                <label htmlFor="checkout-apartment">
                   <span>Unit</span>
-                  <input disabled={formLocked} type="text" value={details.apartment ?? ''} onChange={event => updateDetails('apartment', event.target.value)} />
+                  <input id="checkout-apartment" disabled={formLocked} type="text" value={details.apartment ?? ''} onChange={event => updateDetails('apartment', event.target.value)} />
                 </label>
-                <label>
+                <label htmlFor="checkout-city">
                   <span>City</span>
-                  <input disabled={formLocked} type="text" value={details.city} onChange={event => updateDetails('city', event.target.value)} />
+                  <input
+                    id="checkout-city"
+                    aria-describedby={fieldError('city') ? 'checkout-city-error' : undefined}
+                    aria-invalid={fieldError('city') ? true : undefined}
+                    disabled={formLocked}
+                    type="text"
+                    value={details.city}
+                    onChange={event => updateDetails('city', event.target.value)}
+                  />
+                  {fieldError('city') && <span id="checkout-city-error">{fieldError('city')}</span>}
                 </label>
-                <label>
+                <label htmlFor="checkout-state">
                   <span>State</span>
-                  <input disabled={formLocked} type="text" maxLength={2} value={details.state} onChange={event => updateDetails('state', event.target.value.toUpperCase())} />
+                  <input
+                    id="checkout-state"
+                    aria-describedby={fieldError('state') ? 'checkout-state-error' : undefined}
+                    aria-invalid={fieldError('state') ? true : undefined}
+                    disabled={formLocked}
+                    type="text"
+                    maxLength={2}
+                    value={details.state}
+                    onChange={event => updateDetails('state', event.target.value.toUpperCase())}
+                  />
+                  {fieldError('state') && <span id="checkout-state-error">{fieldError('state')}</span>}
                 </label>
-                <label>
+                <label htmlFor="checkout-postal-code">
                   <span>ZIP code</span>
-                  <input disabled={formLocked} type="text" value={details.postalCode} onChange={event => updateDetails('postalCode', event.target.value)} />
+                  <input
+                    id="checkout-postal-code"
+                    aria-describedby={fieldError('postalCode') ? 'checkout-postal-code-error' : undefined}
+                    aria-invalid={fieldError('postalCode') ? true : undefined}
+                    disabled={formLocked}
+                    type="text"
+                    value={details.postalCode}
+                    onChange={event => updateDetails('postalCode', event.target.value)}
+                  />
+                  {fieldError('postalCode') && <span id="checkout-postal-code-error">{fieldError('postalCode')}</span>}
                 </label>
-                <label>
+                <label htmlFor="checkout-tip">
                   <span>Tip</span>
-                  <select disabled={formLocked} value={details.tipCents} onChange={event => updateDetails('tipCents', event.target.value)}>
+                  <select
+                    id="checkout-tip"
+                    aria-describedby={fieldError('tipCents') ? 'checkout-tip-error' : undefined}
+                    aria-invalid={fieldError('tipCents') ? true : undefined}
+                    disabled={formLocked}
+                    value={details.tipCents}
+                    onChange={event => updateDetails('tipCents', event.target.value)}
+                  >
                     <option value="0">No tip</option>
                     <option value="300">$3.00</option>
                     <option value="500">$5.00</option>
                     <option value="800">$8.00</option>
                   </select>
+                  {fieldError('tipCents') && <span id="checkout-tip-error">{fieldError('tipCents')}</span>}
                 </label>
-                <label className="full-field">
+                <label className="full-field" htmlFor="checkout-instructions">
                   <span>Delivery instructions</span>
-                  <textarea disabled={formLocked} value={details.deliveryInstructions ?? ''} onChange={event => updateDetails('deliveryInstructions', event.target.value)} />
+                  <textarea id="checkout-instructions" disabled={formLocked} value={details.deliveryInstructions ?? ''} onChange={event => updateDetails('deliveryInstructions', event.target.value)} />
                 </label>
-              </div>
+              </form>
 
               <div className="payment-breakdown">
                 <div><span>Delivery address</span><strong>{details.street}</strong></div>
@@ -536,7 +748,7 @@ export default function CheckoutPage() {
               </div>
 
               {checkoutState !== 'uncertain' && (
-                <button className="checkout-button" type="button" disabled={!canSubmit} onClick={() => void placeOrder()}>
+                <button className="checkout-button" type="submit" form="checkout-form" disabled={!canSubmit}>
                   {checkoutState === 'submitting' ? 'Placing order…' : checkoutState === 'accepted' ? 'Order saved' : 'Place mock order'}
                 </button>
               )}

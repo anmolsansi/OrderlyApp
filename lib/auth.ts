@@ -57,7 +57,15 @@ export function createDefaultDemoProfile(
   };
 }
 
-export function getDemoProfile(storage: Storage): DemoProfileResult<DemoProfile | undefined> {
+export function getPreferredDemoAddress(
+  profile: Pick<DemoProfile, 'defaultAddressId'> | undefined,
+  addresses: readonly DemoAddress[],
+): DemoAddress | undefined {
+  if (addresses.length === 0) return undefined;
+  return addresses.find(address => address.id === profile?.defaultAddressId) ?? addresses[0];
+}
+
+export function getDemoProfile(storage: Storage | undefined): DemoProfileResult<DemoProfile | undefined> {
   const migrated = removeLegacyProfileStorage(storage);
   if (!migrated.ok) return migrated;
 
@@ -73,7 +81,7 @@ export function getDemoProfile(storage: Storage): DemoProfileResult<DemoProfile 
   }
 }
 
-export function getDemoAddresses(storage: Storage): DemoProfileResult<DemoAddress[]> {
+export function getDemoAddresses(storage: Storage | undefined): DemoProfileResult<DemoAddress[]> {
   const migrated = removeLegacyProfileStorage(storage);
   if (!migrated.ok) return migrated;
 
@@ -94,7 +102,7 @@ export function getDemoAddresses(storage: Storage): DemoProfileResult<DemoAddres
   }
 }
 
-export function saveDemoProfile(storage: Storage, profile: DemoProfile): DemoProfileResult<DemoProfile> {
+export function saveDemoProfile(storage: Storage | undefined, profile: DemoProfile): DemoProfileResult<DemoProfile> {
   const migrated = removeLegacyProfileStorage(storage);
   if (!migrated.ok) return migrated;
 
@@ -109,7 +117,7 @@ export function saveDemoProfile(storage: Storage, profile: DemoProfile): DemoPro
   return saved.ok ? success(normalized) : saved;
 }
 
-export function forgetDemoProfile(storage: Storage): DemoProfileResult<undefined> {
+export function forgetDemoProfile(storage: Storage | undefined): DemoProfileResult<undefined> {
   const migrated = removeLegacyProfileStorage(storage);
   if (!migrated.ok) return migrated;
 
@@ -120,12 +128,12 @@ export function forgetDemoProfile(storage: Storage): DemoProfileResult<undefined
   return success(undefined);
 }
 
-export function isSignedIn(storage: Storage): boolean {
+export function isSignedIn(storage: Storage | undefined): boolean {
   const result = getDemoProfile(storage);
   return result.ok && Boolean(result.value);
 }
 
-export function getSessionProfile(storage: Storage): UserProfile {
+export function getSessionProfile(storage: Storage | undefined): UserProfile {
   const result = getDemoProfile(storage);
   if (!result.ok || !result.value) {
     return { ...mockUserProfile, favoriteRestaurantIds: [] };
@@ -141,7 +149,7 @@ export function getSessionProfile(storage: Storage): UserProfile {
   };
 }
 
-export function removeLegacyProfileStorage(storage: Storage): DemoProfileResult<undefined> {
+export function removeLegacyProfileStorage(storage: Storage | undefined): DemoProfileResult<undefined> {
   for (const key of LEGACY_PROFILE_STORAGE_KEYS) {
     const removed = removeStorage(storage, key);
     if (!removed.ok) return removed;
@@ -200,7 +208,8 @@ function cloneSyntheticAddresses(): DemoAddress[] {
   return SYNTHETIC_DEMO_ADDRESSES.map(address => ({ ...address }));
 }
 
-function readStorage(storage: Storage, key: string): DemoProfileResult<string | null> {
+function readStorage(storage: Storage | undefined, key: string): DemoProfileResult<string | null> {
+  if (!storage) return storageUnavailable();
   try {
     return success(storage.getItem(key));
   } catch {
@@ -208,7 +217,8 @@ function readStorage(storage: Storage, key: string): DemoProfileResult<string | 
   }
 }
 
-function writeStorage(storage: Storage, key: string, value: string): DemoProfileResult<undefined> {
+function writeStorage(storage: Storage | undefined, key: string, value: string): DemoProfileResult<undefined> {
+  if (!storage) return storageUnavailable();
   try {
     storage.setItem(key, value);
     return success(undefined);
@@ -217,7 +227,8 @@ function writeStorage(storage: Storage, key: string, value: string): DemoProfile
   }
 }
 
-function removeStorage(storage: Storage, key: string): DemoProfileResult<undefined> {
+function removeStorage(storage: Storage | undefined, key: string): DemoProfileResult<undefined> {
+  if (!storage) return storageUnavailable();
   try {
     storage.removeItem(key);
     return success(undefined);

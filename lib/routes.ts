@@ -97,6 +97,39 @@ export const appRoutes: AppRouteDefinition[] = [
   },
 ];
 
+const RETURN_ROUTE_PATTERNS = [
+  /^\/$/,
+  /^\/restaurants$/,
+  /^\/restaurants\/[A-Za-z0-9._~-]+$/,
+  /^\/restaurants\/[A-Za-z0-9._~-]+\/items\/[A-Za-z0-9._~-]+$/,
+  /^\/cart$/,
+  /^\/checkout$/,
+  /^\/order-confirmation$/,
+  /^\/orders$/,
+  /^\/account$/,
+] as const;
+
+const ENCODED_PATH_SEPARATOR_OR_TRAVERSAL = /%(?:2f|5c|2e|00|09|0a|0d)/i;
+const CONTROL_CHARACTER = /[\u0000-\u001f\u007f]/;
+const RETURN_ROUTE_BASE = 'https://orderly.invalid';
+
+export function sanitizeAppReturnPath(value: string | null | undefined, fallback = '/account'): string {
+  if (!value || value !== value.trim()) return fallback;
+  if (!value.startsWith('/') || value.startsWith('//')) return fallback;
+  if (value.includes('\\') || CONTROL_CHARACTER.test(value) || ENCODED_PATH_SEPARATOR_OR_TRAVERSAL.test(value)) {
+    return fallback;
+  }
+
+  try {
+    const parsed = new URL(value, RETURN_ROUTE_BASE);
+    if (parsed.origin !== RETURN_ROUTE_BASE || parsed.hash) return fallback;
+    if (!RETURN_ROUTE_PATTERNS.some(pattern => pattern.test(parsed.pathname))) return fallback;
+    return `${parsed.pathname}${parsed.search}`;
+  } catch {
+    return fallback;
+  }
+}
+
 export const routes = {
   home: '/',
   restaurants: (params?: { query?: string; filter?: string }) => {
@@ -112,6 +145,6 @@ export const routes = {
   checkout: '/checkout',
   orderConfirmation: (orderId?: string) => orderId ? `/order-confirmation?orderId=${encodeURIComponent(orderId)}` : '/order-confirmation',
   orderHistory: '/orders',
-  signIn: (next?: string) => next ? `/sign-in?next=${encodeURIComponent(next)}` : '/sign-in',
+  signIn: (next?: string) => next ? `/sign-in?next=${encodeURIComponent(sanitizeAppReturnPath(next))}` : '/sign-in',
   account: '/account',
 } as const;

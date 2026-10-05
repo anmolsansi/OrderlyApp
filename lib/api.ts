@@ -705,7 +705,8 @@ function isStoredCheckoutRecovery(value: unknown): value is CheckoutRecovery {
     && isStoredOrderSubmission(value.submission);
 }
 
-export function loadCheckoutRecovery(storage: Storage): CheckoutRecovery | undefined {
+export function loadCheckoutRecovery(storage: Storage | undefined): CheckoutRecovery | undefined {
+  if (!storage) return undefined;
   try {
     const raw = storage.getItem(CHECKOUT_RECOVERY_STORAGE_KEY);
     if (!raw) return undefined;
@@ -716,7 +717,8 @@ export function loadCheckoutRecovery(storage: Storage): CheckoutRecovery | undef
   }
 }
 
-export function saveCheckoutRecovery(storage: Storage, recovery: CheckoutRecovery): boolean {
+export function saveCheckoutRecovery(storage: Storage | undefined, recovery: CheckoutRecovery): boolean {
+  if (!storage) return false;
   if (!isStoredCheckoutRecovery(recovery)) return false;
   try {
     storage.setItem(CHECKOUT_RECOVERY_STORAGE_KEY, JSON.stringify(recovery));
@@ -726,7 +728,8 @@ export function saveCheckoutRecovery(storage: Storage, recovery: CheckoutRecover
   }
 }
 
-export function clearCheckoutRecovery(storage: Storage): boolean {
+export function clearCheckoutRecovery(storage: Storage | undefined): boolean {
+  if (!storage) return false;
   try {
     storage.removeItem(CHECKOUT_RECOVERY_STORAGE_KEY);
     return true;
