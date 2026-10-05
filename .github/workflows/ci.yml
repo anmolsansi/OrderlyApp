@@ -117,8 +117,18 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 12
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
     env:
       DATABASE_URL: postgresql://orderly:orderly@127.0.0.1:5432/orderlyapp_e2e
+      REDIS_URL: redis://127.0.0.1:6379
       NEXT_PUBLIC_API_BASE_URL: http://127.0.0.1:8000
       ORDERLY_API_ORIGIN: http://127.0.0.1:8000
       NEXT_PUBLIC_APP_URL: http://127.0.0.1:3200
@@ -126,6 +136,8 @@ jobs:
       NEXT_PUBLIC_CHECKOUT_MODE: mock
       NEXT_PUBLIC_AUTH_PROVIDER: none
       ORDERLY_DATA_MODE: api
+      ORDERLY_ENVIRONMENT: test
+      ORDERLY_SOURCE_SHA: ${{ github.sha }}
       ORDERLY_SESSION_SECRET: ci-st02-session-secret-with-more-than-32-bytes
       ORDERLY_ALLOWED_ORIGINS: http://127.0.0.1:3200
       ORDERLY_CORS_ORIGINS: http://127.0.0.1:3200
@@ -150,16 +162,16 @@ jobs:
           cache-dependency-path: backend/requirements-test.lock
       - name: Install backend runtime
         run: python -m pip install -e ./backend
-      - name: Prepare API database
+      - name: Prepare API database with explicit test fixtures
         run: |
           python backend/scripts/migrate.py
-          python backend/scripts/seed_postgres.py
-      - name: Start API and prove health
+          ORDERLY_ALLOW_FIXTURE_SEED=1 python backend/scripts/seed_postgres.py
+      - name: Start API and prove C8 readiness
         shell: bash
         run: |
           (cd backend && uvicorn app.main:app --host 127.0.0.1 --port 8000 > /tmp/orderly-api.log 2>&1 &)
           for attempt in {1..30}; do
-            if curl --fail --silent http://127.0.0.1:8000/health > /tmp/orderly-health.json; then
+            if curl --fail --silent http://127.0.0.1:8000/health/ready > /tmp/orderly-health.json; then
               cat /tmp/orderly-health.json
               exit 0
             fi
