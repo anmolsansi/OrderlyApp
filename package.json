@@ -9,10 +9,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "npm run typecheck",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:web": "npm run test && npm run typecheck && npm run build",
+    "test:web": "npm run lint && npm run test && npm run typecheck && npm run build",
     "test:contracts": "vitest run tests/contract-fixtures.test.ts",
     "test:backend": "python -m pytest backend/tests",
     "test:e2e": "playwright test",
@@ -25,11 +25,15 @@
     "react-dom": "19.2.4"
   },
   "devDependencies": {
+    "@eslint/js": "9.39.5",
     "@playwright/test": "^1.59.1",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "eslint": "9.39.5",
+    "eslint-plugin-react-hooks": "7.1.1",
     "typescript": "^5",
+    "typescript-eslint": "8.71.0",
     "vitest": "4.1.11"
   }
 }

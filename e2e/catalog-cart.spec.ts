@@ -286,10 +286,8 @@ test('explicit local_demo makes zero API requests and keeps checkout unavailable
   await page.getByRole('link', { name: /mario's pizza lab/i }).first().click();
   await page.getByRole('link', { name: /pepperoni feast/i }).click();
 
-  const radios = page.getByRole('radio');
-  for (let index = 0; index < await radios.count(); index += 1) {
-    if (await radios.nth(index).isEnabled()) await radios.nth(index).check();
-  }
+  await page.getByLabel(/large/i).check();
+  await page.getByLabel(/classic hand-tossed/i).check();
   await page.getByRole('button', { name: /add to cart/i }).click();
   await expect(page).toHaveURL(/\/cart/);
   await expect(page.getByText(/checkout unavailable in fixture preview/i)).toBeVisible();
