@@ -24,6 +24,7 @@ The cookie does not contain the guest ID. Decoding the cookie therefore cannot r
 - Secure: enabled when the browser request is HTTPS
 - Backend path: `/v1`
 - Browser path after gateway rewrite: `/api/orderly`
+- Cookie expiry is formatted in UTC/GMT even if PostgreSQL returns the same instant in a different session timezone. Repeated bootstrap never extends the original expiry.
 
 `POST /api/orderly/session` is safe to call repeatedly. A valid unexpired cookie keeps the same guest identity. An absent, expired, or invalid cookie creates a new isolated guest.
 

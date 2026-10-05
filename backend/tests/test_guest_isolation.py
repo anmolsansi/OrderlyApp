@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import json
+from contextlib import contextmanager
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 
 import pytest
 from fastapi.testclient import TestClient
 
+import app.identity as identity_module
 from app.identity import COOKIE_NAME, token_hash, token_nonce_from_signed_token
 from app.main import app
 
@@ -51,6 +54,32 @@ def cleanup_guest_rows(postgres_connection) -> None:
     postgres_connection.execute("DELETE FROM orders WHERE session_id LIKE 'guest-%'")
     postgres_connection.execute("DELETE FROM guest_sessions")
     postgres_connection.commit()
+
+
+def test_returning_guest_bootstrap_formats_non_utc_database_expiry(
+    identity_environment: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = TestClient(app, base_url=TEST_ORIGIN)
+    token = bootstrap(client)
+    _, expires_at = token_nonce_from_signed_token(token, TEST_SECRET.encode("utf-8"))
+    original_connection = identity_module.get_connection
+
+    @contextmanager
+    def non_utc_connection():
+        with original_connection() as conn:
+            conn.execute("SET TIME ZONE 'America/New_York'")
+            yield conn
+
+    monkeypatch.setattr(identity_module, "get_connection", non_utc_connection)
+    response = client.post("/v1/session", headers={"Origin": TEST_ORIGIN})
+    assert response.status_code == 200
+    assert client.cookies.get(COOKIE_NAME) == token
+    cookie = response.headers["set-cookie"]
+    expiry_header = cookie.split("expires=", 1)[1].split(";", 1)[0]
+    assert expiry_header.endswith(" GMT")
+    assert parsedate_to_datetime(expiry_header) == expires_at
+    assert "HttpOnly" in cookie and "Secure" in cookie and "SameSite=lax" in cookie
 
 
 def test_two_guest_cookie_jars_are_isolated_and_reset_revokes_old_scope(

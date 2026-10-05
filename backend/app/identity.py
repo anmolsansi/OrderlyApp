@@ -335,7 +335,7 @@ def set_guest_cookie(response: Response, request: Request, issued: IssuedGuest) 
         key=COOKIE_NAME,
         value=issued.token,
         max_age=max_age,
-        expires=issued.expires_at,
+        expires=issued.expires_at.astimezone(timezone.utc),
         path=COOKIE_PATH,
         httponly=True,
         secure=_request_is_https(request),
