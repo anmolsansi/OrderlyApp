@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import List, Optional
 from uuid import uuid4
 
@@ -69,6 +70,8 @@ from .store import (
 
 app = FastAPI(title="OrderlyApp API", version="0.2.0")
 
+MIGRATIONS_DIR = Path(__file__).resolve().parents[1] / "migrations"
+
 
 class ApiContractError(Exception):
     def __init__(
@@ -111,6 +114,14 @@ async def request_id_middleware(request: Request, call_next):
 
 def _request_id(request: Request) -> str:
     return getattr(request.state, "request_id", uuid4().hex)
+
+
+def _source_sha() -> str:
+    for name in ("ORDERLY_SOURCE_SHA", "RENDER_GIT_COMMIT", "GITHUB_SHA"):
+        value = os.getenv(name, "").strip()
+        if value:
+            return value[:64]
+    return "unknown"
 
 
 def _error_response(
@@ -342,6 +353,15 @@ def validation_exception_handler(request: Request, exc: RequestValidationError) 
             cart_fields,
         )
     return _error_response(request, 422, "validation_error", "Invalid request payload", fields)
+
+
+@app.get("/health/live")
+def health_live() -> dict[str, object]:
+    return {
+        "schema_version": 1,
+        "live": True,
+        "source_sha": _source_sha(),
+    }
 
 
 @app.get("/health", response_model=HealthResponse)
