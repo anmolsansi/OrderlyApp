@@ -437,7 +437,7 @@ def test_migration_rerun_preserves_legacy_data_and_checksum_drift_fails_closed(
         "SELECT version, checksum_sha256 FROM schema_migrations ORDER BY version"
     ).fetchall()
     assert before_rows
-    assert all(row["checksum_sha256"] for row in before_rows)
+    assert all(row[1] for row in before_rows)
 
     migration_module.main()
 
@@ -451,8 +451,8 @@ def test_migration_rerun_preserves_legacy_data_and_checksum_drift_fails_closed(
     assert after_rows == before_rows
     assert preserved is not None
 
-    version = before_rows[0]["version"]
-    checksum = before_rows[0]["checksum_sha256"]
+    version = before_rows[0][0]
+    checksum = before_rows[0][1]
     try:
         postgres_connection.execute(
             "UPDATE schema_migrations SET checksum_sha256 = %s WHERE version = %s",
@@ -514,7 +514,7 @@ def test_api_process_startup_preserves_catalog_without_seed(
         (restaurant_id,),
     ).fetchone()
     assert preserved is not None
-    assert preserved["name"] == edited_name
+    assert preserved[0] == edited_name
 
     postgres_connection.execute("DELETE FROM restaurants WHERE id = %s", (restaurant_id,))
     postgres_connection.commit()
