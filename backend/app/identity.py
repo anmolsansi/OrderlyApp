@@ -312,6 +312,9 @@ def reset_guest(existing_token: str | None) -> IssuedGuest:
                     raise IdentityError(401, "session_invalid", "Guest session is invalid")
                 conn.execute("DELETE FROM carts WHERE session_id = %s", (verified.guest_id,))
                 conn.execute("DELETE FROM orders WHERE session_id = %s", (verified.guest_id,))
+                # Removing the owner cascades to current carts, receipts and
+                # idempotency records; all deletes and replacement are atomic.
+                conn.execute("DELETE FROM guest_sessions WHERE id = %s", (verified.guest_id,))
                 issued = _insert_guest(conn, settings.secret, now)
     except IdentityError:
         raise

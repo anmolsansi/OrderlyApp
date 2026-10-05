@@ -10,7 +10,7 @@ The original MVP let the browser create a `session-*` string and place it in car
 
 The backend generates two different values:
 
-1. **Guest ID** — server-only ownership key such as `guest-...`. Carts and orders use this value in their existing `session_id` column.
+1. **Guest ID** — server-only ownership key such as `guest-...`. Current `guest_carts`, `guest_orders`, and `order_idempotency` rows reference it through `owner_id`. Legacy `session_id` rows are not adopted.
 2. **Opaque cookie token** — random nonce + expiry + HMAC signature. Only this token reaches the browser. PostgreSQL stores only the SHA-256 hash of the random nonce, not the browser token.
 
 The cookie does not contain the guest ID. Decoding the cookie therefore cannot reveal the database ownership key.
@@ -28,9 +28,9 @@ The cookie does not contain the guest ID. Decoding the cookie therefore cannot r
 
 `POST /api/orderly/session` is safe to call repeatedly. A valid unexpired cookie keeps the same guest identity. An absent, expired, or invalid cookie creates a new isolated guest.
 
-`POST /api/orderly/session/reset` revokes the current guest, deletes that guest's cart/orders, creates a new guest, and rotates the cookie. The old token no longer authorizes protected requests.
+`POST /api/orderly/session/reset` locks/revokes the current guest, deletes its owner row, creates a new guest, and rotates the cookie. Existing foreign-key cascades immediately delete that guest's current basket, receipts, and idempotency records. Legacy rows with that exact guest ID are also deleted. All database changes share one transaction: if replacement fails, the old guest and its data remain intact. The old token no longer authorizes protected requests after a successful reset; other guests are unchanged.
 
-Expired/revoked guest rows and their guest-scoped cart/order rows are cleaned opportunistically during bootstrap. Legacy browser-generated session rows are never adopted by a new guest.
+Expired/revoked guest rows and their guest-scoped cart/order rows are removed by the explicit bounded retention job documented in `docs/runbooks/operations.md`. Bootstrap does not run cleanup or migrations. Legacy browser-generated session rows are never adopted by a new guest.
 
 ## Protected API
 

@@ -168,6 +168,13 @@ def test_two_guest_cookie_jars_are_isolated_and_reset_revokes_old_scope(
         """,
         (receipt_id, guest_a, json.dumps(receipt), created_at),
     )
+    postgres_connection.execute(
+        """
+        INSERT INTO order_idempotency (owner_id, idempotency_key, payload_sha256, order_id)
+        VALUES (%s, %s, %s, %s::uuid)
+        """,
+        (guest_a, "11111111-1111-4111-8111-111111111114", "a" * 64, receipt_id),
+    )
     postgres_connection.commit()
 
     a_cart = client_a.get("/v1/cart")
@@ -234,6 +241,16 @@ def test_two_guest_cookie_jars_are_isolated_and_reset_revokes_old_scope(
     assert new_token and new_token != old_token
     assert client_a.get("/v1/cart").json() == {"schema_version": 1, "revision": 0, "items": []}
     assert client_a.get("/v1/orders").json() == []
+    # Access revocation alone is insufficient: C1 promises immediate deletion.
+    for table in ("guest_carts", "guest_orders", "order_idempotency"):
+        assert postgres_connection.execute(
+            f"SELECT count(*) FROM {table} WHERE owner_id = %s", (guest_a,),
+        ).fetchone()[0] == 0
+    assert postgres_connection.execute(
+        "SELECT count(*) FROM guest_sessions WHERE id = %s", (guest_a,),
+    ).fetchone()[0] == 0
+    assert guest_id_for_token(postgres_connection, token_b) == guest_b
+    assert client_b.get("/v1/cart").json() == {"schema_version": 1, "revision": 1, "items": []}
 
     revoked = TestClient(app, base_url=TEST_ORIGIN).get(
         "/v1/cart",
