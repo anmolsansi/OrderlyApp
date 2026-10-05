@@ -1,14 +1,14 @@
 # OrderlyApp — Restart Plan
 
-> **Superseded for execution — October 4, 2026:** Use [development.md](development.md) for the current stabilization scope, dependencies and acceptance gates. This restart plan is retained as historical context; voice is deferred in the current plan.
+> **Historical plan — superseded for execution and acceptance as of October 5, 2026.** This file records the original restart/MVP intent and is retained for project history. Use [development.md](development.md) for the current stabilization contract, [docs/repo_context.md](docs/repo_context.md) for the implemented architecture, and [docs/releases/stabilization-acceptance.md](docs/releases/stabilization-acceptance.md) for current release evidence. Checked/planned items in this historical file do not prove current public acceptance. Voice was part of the original MVP concept but is deferred from the current stabilization release.
 
-## Status
-Restarted from scratch. New development root: `~/Documents/Projects/OrderlyApp`
+## Historical Status
+Restarted from scratch. Original development root: `~/Documents/Projects/OrderlyApp`.
 
-## Goal
+## Historical Goal
 Build a voice-first food ordering web app with mock checkout and order status.
 
-## Locked MVP
+## Historical Locked MVP
 - Restaurant browsing
 - Menu/item details
 - Voice add/edit/remove cart actions
@@ -18,7 +18,7 @@ Build a voice-first food ordering web app with mock checkout and order status.
 - Transcript + assistant response panel
 - Accessible visual confirmations
 
-## Start Order
+## Historical Start Order
 1. Finalize repo scaffold
 2. Lock stack and folder structure
 3. Implement shared contracts and mock data
@@ -28,5 +28,8 @@ Build a voice-first food ordering web app with mock checkout and order status.
 7. Add backend/database if retained
 8. Test, polish, release
 
-## Task list
+## Historical Task List
 See `docs/TASKS.md`.
+
+## Current Direction
+The current candidate is a manual mock-ordering release with voice deferred. API mode uses server-issued guest ownership and PostgreSQL-backed canonical cart/receipt authority; `local_demo` is an explicit fixture preview with no accepted checkout path. Current completion and public-release status must be read from `development.md` and the stabilization acceptance record rather than inferred from this original plan.
