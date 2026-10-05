@@ -54,3 +54,5 @@ No migration or new dependency is introduced. Existing additive PG schemas/accep
 Hosted CI is queued and is not counted as local acceptance. PR merge, deployment, INT-01/INT-02, retention/operational drills and RELEASE-GATE remain outside this completion claim. Existing unrelated audit and graph outputs are preserved.
 
 Graph indexing/export was unavailable because automatic approval review rejected exporting private repository contents; it was not bypassed. Existing local paths/source and runnable tests supplied the evidence.
+
+Published [PR #48](https://github.com/anmolsansi/OrderlyApp/pull/48). At publication, hosted dependency/web/backend/Chromium checks are queued; no hosted pass is asserted. Local services are stopped and generated Next.js files restored/removed.
