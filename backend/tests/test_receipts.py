@@ -427,3 +427,15 @@ def test_legacy_incomplete_order_is_preserved_but_not_exposed_as_c5_receipt(
         "SELECT id, subtotal_cents FROM orders WHERE id = 'ORD-LEGACY-ST06'"
     ).fetchone()
     assert legacy_row == ("ORD-LEGACY-ST06", 1000)
+
+
+def test_cursor_breaks_equal_timestamp_ties_without_skipping(receipt_environment):
+    owner = receipt_environment['owner_id']
+    timestamp = datetime(2030, 1, 1, tzinfo=timezone.utc)
+    ids = [f'11111111-1111-4111-8111-{n:012d}' for n in (1, 2, 3)]
+    for order_id in ids:
+        persist_receipt(owner, make_receipt(owner, created_at=timestamp, order_id=order_id))
+    first = list_order_snapshots_for_owner(owner, limit=2)
+    second = list_order_snapshots_for_owner(owner, limit=2, cursor=first[-1].id)
+    assert [r.id for r in first + second] == list(reversed(ids))
+    assert list_order_snapshots_for_owner(owner, cursor=second[-1].id) == []

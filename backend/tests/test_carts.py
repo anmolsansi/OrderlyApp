@@ -325,3 +325,36 @@ def test_http_conflict_contains_current_cart_and_storage_failure_is_typed(
     unavailable = client.get("/v1/cart")
     assert unavailable.status_code == 503
     assert unavailable.json()["error"]["code"] == "storage_unavailable"
+
+
+def test_post_update_failure_rolls_back_existing_basket(cart_environment, monkeypatch):
+    owner = cart_environment['owner_id']
+    accepted = put_cart(owner, 0, [line(cart_environment)])
+    update = cart_service.update_guest_cart_row
+
+    def fail_after_update(*args, **kwargs):
+        update(*args, **kwargs)
+        raise RuntimeError('synthetic failure after SQL update')
+
+    monkeypatch.setattr(cart_service, 'update_guest_cart_row', fail_after_update)
+    with pytest.raises(CartStorageUnavailableError):
+        put_cart(owner, 1, [line(cart_environment, line_id='replacement')])
+    assert get_cart(owner).model_dump(mode='json') == accepted.model_dump(mode='json')
+
+
+@pytest.mark.parametrize('change', [
+    {'quantity': 0}, {'quantity': 11}, {'quantity': True}, {'quantity': 1.5},
+    {'quantity': '1'}, {'special_instructions': 'x' * 501},
+    {'menu_item_id': 'unknown'}, {'name': 'spoof', 'base_price_cents': 1},
+])
+def test_invalid_http_write_preserves_accepted_basket(cart_environment, change):
+    owner = cart_environment['owner_id']
+    app.dependency_overrides[verify_request_guest] = lambda: VerifiedGuest(
+        guest_id=owner, expires_at=datetime.now(timezone.utc) + timedelta(hours=1))
+    client = TestClient(app, base_url=TEST_ORIGIN)
+    accepted = put_cart(owner, 0, [line(cart_environment)])
+    invalid = {**line(cart_environment).model_dump(mode='json'), **change}
+    response = client.put('/v1/cart', headers={'Origin': TEST_ORIGIN}, json={'expected_revision': 1, 'items': [invalid]})
+    assert response.status_code == 422, response.text
+    assert response.json()['error']['code'] == 'invalid_cart'
+    assert get_cart(owner).model_dump(mode='json') == accepted.model_dump(mode='json')
