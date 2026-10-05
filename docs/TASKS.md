@@ -1,9 +1,11 @@
 # OrderlyApp — Master Task List
 
-## Goal
+> **Historical checklist — superseded for current stabilization work as of October 5, 2026.** The checked items below record the original voice-first MVP build and are intentionally preserved as history. They are not current release-acceptance evidence and some implementation assumptions (voice requirement, cart/session storage, fallback behavior, startup lifecycle) were replaced by later C1–C8 stabilization contracts. Use [`../development.md`](../development.md) for current ticket/gate status and [`releases/stabilization-acceptance.md`](releases/stabilization-acceptance.md) for release evidence.
+
+## Historical Goal
 Build a voice-first food ordering web app from scratch at `~/Documents/Projects/OrderlyApp`.
 
-## Scope
+## Historical Scope
 - Browse restaurants
 - View menus and item details
 - Add/edit/remove cart items
@@ -122,7 +124,7 @@ Build a voice-first food ordering web app from scratch at `~/Documents/Projects/
 - [x] Final pass on bugs
 - [x] Tag release
 
-## Suggested Build Order
+## Historical Suggested Build Order
 1. Foundation
 2. Product design
 3. Mock data + contracts
@@ -132,3 +134,7 @@ Build a voice-first food ordering web app from scratch at `~/Documents/Projects/
 7. Backend + DB
 8. Tests + polish
 9. Release
+
+## Current Status Pointer
+
+The stabilized implementation has moved beyond this checklist. Current ordering behavior uses a server-issued guest cookie, canonical API data, PostgreSQL revisioned carts/immutable receipts/idempotency, explicit `api|local_demo` modes, and explicit operational lifecycle commands. Voice is deferred from the current release. Do not derive current completion from the historical checkmarks above.
