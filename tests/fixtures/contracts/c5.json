@@ -12,7 +12,7 @@
     "quote": {
       "schema_version": 1,
       "cart_revision": 1,
-      "catalog_fingerprint": "fixture-catalog-v1",
+      "catalog_fingerprint": "765f7cf419e98eef30e35b65c7a53156f7b72e415155dd019f650278084d7293",
       "totals": {
         "subtotal_cents": 1000,
         "discount_cents": 500,
@@ -37,7 +37,19 @@
           "unit_price_cents": 1000,
           "quantity": 1,
           "line_total_cents": 1000,
-          "modifiers": [],
+          "modifiers": [
+            {
+              "group_id": "size",
+              "name": "Size",
+              "options": [
+                {
+                  "id": "small",
+                  "name": "Small",
+                  "price_delta_cents": 0
+                }
+              ]
+            }
+          ],
           "special_instructions": "Synthetic fixture only"
         }
       ],
@@ -94,7 +106,9 @@
         "code": "invalid_checkout",
         "message": "Checkout details are invalid",
         "request_id": "synthetic-request-2",
-        "fields": ["checkout.postal_code"]
+        "fields": [
+          "checkout.postal_code"
+        ]
       }
     },
     {

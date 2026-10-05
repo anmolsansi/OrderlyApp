@@ -64,9 +64,15 @@
                   }
                 ]
               }
-            ]
+            ],
+            "description": "Synthetic fixture only",
+            "image_emoji": "M"
           }
-        ]
+        ],
+        "rating": 4.8,
+        "delivery_minutes": "10-20 min",
+        "image_emoji": "R",
+        "tags": []
       }
     ],
     "authority_case": {
@@ -80,7 +86,9 @@
         "modifiers": [
           {
             "group_id": "size",
-            "option_ids": ["large"]
+            "option_ids": [
+              "large"
+            ]
           }
         ]
       },
@@ -94,7 +102,9 @@
         "modifiers": [
           {
             "group_id": "size",
-            "option_ids": ["large"]
+            "option_ids": [
+              "large"
+            ]
           }
         ],
         "unit_price_cents": 1300
@@ -119,7 +129,9 @@
         "code": "invalid_cart",
         "message": "Cart contains invalid catalog choices",
         "request_id": "synthetic-request-2",
-        "fields": ["items.0.menu_item_id"]
+        "fields": [
+          "items.0.menu_item_id"
+        ]
       }
     },
     {
@@ -129,7 +141,9 @@
         "code": "invalid_cart",
         "message": "Cart contains invalid catalog choices",
         "request_id": "synthetic-request-3",
-        "fields": ["items.0.restaurant_id"]
+        "fields": [
+          "items.0.restaurant_id"
+        ]
       }
     },
     {
@@ -139,7 +153,9 @@
         "code": "invalid_cart",
         "message": "Cart contains invalid catalog choices",
         "request_id": "synthetic-request-4",
-        "fields": ["items.0.menu_item_id"]
+        "fields": [
+          "items.0.menu_item_id"
+        ]
       }
     },
     {
@@ -149,7 +165,9 @@
         "code": "invalid_cart",
         "message": "Cart contains invalid catalog choices",
         "request_id": "synthetic-request-5",
-        "fields": ["items.0.modifiers"]
+        "fields": [
+          "items.0.modifiers"
+        ]
       }
     },
     {
@@ -159,7 +177,9 @@
         "code": "invalid_cart",
         "message": "Cart contains invalid catalog choices",
         "request_id": "synthetic-request-6",
-        "fields": ["items.0.modifiers.1.option_ids"]
+        "fields": [
+          "items.0.modifiers.1.option_ids"
+        ]
       }
     },
     {
@@ -169,7 +189,9 @@
         "code": "invalid_cart",
         "message": "Cart contains invalid catalog choices",
         "request_id": "synthetic-request-7",
-        "fields": ["items.1.id"]
+        "fields": [
+          "items.1.id"
+        ]
       }
     },
     {
@@ -179,7 +201,9 @@
         "code": "invalid_cart",
         "message": "Cart contains invalid catalog choices",
         "request_id": "synthetic-request-8",
-        "fields": ["items.0.modifiers.1.group_id"]
+        "fields": [
+          "items.0.modifiers.1.group_id"
+        ]
       }
     },
     {
@@ -189,7 +213,9 @@
         "code": "invalid_cart",
         "message": "Cart contains invalid catalog choices",
         "request_id": "synthetic-request-9",
-        "fields": ["items.0.modifiers.0.group_id"]
+        "fields": [
+          "items.0.modifiers.0.group_id"
+        ]
       }
     },
     {
@@ -199,7 +225,9 @@
         "code": "invalid_cart",
         "message": "Cart contains invalid catalog choices",
         "request_id": "synthetic-request-10",
-        "fields": ["items.0.modifiers.0.option_ids.1"]
+        "fields": [
+          "items.0.modifiers.0.option_ids.1"
+        ]
       }
     },
     {
@@ -209,7 +237,9 @@
         "code": "invalid_cart",
         "message": "Cart contains invalid catalog choices",
         "request_id": "synthetic-request-11",
-        "fields": ["items.0.modifiers.0.option_ids.0"]
+        "fields": [
+          "items.0.modifiers.0.option_ids.0"
+        ]
       }
     },
     {
@@ -219,7 +249,9 @@
         "code": "invalid_cart",
         "message": "Cart contains invalid catalog choices",
         "request_id": "synthetic-request-12",
-        "fields": ["items.0.modifiers.1.option_ids.0"]
+        "fields": [
+          "items.0.modifiers.1.option_ids.0"
+        ]
       }
     },
     {
@@ -229,7 +261,9 @@
         "code": "invalid_cart",
         "message": "Cart contains invalid catalog choices",
         "request_id": "synthetic-request-13",
-        "fields": ["items.1.restaurant_id"]
+        "fields": [
+          "items.1.restaurant_id"
+        ]
       }
     },
     {
@@ -239,7 +273,9 @@
         "code": "invalid_cart",
         "message": "Cart contains invalid catalog choices",
         "request_id": "synthetic-request-14",
-        "fields": ["items.0.quantity"]
+        "fields": [
+          "items.0.quantity"
+        ]
       }
     },
     {
@@ -249,7 +285,9 @@
         "code": "invalid_cart",
         "message": "Cart contains invalid catalog choices",
         "request_id": "synthetic-request-15",
-        "fields": ["items.0.special_instructions"]
+        "fields": [
+          "items.0.special_instructions"
+        ]
       }
     }
   ]
