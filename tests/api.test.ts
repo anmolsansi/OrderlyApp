@@ -12,6 +12,7 @@ import {
   loadCheckoutRecovery,
   saveCheckoutRecovery,
   saveRevisionedCart,
+  resetGuestSession,
   submitCheckoutOrder,
 } from '../lib/api';
 import { restaurants } from '../lib/mock-data';
@@ -175,6 +176,31 @@ describe('C7 web API adapter', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
+  });
+
+  it('guest reset aborts active requests and prevents queued old-scope cart writes', async () => {
+    let started!: () => void;
+    const activeStarted = new Promise<void>(resolve => { started = resolve; });
+    let writes = 0;
+    gatewayMock((url, init) => {
+      if (url.endsWith('/session/reset')) return mockJsonResponse({ schema_version: 1 });
+      if (init?.method === 'PUT') {
+        writes += 1;
+        started();
+        return new Promise<Response>((_resolve, reject) => {
+          init.signal!.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
+        });
+      }
+      return mockJsonResponse({ schema_version: 1, revision: 0, items: [] });
+    });
+    const active = saveRevisionedCart(0, [cartItem]);
+    await activeStarted;
+    const queued = saveRevisionedCart(1, [cartItem]);
+    expect(await resetGuestSession()).toBe(true);
+    expect(await active).toMatchObject({ ok: false, error: { code: 'request_aborted' } });
+    expect(await queued).toMatchObject({ ok: false, error: { code: 'request_aborted' } });
+    expect(writes).toBe(1);
+    expect(await fetchRevisionedCart()).toMatchObject({ ok: true, data: { revision: 0, items: [] } });
   });
 
   it('uses API by default and requires explicit local_demo selection', () => {

@@ -30,6 +30,8 @@ The cookie does not contain the guest ID. Decoding the cookie therefore cannot r
 
 `POST /api/orderly/session/reset` locks/revokes the current guest, deletes its owner row, creates a new guest, and rotates the cookie. Existing foreign-key cascades immediately delete that guest's current basket, receipts, and idempotency records. Legacy rows with that exact guest ID are also deleted. All database changes share one transaction: if replacement fails, the old guest and its data remain intact. The old token no longer authorizes protected requests after a successful reset; other guests are unchanged.
 
+The browser adapter aborts active protected requests and rejects queued basket writes captured under the old guest scope when reset begins. It blocks new protected requests until reset settles, then creates a fresh request scope. The account reset action removes old checkout recovery data after server reset; a blocked storage cleanup is reported explicitly. Cancellation cannot undo a write already committed on the server: the transactional owner deletion removes its old-scope records on successful reset.
+
 Expired/revoked guest rows and their guest-scoped cart/order rows are removed by the explicit bounded retention job documented in `docs/runbooks/stabilization.md`. Bootstrap does not run cleanup or migrations. Legacy browser-generated session rows are never adopted by a new guest.
 
 ## Protected API

@@ -65,6 +65,7 @@ test('profile name and forged local id preserve own receipts and cannot access a
     expect(access.ids).not.toContain(foreignOrder);
     expect((await context.cookies()).find(cookie => cookie.name === 'orderly_guest')?.value).toBe(guestBefore!.value);
 
+    await page.evaluate(() => sessionStorage.setItem('orderlyapp.marketplace.checkoutRecovery.v1', 'synthetic-old-scope'));
     await page.getByRole('button', { name: /start fresh guest session/i }).click();
     await expect(page.getByRole('status')).toContainText(/fresh guest session started/i);
     const resetAccess = await page.evaluate(async orderId => {
@@ -73,6 +74,7 @@ test('profile name and forged local id preserve own receipts and cannot access a
       return { history: await history.json(), status: receipt.status };
     }, ownOrder);
     expect(resetAccess).toEqual({ history: [], status: 404 });
+    expect(await page.evaluate(() => sessionStorage.getItem('orderlyapp.marketplace.checkoutRecovery.v1'))).toBeNull();
     expect((await otherPage.request.get(`/api/orderly/orders/${foreignOrder}`)).status()).toBe(200);
   } finally {
     await otherContext.close();
@@ -97,4 +99,26 @@ test('browser upgrade removes legacy passwords while retaining unrelated prefere
   }
   expect(JSON.stringify(snapshot)).not.toContain('synthetic-legacy-secret');
   expect(snapshot['unrelated.preference']).toBe('keep-me');
+});
+
+test('blocked checkout recovery cleanup reports that the server guest already rotated', async ({ page, context }) => {
+  await page.goto('/sign-in?next=%2Faccount');
+  await page.getByRole('button', { name: /use demo profile/i }).click();
+  await expect(page).toHaveURL(/\/account/);
+  await page.evaluate(async () => { await fetch('/api/orderly/session', { method: 'POST' }); });
+  const before = (await context.cookies()).find(cookie => cookie.name === 'orderly_guest');
+  expect(before).toBeTruthy();
+  await page.evaluate(() => {
+    const originalRemove = Storage.prototype.removeItem;
+    Storage.prototype.removeItem = function removeItem(key: string): void {
+      if (this === window.sessionStorage && key === 'orderlyapp.marketplace.checkoutRecovery.v1') {
+        throw new DOMException('Synthetic recovery cleanup block', 'SecurityError');
+      }
+      originalRemove.call(this, key);
+    };
+  });
+  await page.getByRole('button', { name: /start fresh guest session/i }).click();
+  await expect(page.getByRole('alert').filter({ hasText: /fresh guest session started, but old checkout recovery data could not be cleared/i })).toBeVisible();
+  expect((await context.cookies()).find(cookie => cookie.name === 'orderly_guest')?.value).not.toBe(before!.value);
+  await expect(page.getByRole('button', { name: /start fresh guest session/i })).toBeEnabled();
 });

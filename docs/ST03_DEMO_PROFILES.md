@@ -56,6 +56,8 @@ The migration never calls `localStorage.clear()`. Cart and order-history keys ar
 
 **Start fresh guest session** calls the existing ST-02 `resetGuestSession()` client operation. On success, the server rotates the private guest scope and the page then clears the local demo profile so the user must choose presentation data again.
 
+The reset also clears this tab's old checkout recovery record. Profile rename and **Forget local profile** do not clear it or rotate the guest. If recovery cleanup is blocked after the server rotates, the page states that partial result explicitly.
+
 If guest reset fails, the existing guest scope remains active and the UI reports the failure. If the guest rotates successfully but local storage cleanup fails, the UI reports that partial local cleanup problem instead of pretending the whole reset failed.
 
 ## Checkout compatibility
