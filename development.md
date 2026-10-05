@@ -1,8 +1,8 @@
 # OrderlyApp development guide — stabilization
 
-Revision: 2 • Updated: 2026-10-04 • Assessed source: `9222c10435e3a96396ab7c1b39e4d6d79d839771` on `main` • Release status: **Not completed**.
+Revision: 3 • Updated: 2026-10-05 • ST-02/ST-03 acceptance source: `a9537931c57cbf636466bf3f791e440e24ce74bd` on `fix/st02-st03-acceptance` • Release status: **Not completed**.
 
-This is the single execution guide for taking the existing application to a stable **public mock demo**. **ST-01 is now implemented and verified.** ST-02 through ST-13 and the integration/release gates remain **Not completed**. This guide began as planning-only documentation; the dated ST-01 evidence below records the authorized implementation that followed. No later ticket is implied complete by ST-01.
+This is the single execution guide for taking the existing application to a stable **public mock demo**. **ST-01 is implemented and verified. ST-02 and ST-03 implementation/local acceptance are completed on the identified follow-up branch; PR CI and merge are pending.** ST-04 through ST-13 and the integration/release gates remain **Not completed**. See [ST-02/ST-03 acceptance](docs/qa/st02-st03-acceptance/acceptance.md) for current criteria and evidence. This guide began as planning-only documentation; the dated ST-01 evidence below records the authorized implementation that followed. No later ticket is implied complete by ST-01.
 
 Think of the app as a shop made from Lego. The screens already look like a shop, but some connections behind them can lose a basket, show another visitor's receipt, or pretend an order succeeded when the server failed. First we strengthen those connections. Then we add more Lego.
 
@@ -167,7 +167,7 @@ The contract designs below remain authoritative. **C0 is frozen by completed ST-
 7. **Preconditions:** API mode, >=32-byte random signing secret, exact allowed origins.
 8. **Postconditions:** Valid bootstrap preserves identity; new/reset/expired session cannot read previous guest data.
 9. **Errors:** 401 session_required/session_expired;403 origin_forbidden;503 storage_unavailable.
-10. **Retry / idempotency:** Bootstrap repeat preserves valid guest; reset intentionally creates new guest and marks previous for deletion.
+10. **Retry / idempotency:** Bootstrap repeat preserves valid guest; reset intentionally creates a new guest and atomically deletes the old guest scope through existing foreign-key cascades; a failed replacement rolls back all changes.
 11. **Ordering / concurrency:** Bootstrap completes before protected requests; reset aborts pending client writes.
 12. **Security / privacy:** HttpOnly; Secure on HTTPS; SameSite=Lax; Path=/api/orderly on browser; backend validates signature/expiry; no identity header bypass; generic404 for foreign orders.
 13. **Migration / lifecycle:** 30-day expiry; API traffic never extends it silently; secret rotation invalidates old tokens; cleanup deletes expired scoped carts/orders/idempotency records; legacy unowned data remains offline.
@@ -362,7 +362,7 @@ flowchart TD
 
 ### Machine-readable edge table
 
-Each row is a directed edge. `fixture` means provider-design schema plus executable ST-01 synthetic fixture; provider freeze/conformance is mandatory before merge. `released` means previous shared-file writer finished its reviewed diff. **ST-01 C0/fixture handoff is achieved; later provider freeze/release states are not.**
+Each row is a directed edge. `fixture` means provider-design schema plus executable ST-01 synthetic fixture; provider freeze/conformance is mandatory before merge. `released` means previous shared-file writer finished its reviewed diff. **ST-01 C0/fixture handoff is achieved. C1/C2 local conformance is verified on the ST-02/ST-03 follow-up branch; merge/publication handoff remains pending. Other provider release states are not reconciled by this update.**
 
 | From | To | Contract / gate | Start dependency | Merge dependency | Runtime dependency | Verification |
 |---|---|---|---|---|---|---|
@@ -410,16 +410,16 @@ Consumers may prepare read-only designs after W0 fixtures; implementation starts
 
 ## 9. Task index and remaining work
 
-**ST-01 is Completed.** ST-02 through ST-13, INT-01, INT-02, and RELEASE-GATE remain **Not completed**. Effort is an estimate for one engineer familiar with the stack, excluding queue time and unavailable infrastructure. Split a ticket before starting if its concrete diff will exceed three engineer-days; preserve its contract seam, owned files and acceptance tests.
+**ST-01 is Completed. ST-02 and ST-03 are Completed for branch implementation/local acceptance; PR CI and merge remain pending.** ST-04 through ST-13, INT-01, INT-02, and RELEASE-GATE remain **Not completed**. Effort is an estimate for one engineer familiar with the stack, excluding queue time and unavailable infrastructure. Split a ticket before starting if its concrete diff will exceed three engineer-days; preserve its contract seam, owned files and acceptance tests.
 
 | Ticket / outcome / status | Wave | Dependencies | Effort | Critical path |
 |---|---|---|---|---|
 
 | [ST-01 — Reproduce the baseline and publish executable contracts](#st-01) — **Completed** | W0 | None | 3d | Yes |
 
-| [ST-02 — Give each visitor a private server-issued guest session](#st-02) — **Not completed** | W1 | ST-01 via C0 | 3d | Yes |
+| [ST-02 — Give each visitor a private server-issued guest session](#st-02) — **Completed — branch/local acceptance; PR CI/merge pending** | W1 | ST-01 via C0 | 3d | Yes |
 
-| [ST-03 — Replace local passwords with honest demo profiles](#st-03) — **Not completed** | W2 | ST-02 via C1 | 2d | Convergence lane |
+| [ST-03 — Replace local passwords with honest demo profiles](#st-03) — **Completed — branch/local acceptance; PR CI/merge pending** | W2 | ST-02 via C1 | 2d | Convergence lane |
 
 | [ST-04 — Validate and price items from one canonical catalog](#st-04) — **Not completed** | W2 | ST-01 via C0; ST-02 shared backend files released | 3d | Yes |
 
@@ -554,7 +554,7 @@ P0: ownership/password removal, truthful checkout, canonical money/validation, d
 
 ### ST-02 — Give each visitor a private server-issued guest session
 
-**Status:** Not completed. **Execution owner:** Unassigned. **Objective:** Guest A cannot read/list/change Guest B data by IDs, forged cookie or spoofed proxy headers.
+**Status:** Completed — implementation/local acceptance on the identified branch; PR CI/merge pending. **Execution owner:** Anmol Sansi / Codex follow-up. **Objective:** Guest A cannot read/list/change Guest B data by IDs, forged cookie or spoofed proxy headers.
 
 **Why this task exists:** Today a browser-chosen session string is treated like ownership, and orders can be listed globally. That is like opening every visitor's locker with a label instead of a lock. A signed guest cookie provides actual isolation without adding real accounts.
 
@@ -591,15 +591,15 @@ P0: ownership/password removal, truthful checkout, canonical money/validation, d
 
 **Implementation steps / TODOs:**
 
-- [ ] **ST-02.01** — Implement signed random guest session bootstrap/expiry/reset and guest persistence. Require explicit mode, secret and allowed Origin; reject insecure/missing production config.
+- [x] **ST-02.01** — Implement signed random guest session bootstrap/expiry/reset and guest persistence. Require explicit mode, secret and allowed Origin; reject insecure/missing production config.
 
-- [ ] **ST-02.02** — Create bounded same-origin gateway with method/path allowlist and safe cookie/Set-Cookie forwarding. Do not forward arbitrary upstream URLs, client owner headers or request-body ownership.
+- [x] **ST-02.02** — Create bounded same-origin gateway with method/path allowlist and safe cookie/Set-Cookie forwarding. Do not forward arbitrary upstream URLs, client owner headers or request-body ownership.
 
-- [ ] **ST-02.03** — Make every cart/order route depend on verified session; remove global order listing and disable old /sessions/{id} access in API mode. Return generic404 for foreign order IDs.
+- [x] **ST-02.03** — Make every cart/order route depend on verified session; remove global order listing and disable old /sessions/{id} access in API mode. Return generic404 for foreign order IDs.
 
-- [ ] **ST-02.04** — Preserve valid guest bootstrap identity; handle expiry/reset by clearing client session-derived state. Create guest migration without adopting old session IDs.
+- [x] **ST-02.04** — Preserve valid guest bootstrap identity; handle expiry/reset by clearing client session-derived state. Create guest migration without adopting old session IDs.
 
-- [ ] **ST-02.05** — Test cookie flags, signatures, Origin/forged-header attacks, reset/expiry and two guests through both real gateway and direct API. Freeze C1.
+- [x] **ST-02.05** — Test cookie flags, signatures, Origin/forged-header attacks, reset/expiry and two guests through both real gateway and direct API. Freeze C1.
 
 **Invariants affected:** INV-01, INV-09; acceptance/tests below are enforcement proof.
 
@@ -617,11 +617,13 @@ P0: ownership/password removal, truthful checkout, canonical money/validation, d
 
 **Acceptance criteria / completion proof:**
 
-1. **ST-02-AC1 — PASS/FAIL:** Guest A cannot read/list/change Guest B data by IDs, forged cookie or spoofed proxy headers. Attach the shared evidence form.
+Current criterion-indexed proof: [ST-02/ST-03 acceptance](docs/qa/st02-st03-acceptance/acceptance.md). This is branch/local evidence, not merged or public deployment acceptance.
 
-2. **ST-02-AC2 — PASS/FAIL:** Allowed-origin bootstrap preserves valid identity; forbidden-origin mutations fail403; missing/expired session fails401. Attach the shared evidence form.
+1. **ST-02-AC1 — PASS (local acceptance):** Guest A cannot read/list/change Guest B data by IDs, forged cookie or spoofed proxy headers. Attach the shared evidence form.
 
-3. **ST-02-AC3 — PASS/FAIL:** HTTPS cookie is HttpOnly/Secure/SameSite and no owner identifier/password appears in browser storage or API body. Attach the shared evidence form.
+2. **ST-02-AC2 — PASS (local acceptance):** Allowed-origin bootstrap preserves valid identity; forbidden-origin mutations fail403; missing/expired session fails401. Attach the shared evidence form.
+
+3. **ST-02-AC3 — PASS (local acceptance):** HTTPS cookie is HttpOnly/Secure/SameSite and no owner identifier/password appears in browser storage or API body. Attach the shared evidence form.
 
 **Rollback / recovery:** Disable public API exposure if identity fails; do not reopen legacy unscoped endpoints. Roll back app only to a version compatible with additive guest schema; rotating secret safely forces isolated new sessions.
 
@@ -635,7 +637,7 @@ P0: ownership/password removal, truthful checkout, canonical money/validation, d
 
 ### ST-03 — Replace local passwords with honest demo profiles
 
-**Status:** Not completed. **Execution owner:** Unassigned. **Objective:** No UI collects a password and no versioned/legacy application key retains one after migration.
+**Status:** Completed — implementation/local acceptance on the identified branch; PR CI/merge pending. **Execution owner:** Anmol Sansi / Codex follow-up. **Objective:** No UI collects a password and no versioned/legacy application key retains one after migration.
 
 **Why this task exists:** The old sign-up screen stores real-looking passwords without providing server authentication. A public mock demo should let a child pick a demo name without teaching them to trust a pretend login.
 
@@ -667,15 +669,15 @@ P0: ownership/password removal, truthful checkout, canonical money/validation, d
 
 **Implementation steps / TODOs:**
 
-- [ ] **ST-03.01** — Replace signUpWithCredentials/signInWithCredentials and raw AuthAccount password persistence with validated versioned presentation profiles. Retain wrapper compatibility only while updating all actual callers in the same diff.
+- [x] **ST-03.01** — Replace signUpWithCredentials/signInWithCredentials and raw AuthAccount password persistence with validated versioned presentation profiles. Retain wrapper compatibility only while updating all actual callers in the same diff.
 
-- [ ] **ST-03.02** — Remove password fields, password prompts and claims of secure login. Label profile selection as demo-only, with synthetic contact/address defaults.
+- [x] **ST-03.02** — Remove password fields, password prompts and claims of secure login. Label profile selection as demo-only, with synthetic contact/address defaults.
 
-- [ ] **ST-03.03** — Delete exact legacy credential/session keys on upgrade without localStorage.clear; reject malformed/unknown data shapes. Handle storage access/write exceptions visibly.
+- [x] **ST-03.03** — Delete exact legacy credential/session keys on upgrade without localStorage.clear; reject malformed/unknown data shapes. Handle storage access/write exceptions visibly.
 
-- [ ] **ST-03.04** — Ensure profile changes and sign-out label actions do not grant access to any new guest order data; use explicit forget/reset for server scope change.
+- [x] **ST-03.04** — Ensure profile changes and sign-out label actions do not grant access to any new guest order data; use explicit forget/reset for server scope change.
 
-- [ ] **ST-03.05** — Update navigation/account/sign-in tests; freeze C2 with storage snapshots containing no credentials.
+- [x] **ST-03.05** — Update navigation/account/sign-in tests; freeze C2 with storage snapshots containing no credentials.
 
 **Invariants affected:** INV-09; acceptance/tests below are enforcement proof.
 
@@ -693,11 +695,13 @@ P0: ownership/password removal, truthful checkout, canonical money/validation, d
 
 **Acceptance criteria / completion proof:**
 
-1. **ST-03-AC1 — PASS/FAIL:** No UI collects a password and no versioned/legacy application key retains one after migration. Attach the shared evidence form.
+Current criterion-indexed proof: [ST-02/ST-03 acceptance](docs/qa/st02-st03-acceptance/acceptance.md). This is branch/local evidence, not merged or public deployment acceptance.
 
-2. **ST-03-AC2 — PASS/FAIL:** Changing profile name or local ID never changes access to server orders. Attach the shared evidence form.
+1. **ST-03-AC1 — PASS (local acceptance):** No UI collects a password and no versioned/legacy application key retains one after migration. Attach the shared evidence form.
 
-3. **ST-03-AC3 — PASS/FAIL:** Malformed or unavailable storage does not crash the page; reset has a clear result. Attach the shared evidence form.
+2. **ST-03-AC2 — PASS (local acceptance):** Changing profile name or local ID never changes access to server orders. Attach the shared evidence form.
+
+3. **ST-03-AC3 — PASS (local acceptance):** Malformed or unavailable storage does not crash the page; reset has a clear result. Attach the shared evidence form.
 
 **Rollback / recovery:** Revert UI only with password-free compatibility adapter; never reintroduce secret storage. If migration fails, disable profile edits and offer explicit reset while preserving guest orders.
 
