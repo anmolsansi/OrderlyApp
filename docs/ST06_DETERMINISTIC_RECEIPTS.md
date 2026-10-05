@@ -175,6 +175,8 @@ limit=1..50
 cursor=<last receipt UUID from the previous page>
 ```
 
+The browser gateway at `GET /api/orderly/orders` forwards only `limit` and `cursor` to the versioned backend. Ownership still comes exclusively from the verified guest cookie. List parameters are not forwarded on order submissions or individual receipt reads; backend validation enforces the page-size and cursor bounds.
+
 The cursor is resolved only inside the current guest's ownership scope. A missing, malformed, or foreign cursor is not used to expose another guest's position.
 
 `GET /v1/orders/{id}` returns exactly one immutable receipt owned by the current guest. A nonexistent or foreign receipt returns the same HTTP 404 `order_not_found` response.

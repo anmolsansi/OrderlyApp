@@ -171,6 +171,11 @@ async function proxy(request: NextRequest, context: RouteContext): Promise<NextR
 
   if (path === 'restaurants' || path.startsWith('restaurants/')) {
     target.search = request.nextUrl.search;
+  } else if (path === 'orders' && request.method === 'GET') {
+    for (const name of ['limit', 'cursor']) {
+      const value = request.nextUrl.searchParams.get(name);
+      if (value !== null) target.searchParams.set(name, value);
+    }
   }
 
   const controller = new AbortController();

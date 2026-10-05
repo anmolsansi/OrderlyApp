@@ -25,6 +25,24 @@ async function call(handler: Handler, method: string, path: string, init?: Gatew
 }
 
 describe('same-origin Orderly API gateway', () => {
+  it('forwards receipt pagination on GET while ignoring caller ownership and unrelated queries', async () => {
+    process.env.ORDERLY_API_ORIGIN = 'https://api.orderly.test';
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('[]', { status: 200 }));
+    const cursor = '11111111-1111-4111-8111-111111111112';
+    await GET(new NextRequest(`https://orderly.test/api/orderly/orders?limit=2&cursor=${cursor}&owner_id=other&debug=1`), context('orders'));
+    expect(String(fetchMock.mock.calls[0][0])).toBe(`https://api.orderly.test/v1/orders?limit=2&cursor=${cursor}`);
+  });
+
+  it('does not forward list parameters on order submission or individual receipt reads', async () => {
+    process.env.ORDERLY_API_ORIGIN = 'https://api.orderly.test';
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response('{}', { status: 200 }));
+    await POST(new NextRequest('https://orderly.test/api/orderly/orders?limit=2&cursor=ignored', {
+      method: 'POST', headers: { origin: 'https://orderly.test' },
+    }), context('orders'));
+    await GET(new NextRequest('https://orderly.test/api/orderly/orders/order-id?limit=2'), context('orders', 'order-id'));
+    expect(String(fetchMock.mock.calls[0][0])).toBe('https://api.orderly.test/v1/orders');
+    expect(String(fetchMock.mock.calls[1][0])).toBe('https://api.orderly.test/v1/orders/order-id');
+  });
   afterEach(() => {
     vi.restoreAllMocks();
     delete process.env.ORDERLY_API_ORIGIN;
