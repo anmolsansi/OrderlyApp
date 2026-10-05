@@ -60,15 +60,16 @@ The committed `package-lock.json` is authoritative. Do not replace `npm ci` with
 
 ## Backend and Python dependency verification
 
-For the strict security scan, install the backend candidate non-editably so `pip-audit --strict` can inspect the installed environment without treating the application itself as an unresolved editable distribution:
+For the strict security scan, resolve the candidate's third-party environment first. Then uninstall only the local `orderlyapp-backend` distribution before auditing, because that private application package is not a PyPI dependency and `pip-audit --strict` correctly rejects unresolved non-PyPI distributions. `pip uninstall` does not remove the already-resolved third-party dependencies, so those packages remain available for the strict scan:
 
 ```bash
 python -m pip install ./backend
 python -m pip install -r backend/requirements-test.lock
+python -m pip uninstall -y orderlyapp-backend
 python -m pip_audit --local --strict --progress-spinner=off
 ```
 
-The hosted security job records current JSON results for both npm and Python audits. Each audit is allowed to finish and produce evidence, then a final enforcement step fails the job if either scan outcome is not successful. This keeps one failing ecosystem from hiding the current result of the other.
+The hosted security job records current JSON results for both npm and Python audits. Each audit is allowed to finish and produce evidence, then a final enforcement step fails the job if either scan outcome is not successful. This keeps one failing ecosystem from hiding the current result of the other. Do not add a vulnerability allowlist merely to make this gate green.
 
 For backend behavior tests, hosted CI uses an isolated PostgreSQL 16 database and Redis 7 service:
 
