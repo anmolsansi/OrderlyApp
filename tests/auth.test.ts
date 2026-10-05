@@ -21,6 +21,7 @@ import {
   SESSION_STORAGE_KEY,
 } from '../lib/cart';
 import { routes, sanitizeAppReturnPath } from '../lib/routes';
+import c2 from './fixtures/contracts/c2.json';
 
 type StorageFailure = 'get' | 'set' | 'remove';
 
@@ -57,6 +58,13 @@ function createStorage(
 }
 
 describe('C2 demo profile storage', () => {
+  it('conforms to the frozen C2 positive profile, address and storage fixtures', () => {
+    const { storage, snapshot } = createStorage();
+    expect(saveDemoProfile(storage, c2.positive.profile as Parameters<typeof saveDemoProfile>[1]))
+      .toEqual({ ok: true, value: c2.positive.profile });
+    expect(getDemoAddresses(storage)).toEqual({ ok: true, value: c2.positive.addresses });
+    expect(snapshot()).toEqual(c2.positive.storage_snapshot);
+  });
   it('round-trips a valid versioned profile and seeds only synthetic addresses', () => {
     const { storage } = createStorage();
     const profile = createDefaultDemoProfile('Riley Demo', 'demo-address-2');
