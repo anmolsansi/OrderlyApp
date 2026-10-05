@@ -487,3 +487,14 @@ def test_real_api_restart_and_unreachable_postgres_preserve_state(cart_environme
         if guest_id:
             postgres_connection.execute('DELETE FROM guest_sessions WHERE id = %s', (guest_id,))
             postgres_connection.commit()
+
+
+def test_line_limit_preserves_accepted_basket(cart_environment):
+    owner = cart_environment['owner_id']
+    accepted = put_cart(owner, 0, [line(cart_environment)])
+    app.dependency_overrides[verify_request_guest] = lambda: VerifiedGuest(guest_id=owner, expires_at=datetime.now(timezone.utc) + timedelta(hours=1))
+    items = [line(cart_environment, line_id=f'line-{n}').model_dump(mode='json') for n in range(51)]
+    response = TestClient(app, base_url=TEST_ORIGIN).put('/v1/cart', headers={'Origin': TEST_ORIGIN}, json={'expected_revision': 1, 'items': items})
+    assert response.status_code == 422
+    assert response.json()['error']['fields'] == ['items']
+    assert get_cart(owner).model_dump(mode='json') == accepted.model_dump(mode='json')
