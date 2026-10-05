@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import importlib.util
 import json
+import os
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
+import subprocess
+import sys
 from typing import Any, Iterator
 from uuid import uuid4
 
@@ -14,6 +19,8 @@ from app import main as main_module
 from app.identity import cleanup_expired_guests
 from app.main import app
 from app.order_service import _lock_active_guest
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
 
 class _Rows:
@@ -84,6 +91,16 @@ def _configure_ready_environment(monkeypatch, *, source_sha: str = "abc123") -> 
     monkeypatch.delenv("ORDERLY_CHECKOUT_RATE_WINDOW_SECONDS", raising=False)
     monkeypatch.delenv("ORDERLY_CHECKOUT_RATE_LIMIT_PER_GUEST", raising=False)
     monkeypatch.delenv("ORDERLY_CHECKOUT_RATE_LIMIT_AGGREGATE", raising=False)
+
+
+def _load_migrate_module():
+    path = REPOSITORY_ROOT / "backend" / "scripts" / "migrate.py"
+    spec = importlib.util.spec_from_file_location("orderly_migrate_test", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("Unable to load migration runner")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def test_liveness_is_process_only_and_redacted(isolated_environment, monkeypatch) -> None:
@@ -206,6 +223,29 @@ def test_readiness_dependency_failure_never_exposes_connection_details(monkeypat
     assert "hidden-user" not in serialized
     assert "hidden-pass" not in serialized
     assert response.json()["dependencies"]["postgres"] == "unavailable"
+
+
+def test_readiness_recovers_without_process_restart(monkeypatch) -> None:
+    _configure_ready_environment(monkeypatch)
+    outcomes = iter([False, True])
+
+    @contextmanager
+    def recovering_connection(*, connect_timeout_seconds: int | None = None):
+        assert connect_timeout_seconds == 2
+        if not next(outcomes):
+            raise RuntimeError("database unavailable")
+        yield _ReadyConnection()
+
+    monkeypatch.setattr(main_module, "get_connection", recovering_connection)
+    client = TestClient(app)
+
+    unavailable = client.get("/health/ready")
+    recovered = client.get("/health/ready")
+
+    assert unavailable.status_code == 503
+    assert unavailable.json()["dependencies"]["postgres"] == "unavailable"
+    assert recovered.status_code == 200
+    assert recovered.json()["ready"] is True
 
 
 def test_checkout_rate_limit_rejects_per_guest_excess(monkeypatch) -> None:
@@ -373,3 +413,128 @@ def test_cleanup_skips_guest_locked_by_checkout(
         (guest_id,),
     ).fetchone()
     assert removed is None
+
+
+def test_migration_rerun_preserves_legacy_data_and_checksum_drift_fails_closed(
+    postgres_connection: Any,
+    postgres_database_url: str,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("DATABASE_URL", postgres_database_url)
+    migration_module = _load_migrate_module()
+    legacy_order_id = f"st11-legacy-{uuid4().hex}"
+
+    postgres_connection.execute(
+        """
+        INSERT INTO orders (id, session_id, cart_items, subtotal_cents, status)
+        VALUES (%s, %s, '[]'::jsonb, 0, 'Placed')
+        """,
+        (legacy_order_id, "st11-legacy-session"),
+    )
+    postgres_connection.commit()
+
+    before_rows = postgres_connection.execute(
+        "SELECT version, checksum_sha256 FROM schema_migrations ORDER BY version"
+    ).fetchall()
+    assert before_rows
+    assert all(row["checksum_sha256"] for row in before_rows)
+
+    migration_module.main()
+
+    after_rows = postgres_connection.execute(
+        "SELECT version, checksum_sha256 FROM schema_migrations ORDER BY version"
+    ).fetchall()
+    preserved = postgres_connection.execute(
+        "SELECT id FROM orders WHERE id = %s",
+        (legacy_order_id,),
+    ).fetchone()
+    assert after_rows == before_rows
+    assert preserved is not None
+
+    version = before_rows[0]["version"]
+    checksum = before_rows[0]["checksum_sha256"]
+    try:
+        postgres_connection.execute(
+            "UPDATE schema_migrations SET checksum_sha256 = %s WHERE version = %s",
+            ("0" * 64, version),
+        )
+        postgres_connection.commit()
+        with pytest.raises(RuntimeError, match="checksum drift"):
+            migration_module.main()
+    finally:
+        postgres_connection.execute(
+            "UPDATE schema_migrations SET checksum_sha256 = %s WHERE version = %s",
+            (checksum, version),
+        )
+        postgres_connection.execute("DELETE FROM orders WHERE id = %s", (legacy_order_id,))
+        postgres_connection.commit()
+
+
+def test_api_process_startup_preserves_catalog_without_seed(
+    postgres_connection: Any,
+    postgres_database_url: str,
+) -> None:
+    restaurant_id = f"st11-r-{uuid4().hex[:12]}"
+    edited_name = "ST-11 preserved catalog edit"
+    postgres_connection.execute(
+        """
+        INSERT INTO restaurants (
+          id, name, cuisine, rating, delivery_minutes,
+          delivery_fee_cents, image_emoji, tags
+        )
+        VALUES (%s, %s, 'Test', 5.0, '10-20 min', 0, 'T', '[]'::jsonb)
+        """,
+        (restaurant_id, edited_name),
+    )
+    postgres_connection.commit()
+
+    env = os.environ.copy()
+    env.update(
+        {
+            "DATABASE_URL": postgres_database_url,
+            "ORDERLY_DATA_MODE": "api",
+            "ORDERLY_SESSION_SECRET": "st11-process-start-session-secret-1234567890",
+            "ORDERLY_ALLOWED_ORIGINS": "http://127.0.0.1:3200",
+            "ORDERLY_CORS_ORIGINS": "http://127.0.0.1:3200",
+        }
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", "from app.main import app; print(app.title)"],
+        cwd=REPOSITORY_ROOT / "backend",
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    preserved = postgres_connection.execute(
+        "SELECT name FROM restaurants WHERE id = %s",
+        (restaurant_id,),
+    ).fetchone()
+    assert preserved is not None
+    assert preserved["name"] == edited_name
+
+    postgres_connection.execute("DELETE FROM restaurants WHERE id = %s", (restaurant_id,))
+    postgres_connection.commit()
+
+
+def test_serving_manifests_keep_seed_out_of_api_startup() -> None:
+    backend_dockerfile = (REPOSITORY_ROOT / "backend" / "Dockerfile").read_text(encoding="utf-8")
+    assert "seed_postgres.py" not in backend_dockerfile
+    assert "scripts/migrate.py" not in backend_dockerfile
+    assert "uvicorn" in backend_dockerfile
+
+    compose = (REPOSITORY_ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+    api_block = compose.split("\n  api:\n", 1)[1].split("\n  postgres:\n", 1)[0]
+    assert "command: uvicorn app.main:app" in api_block
+    assert "seed_postgres.py" not in api_block
+    assert "scripts/migrate.py" not in api_block
+
+    render = (REPOSITORY_ROOT / "infra" / "render.yaml").read_text(encoding="utf-8")
+    api_render_block = render.split("  - type: web\n    name: orderlyapp-api", 1)[1].split(
+        "\n\n  - type:", 1
+    )[0]
+    assert "startCommand: uvicorn app.main:app" in api_render_block
+    assert "seed_postgres.py" not in api_render_block
