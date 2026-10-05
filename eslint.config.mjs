@@ -1,15 +1,20 @@
+import js from '@eslint/js';
 import { defineConfig, globalIgnores } from 'eslint/config';
-import nextVitals from 'eslint-config-next/core-web-vitals';
-import nextTypeScript from 'eslint-config-next/typescript';
+import reactHooks from 'eslint-plugin-react-hooks';
+import tseslint from 'typescript-eslint';
 
 export default defineConfig([
-  ...nextVitals,
-  ...nextTypeScript,
+  {
+    files: ['**/*.{js,mjs,cjs}'],
+    rules: js.configs.recommended.rules,
+  },
+  ...tseslint.configs.recommended,
+  reactHooks.configs.flat.recommended,
   {
     files: ['app/**/*.{ts,tsx}'],
     rules: {
       // Existing client pages synchronously initialize loading/view state in effects.
-      // ST-12 records this as visible lint debt instead of rewriting non-owned product code.
+      // ST-12 keeps this debt visible without rewriting non-owned product behavior.
       'react-hooks/set-state-in-effect': 'warn',
     },
   },
