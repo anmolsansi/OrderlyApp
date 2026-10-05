@@ -23,8 +23,10 @@ Twenty meaningful verification/implementation units; fewer than fifty because th
 - [x] 17/20 Verify browser legacy-key cleanup, malformed/storage errors and explicit reset
 - [x] 18/20 Run full applicable web/backend/API browser regression suites
 - [x] 19/20 Map all ST-02/ST-03 criteria and update guide/status with scoped evidence
-- [ ] 20/20 Review staged scope, push microcommits and publish a reviewable PR with CI status
+- [x] 20/20 Review staged scope, push microcommits and publish a reviewable PR with CI status
 
 C1 reset deletes current owner-scoped rows; no legacy row adoption. C2 profile labels never authorize server data. Release-wide INT-01/INT-02/ST-13 remain separate.
 
-Implementation/local acceptance: PASS on `a9537931c57cbf636466bf3f791e440e24ce74bd`. Unit 12 includes aborting old-scope requests and clearing checkout recovery. Source/discovery units have no runtime documentation impact; behavior units update C1/C2 guides. Publication unit 20 remains pending until the PR and final remote commit are verified.
+Implementation/local acceptance: PASS on `a9537931c57cbf636466bf3f791e440e24ce74bd`. Unit 12 includes aborting old-scope requests and clearing checkout recovery. Source/discovery units have no runtime documentation impact; behavior units update C1/C2 guides. Publication: PR #47 targets main; the final progress microcommit is pushed and remote SHA verified. Hosted CI and merge remain pending, separately from this publication unit.
+
+Review: https://github.com/anmolsansi/OrderlyApp/pull/47. Existing GitHub issues #22 and #24 reused; no duplicate issue or Linear task created. Nine meaningful microcommits group related red/green regression and implementation units.
