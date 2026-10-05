@@ -56,9 +56,19 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 12
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
     env:
       DATABASE_URL: postgresql://orderly:orderly@127.0.0.1:5432/orderlyapp_test
       ORDERLY_TEST_DATABASE_URL: postgresql://orderly:orderly@127.0.0.1:5432/orderlyapp_test
+      REDIS_URL: redis://127.0.0.1:6379
     steps:
       - name: Check out source
         uses: actions/checkout@v4
@@ -76,6 +86,95 @@ jobs:
         run: python backend/scripts/migrate.py
       - name: Run BACKEND suite
         run: python -m pytest backend/tests -q
+      - name: Rehearse transaction-consistent receipt backup and restore
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          from uuid import uuid4
+
+          import psycopg
+
+          fixture = json.loads(Path("tests/fixtures/contracts/c5.json").read_text(encoding="utf-8"))
+          receipt = fixture["positive"]["receipt"]
+          receipt["id"] = str(uuid4())
+          owner_id = f"guest-st11-backup-{uuid4()}"
+
+          with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+              conn.execute(
+                  """
+                  INSERT INTO guest_sessions (id, token_hash, expires_at)
+                  VALUES (%s, %s, now() + interval '1 day')
+                  """,
+                  (owner_id, uuid4().hex),
+              )
+              conn.execute(
+                  """
+                  INSERT INTO guest_orders (id, owner_id, snapshot, created_at)
+                  VALUES (%s, %s, %s::jsonb, %s)
+                  """,
+                  (receipt["id"], owner_id, json.dumps(receipt), receipt["created_at"]),
+              )
+
+          Path("artifacts/backup-proof.json").write_text(
+              json.dumps({"receipt_id": receipt["id"], "total_cents": 1192}),
+              encoding="utf-8",
+          )
+          print(f"Prepared synthetic receipt {receipt['id']} for backup proof")
+          PY
+          docker run --rm --network host \
+            -e PGPASSWORD=orderly \
+            -v "${GITHUB_WORKSPACE}/artifacts:/backup" \
+            postgres:16-alpine \
+            pg_dump -h 127.0.0.1 -U orderly -d orderlyapp_test \
+              --format=custom --no-owner --no-acl --file=/backup/orderlyapp_test.dump
+          docker run --rm --network host \
+            -e PGPASSWORD=orderly \
+            postgres:16-alpine \
+            psql -h 127.0.0.1 -U orderly -d postgres -v ON_ERROR_STOP=1 \
+              -c "DROP DATABASE IF EXISTS orderlyapp_restore WITH (FORCE);" \
+              -c "CREATE DATABASE orderlyapp_restore;"
+          docker run --rm --network host \
+            -e PGPASSWORD=orderly \
+            -v "${GITHUB_WORKSPACE}/artifacts:/backup" \
+            postgres:16-alpine \
+            pg_restore -h 127.0.0.1 -U orderly -d orderlyapp_restore \
+              --single-transaction --exit-on-error --no-owner --no-acl \
+              /backup/orderlyapp_test.dump
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          import psycopg
+
+          proof = json.loads(Path("artifacts/backup-proof.json").read_text(encoding="utf-8"))
+          with psycopg.connect(
+              "postgresql://orderly:orderly@127.0.0.1:5432/orderlyapp_restore"
+          ) as conn:
+              row = conn.execute(
+                  "SELECT snapshot FROM guest_orders WHERE id = %s",
+                  (proof["receipt_id"],),
+              ).fetchone()
+              assert row is not None
+              snapshot = row[0]
+              assert snapshot["id"] == proof["receipt_id"]
+              assert snapshot["totals"]["total_cents"] == proof["total_cents"]
+              migration_count = conn.execute("SELECT count(*) FROM schema_migrations").fetchone()[0]
+              assert migration_count > 0
+          print(
+              f"Backup/restore verified receipt={proof['receipt_id']} "
+              f"total_cents={proof['total_cents']} migrations={migration_count}"
+          )
+          PY
+          rm -f artifacts/orderlyapp_test.dump artifacts/backup-proof.json
+          docker run --rm --network host \
+            -e PGPASSWORD=orderly \
+            postgres:16-alpine \
+            psql -h 127.0.0.1 -U orderly -d postgres -v ON_ERROR_STOP=1 \
+              -c "DROP DATABASE IF EXISTS orderlyapp_restore WITH (FORCE);"
 
   browser-runtime:
     runs-on: ubuntu-latest
@@ -117,8 +216,18 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 12
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
     env:
       DATABASE_URL: postgresql://orderly:orderly@127.0.0.1:5432/orderlyapp_e2e
+      REDIS_URL: redis://127.0.0.1:6379
       NEXT_PUBLIC_API_BASE_URL: http://127.0.0.1:8000
       ORDERLY_API_ORIGIN: http://127.0.0.1:8000
       NEXT_PUBLIC_APP_URL: http://127.0.0.1:3200
@@ -126,6 +235,8 @@ jobs:
       NEXT_PUBLIC_CHECKOUT_MODE: mock
       NEXT_PUBLIC_AUTH_PROVIDER: none
       ORDERLY_DATA_MODE: api
+      ORDERLY_ENVIRONMENT: test
+      ORDERLY_SOURCE_SHA: ${{ github.sha }}
       ORDERLY_SESSION_SECRET: ci-st02-session-secret-with-more-than-32-bytes
       ORDERLY_ALLOWED_ORIGINS: http://127.0.0.1:3200
       ORDERLY_CORS_ORIGINS: http://127.0.0.1:3200
@@ -150,16 +261,16 @@ jobs:
           cache-dependency-path: backend/requirements-test.lock
       - name: Install backend runtime
         run: python -m pip install -e ./backend
-      - name: Prepare API database
+      - name: Prepare API database with explicit test fixtures
         run: |
           python backend/scripts/migrate.py
-          python backend/scripts/seed_postgres.py
-      - name: Start API and prove health
+          ORDERLY_ALLOW_FIXTURE_SEED=1 python backend/scripts/seed_postgres.py
+      - name: Start API and prove C8 readiness
         shell: bash
         run: |
           (cd backend && uvicorn app.main:app --host 127.0.0.1 --port 8000 > /tmp/orderly-api.log 2>&1 &)
           for attempt in {1..30}; do
-            if curl --fail --silent http://127.0.0.1:8000/health > /tmp/orderly-health.json; then
+            if curl --fail --silent http://127.0.0.1:8000/health/ready > /tmp/orderly-health.json; then
               cat /tmp/orderly-health.json
               exit 0
             fi

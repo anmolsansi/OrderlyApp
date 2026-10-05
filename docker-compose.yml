@@ -22,23 +22,53 @@ services:
       api:
         condition: service_healthy
 
+  migrate:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: python scripts/migrate.py
+    environment:
+      DATABASE_URL: ${ORDERLY_COMPOSE_DATABASE_URL:-postgresql://orderly:orderly@postgres:5432/orderlyapp}
+      ORDERLY_ENVIRONMENT: ${ORDERLY_ENVIRONMENT:-development}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  seed:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: python scripts/seed_postgres.py
+    profiles: ["seed"]
+    environment:
+      DATABASE_URL: ${ORDERLY_COMPOSE_DATABASE_URL:-postgresql://orderly:orderly@postgres:5432/orderlyapp}
+      ORDERLY_ENVIRONMENT: development
+      ORDERLY_ALLOW_FIXTURE_SEED: "1"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
+
   api:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    command: sh -c "python scripts/migrate.py && python scripts/seed_postgres.py && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     ports:
       - "8000:8000"
     environment:
       DATABASE_URL: ${ORDERLY_COMPOSE_DATABASE_URL:-postgresql://orderly:orderly@postgres:5432/orderlyapp}
       REDIS_URL: ${ORDERLY_COMPOSE_REDIS_URL:-redis://redis:6379}
       ORDERLY_DATA_MODE: api
+      ORDERLY_ENVIRONMENT: ${ORDERLY_ENVIRONMENT:-development}
+      ORDERLY_SOURCE_SHA: ${ORDERLY_SOURCE_SHA:-local}
       ORDERLY_SESSION_SECRET: ${ORDERLY_SESSION_SECRET:?Set ORDERLY_SESSION_SECRET to at least 32 bytes}
       ORDERLY_ALLOWED_ORIGINS: ${ORDERLY_ALLOWED_ORIGINS:-http://localhost:3100,http://127.0.0.1:3100}
       ORDERLY_CORS_ORIGINS: ${ORDERLY_CORS_ORIGINS:-http://localhost:3100,http://127.0.0.1:3100,http://localhost:3000,http://127.0.0.1:3000}
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
 
@@ -52,7 +82,6 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./backend/migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s

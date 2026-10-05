@@ -8,7 +8,40 @@
       "schema_version": 1,
       "ready": true,
       "mode": "api",
-      "source_sha": "fixture-source-sha"
+      "source_sha": "fixture-source-sha",
+      "dependencies": {
+        "configuration": "ok",
+        "postgres": "ok",
+        "schema": "ok",
+        "rate_limit_configuration": "ok"
+      }
+    },
+    "live": {
+      "status": 200,
+      "body": {
+        "schema_version": 1,
+        "live": true,
+        "source_sha": "fixture-source-sha"
+      }
+    },
+    "migration_lifecycle": {
+      "serving_start_runs_migrations": false,
+      "serving_start_runs_fixture_seed": false,
+      "single_migration_writer": true,
+      "checksum_drift_fails_closed": true
+    },
+    "retention": {
+      "max_batch_size": 100,
+      "guest_row_lock": "FOR UPDATE SKIP LOCKED",
+      "checkout_uses_same_guest_lock": true,
+      "rerun_safe": true
+    },
+    "checkout_rate_limit": {
+      "window_seconds": 60,
+      "per_guest_attempts": 10,
+      "aggregate_attempts": 120,
+      "counter_store": "redis",
+      "order_authority": "postgres"
     }
   },
   "negative": [
@@ -23,8 +56,61 @@
       },
       "error": {
         "code": "not_ready",
-        "message": "Required storage is unavailable",
-        "request_id": "synthetic-request-1",
+        "message": "Required application dependencies are not ready",
+        "request_id": "synthetic-request-c8-db",
+        "fields": ["DATABASE_URL"]
+      }
+    },
+    {
+      "name": "required_migration_missing",
+      "status": 503,
+      "body": {
+        "schema_version": 1,
+        "ready": false,
+        "mode": "api",
+        "source_sha": "fixture-source-sha"
+      },
+      "error": {
+        "code": "not_ready",
+        "message": "Required application dependencies are not ready",
+        "request_id": "synthetic-request-c8-schema",
+        "fields": ["schema_migrations"]
+      }
+    },
+    {
+      "name": "invalid_identity_configuration",
+      "status": 503,
+      "body": {
+        "schema_version": 1,
+        "ready": false,
+        "mode": "api",
+        "source_sha": "fixture-source-sha"
+      },
+      "error": {
+        "code": "not_ready",
+        "message": "Required application dependencies are not ready",
+        "request_id": "synthetic-request-c8-config",
+        "fields": ["ORDERLY_SESSION_SECRET"]
+      }
+    },
+    {
+      "name": "checkout_guest_limit_exceeded",
+      "status": 429,
+      "retry_after_seconds": 17,
+      "error": {
+        "code": "checkout_rate_limited",
+        "message": "Checkout is temporarily rate limited",
+        "request_id": "synthetic-request-c8-rate",
+        "fields": []
+      }
+    },
+    {
+      "name": "checkout_counter_unavailable",
+      "status": 503,
+      "error": {
+        "code": "rate_limit_unavailable",
+        "message": "Checkout is temporarily unavailable",
+        "request_id": "synthetic-request-c8-counter",
         "fields": []
       }
     }

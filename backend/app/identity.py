@@ -20,6 +20,7 @@ COOKIE_NAME = "orderly_guest"
 COOKIE_PATH = "/v1"
 SESSION_TTL = timedelta(days=30)
 TOKEN_VERSION = "v1"
+MAX_CLEANUP_BATCH_SIZE = 100
 
 
 class IdentityError(Exception):
@@ -217,7 +218,14 @@ def _insert_guest(conn: object, secret: bytes, now: datetime) -> IssuedGuest:
     return IssuedGuest(guest_id=guest_id, token=token, expires_at=expires_at, created=True)
 
 
-def cleanup_expired_guests(*, now: datetime | None = None) -> None:
+def cleanup_expired_guests(
+    *,
+    now: datetime | None = None,
+    batch_size: int = MAX_CLEANUP_BATCH_SIZE,
+) -> int:
+    if batch_size < 1 or batch_size > MAX_CLEANUP_BATCH_SIZE:
+        raise ValueError(f"batch_size must be between 1 and {MAX_CLEANUP_BATCH_SIZE}")
+
     current_time = now or utc_now()
     guest_ids: list[str] = []
     try:
@@ -228,27 +236,32 @@ def cleanup_expired_guests(*, now: datetime | None = None) -> None:
                     SELECT id
                     FROM guest_sessions
                     WHERE expires_at <= %s OR revoked_at IS NOT NULL
+                    ORDER BY expires_at ASC, id ASC
+                    FOR UPDATE SKIP LOCKED
+                    LIMIT %s
                     """,
-                    (current_time,),
+                    (current_time, batch_size),
                 ).fetchall()
                 guest_ids = [row["id"] for row in rows]
                 if not guest_ids:
-                    return
+                    return 0
+
+                # Legacy rows do not have cascade ownership. New guest_carts,
+                # guest_orders, and idempotency rows are removed by guest FK cascades.
                 conn.execute("DELETE FROM carts WHERE session_id = ANY(%s)", (guest_ids,))
                 conn.execute("DELETE FROM orders WHERE session_id = ANY(%s)", (guest_ids,))
                 conn.execute("DELETE FROM guest_sessions WHERE id = ANY(%s)", (guest_ids,))
     except Exception as exc:
         raise _storage_unavailable() from exc
 
-    # Redis is only a cache/fallback at this stage. Purge old guest keys after
-    # the database transaction; a Redis outage cannot resurrect authorization
-    # because the guest record/token has already been removed server-side.
+    # Redis is non-authoritative. Purge stale cache keys after the database commit.
+    # A Redis outage cannot resurrect authorization because the guest row is gone.
     delete_cart_keys(guest_ids)
+    return len(guest_ids)
 
 
 def bootstrap_guest(existing_token: str | None) -> IssuedGuest:
     settings = load_identity_settings()
-    cleanup_expired_guests()
 
     if existing_token:
         try:

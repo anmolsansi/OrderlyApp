@@ -4,7 +4,11 @@ services:
     env: python
     rootDir: backend
     buildCommand: pip install -e .
-    startCommand: python scripts/migrate.py && python scripts/seed_postgres.py && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    # Render documents preDeployCommand for paid web services. Do not upgrade or
+    # activate a paid plan solely from this blueprint without explicit approval.
+    preDeployCommand: python scripts/migrate.py
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health/ready
     envVars:
       - key: DATABASE_URL
         sync: false
@@ -12,12 +16,37 @@ services:
         sync: false
       - key: ORDERLY_DATA_MODE
         value: api
+      - key: ORDERLY_ENVIRONMENT
+        value: production
       - key: ORDERLY_SESSION_SECRET
         generateValue: true
       - key: ORDERLY_ALLOWED_ORIGINS
         sync: false
       - key: ORDERLY_CORS_ORIGINS
         sync: false
+      - key: ORDERLY_CHECKOUT_RATE_WINDOW_SECONDS
+        value: "60"
+      - key: ORDERLY_CHECKOUT_RATE_LIMIT_PER_GUEST
+        value: "10"
+      - key: ORDERLY_CHECKOUT_RATE_LIMIT_AGGREGATE
+        value: "120"
+
+  - type: cron
+    name: orderlyapp-guest-cleanup
+    env: python
+    rootDir: backend
+    schedule: "17 3 * * *"
+    buildCommand: pip install -e .
+    startCommand: python scripts/cleanup_guests.py
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: ORDERLY_ENVIRONMENT
+        value: production
+      - key: ORDERLY_CLEANUP_MAX_BATCHES
+        value: "1000"
 
   - type: web
     name: orderlyapp-web

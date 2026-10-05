@@ -23,13 +23,19 @@ def postgres_available() -> bool:
 
 
 @contextmanager
-def get_connection() -> Iterator[Any]:
+def get_connection(*, connect_timeout_seconds: int | None = None) -> Iterator[Any]:
     url = database_url()
     if not url:
         raise RuntimeError("DATABASE_URL is not configured")
+    if connect_timeout_seconds is not None and connect_timeout_seconds < 1:
+        raise ValueError("connect_timeout_seconds must be at least 1")
 
     import psycopg
     from psycopg.rows import dict_row
 
-    with psycopg.connect(url, row_factory=dict_row) as conn:
+    connection_options: dict[str, Any] = {"row_factory": dict_row}
+    if connect_timeout_seconds is not None:
+        connection_options["connect_timeout"] = connect_timeout_seconds
+
+    with psycopg.connect(url, **connection_options) as conn:
         yield conn
