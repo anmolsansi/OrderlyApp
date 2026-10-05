@@ -1,99 +1,91 @@
 # OrderlyApp — Vision, Decisions, and Roadmap
 
 ## Purpose
-This document is the tracked home for the product vision, planning notes, future ideas, and decisions discussed while building OrderlyApp. It should be updated whenever the project direction changes so the next development session can quickly recover context.
 
-## Product Vision
-OrderlyApp is a portfolio-ready, voice-first food ordering web app. The core experience proves that a user can browse restaurants, customize food, manage a cart, and place a mock order primarily through natural language while still receiving clear visual confirmation and correction options at each important step.
+This document records the current product direction and future ideas. The implementation contract and release gates live in [`development.md`](../development.md); the current repository architecture lives in [`repo_context.md`](repo_context.md). Future ideas here are not claims about the accepted release.
 
-The long-term direction is to turn the MVP into a polished showcase for conversational commerce: a fast, accessible ordering flow where voice and touch/keyboard interactions work together rather than competing with each other.
+## Current Product Vision
 
-## Target User
-The primary user is a hungry desktop or mobile visitor who wants to order pizza quickly and safely. They should be able to use voice commands for speed, inspect every interpreted action visually, and correct the cart before checkout.
+OrderlyApp is a portfolio-ready **manual mock-ordering demo** focused on truthful state, safe recovery, and clear evidence. A visitor should be able to browse a canonical pizza catalog, customize an item, maintain a private guest basket, review server-calculated totals, place an idempotent mock order, and reopen the immutable receipt without creating a real account or supplying payment credentials.
 
-## MVP Promise
-The MVP demonstrates an end-to-end mock ordering flow:
-
-1. Browse pizza restaurants.
-2. Pick a restaurant and menu item.
-3. Customize size, toppings, sides, and quantity.
-4. Add, edit, and remove items in the cart.
-5. Use voice commands for key cart actions where browser support exists.
-6. Review the order and totals.
-7. Complete an explicitly mocked checkout with no real payment.
-8. See a basic mock order status timeline.
+The stabilization release deliberately narrows the earlier voice-first concept. Voice remains a future enhancement; keyboard/touch/manual ordering is the required release path.
 
 ## Current Product Principles
-- **Voice-first, not voice-only:** every key voice action must have a visible fallback and confirmation path.
-- **Safe checkout:** checkout is always clearly marked as mock/non-payment until real payment support is intentionally added.
-- **Visible interpretation:** transcripts, parsed intent, assistant response, and resulting cart changes should be easy to inspect.
-- **Accessible recovery:** users should be able to correct mistakes, retry failed voice commands, and complete the flow without speech input.
-- **Demo reliability:** the project should remain runnable locally with clear setup, stable mock data, and passing checks.
 
-## Decisions Already Made
-- Build as a single Next.js app for the current MVP slice, with backend support available for API, persistence, and deploy demonstrations.
-- Keep the MVP focused on pizza ordering instead of broad multi-category marketplace behavior.
-- Use mock checkout and mock order status rather than real payments, real restaurant integrations, or real delivery tracking.
-- Do not include user accounts, restaurant admin dashboards, real delivery tracking, real payment processing, or multi-vendor orders in the MVP.
-- Treat voice as an enhancement: the non-voice ordering path must stay complete and usable.
+- **Manual path first:** the full accepted journey must work without speech input.
+- **One durable authority:** API-mode catalog/cart/order correctness comes from the server/PostgreSQL path, not browser fixtures or hidden fallback.
+- **Private guest ownership:** server-issued opaque guest identity is separate from local demo-profile presentation.
+- **Safe checkout:** checkout remains mock-only and clearly states that no real payment is charged.
+- **Truthful failures:** network/storage/conflict/unknown outcomes remain errors or recovery states; they do not become invented success.
+- **Exact recovery:** uncertain checkout retries reuse the same idempotency key/body, and receipt reload uses immutable server snapshots.
+- **Explicit preview mode:** `local_demo` is labelled, isolated, and has no accepted checkout path.
+- **Operational honesty:** liveness, readiness, migrations, seed, retention, backup, and recovery are separate lifecycle concerns.
 
-## Completed Foundation
-The project has already covered the initial restart, product design, app shell, mock data, voice parsing, cart logic, checkout/status flow, backend API, database/infrastructure setup, quality checks, and release preparation. Future work should build on this foundation rather than restarting it.
+## Current Stabilized Architecture Decisions
 
-## Current Status
-The app has been stabilized for deployment preparation. The local quality gate passes for TypeScript, unit tests, production build, backend Python compile, and Playwright smoke tests. The current customer-facing flow is backend-backed for restaurant data, anonymous cart sessions, mock order creation, order confirmation, and order history, with local fallback mirrors for demo resilience.
+- Next.js App Router frontend with a bounded same-origin `/api/orderly` gateway.
+- FastAPI backend with versioned ordering contracts.
+- PostgreSQL as durable authority for guest identity, canonical catalog data, revisioned carts, immutable receipts, and idempotency state.
+- Redis only for ephemeral checkout abuse counters, never durable cart/order authority.
+- Server-issued opaque HttpOnly guest cookie; no public owner ID in localStorage or request bodies.
+- Password-free local demo profile and synthetic addresses as presentation/input only.
+- Deterministic `mock-v1` quote pricing and atomic idempotent mock checkout.
+- `api` and `local_demo` are explicit browser modes; an API failure does not switch modes.
+- Serving startup does not migrate or seed. Migrations are explicit/serialized/checksummed; fixture seeding is explicit and non-production only.
+- Anonymous guest cleanup is an explicit bounded operational job.
 
-The next product-prototype milestone is deployed-demo verification and portfolio capture from the hosted frontend/API path.
+## Current Release Status
 
-## Future Roadmap
+The repository candidate at source SHA `934208c36d323e39d9f6ddcfcc3805cbd979507f` passed the ST-12 hosted release-CI matrix, including genuine lint, independent typecheck/build, backend/PostgreSQL recovery checks, Chromium launch, API product E2E, local fixture-preview E2E, and dependency audits.
 
-### Product Prototype
-- Keep backend-backed session carts as the primary cart source across item customization and checkout.
-- Keep order creation and confirmation hydration on backend APIs by stable order ID.
-- Keep mock/no-payment checkout copy until real payment support is intentionally scoped.
-- Continue expanding API contract coverage as backend behavior grows.
+That does **not** by itself make the public demo accepted. The exact Vercel production build is currently behind Vercel developer authentication, and the available Render backend deployment is an older failed candidate. INT-02/public acceptance evidence is therefore still missing. The release remains Not completed until the public/recovery gates in [`releases/stabilization-acceptance.md`](releases/stabilization-acceptance.md) are satisfied.
 
-### Near-Term Polish
-- Verify the deployed demo against the production smoke checklist.
-- Capture final screenshots/video from the hosted demo.
-- Improve voice command examples and onboarding so users know what to say.
-- Add richer empty, loading, and error states for edge cases discovered during demo use.
-- Tighten responsive behavior for smaller mobile screens.
-- Refine copy around mock checkout, order status, and voice confidence.
-- Expand visual regression or screenshot coverage for portfolio confidence.
+## Immediate Roadmap — Finish Stabilization Acceptance
 
-### Voice and Assistant Enhancements
-- Add richer natural-language parsing for substitutions, grouped modifiers, and multi-item commands.
-- Support conversational clarification when a command is ambiguous.
-- Track command confidence and ask for confirmation when confidence is low.
-- Add a command history so users can review what voice actions changed.
-- Explore server-side or model-backed interpretation behind the current parser abstraction.
+1. Produce/approve an eligible public frontend + current backend candidate through the separately authorized release operation.
+2. Complete INT-02 candidate/recovery rehearsal and save criterion-indexed evidence.
+3. Verify two fresh unauthenticated visitors can reach the identified public build.
+4. Run the manual browse → customize → cart → quote → mock checkout → exact receipt reload journey against that candidate.
+5. Re-prove guest isolation and required controlled failure/recovery cases.
+6. Capture portfolio screenshots/video only from a candidate whose public identity and behavior are verified.
+7. Mark the release gate complete only when every mandatory criterion has current evidence.
 
-### Product Expansion Ideas
-- Add additional cuisine categories after the pizza flow is strong.
-- Add saved favorites or repeat-order shortcuts.
-- Add optional lightweight user profiles once auth becomes valuable.
-- Add restaurant availability, prep-time estimates, and better status simulations.
-- Add a restaurant/admin demo mode only after the customer ordering flow is fully polished.
+## Future Roadmap — After Stabilization
 
-### Technical Expansion Ideas
-- Harden API validation and error boundaries.
-- Add stronger persistence paths for carts and orders in deployed environments.
-- Improve telemetry dashboards for voice failures, checkout completion, and cart corrections.
-- Add accessibility automation and manual audit notes.
-- Add CI coverage for linting, typecheck, unit tests, build, and end-to-end tests.
+### Voice and Conversational Interaction
 
-## Release and Demo Goals
-A successful release should be easy to demo from a clean checkout. The README should explain setup, the demo script should walk through the full user journey, and screenshots or mockups should show the intended flow. The ideal portfolio demo highlights the combination of voice interaction, visual confirmation, safe correction, and mock checkout.
+Voice is deferred from the current release. A future ticket may evaluate:
 
-## Open Questions
-- Which voice commands should be considered the canonical demo commands?
-- Should future interpretation remain local/rule-based, become model-backed, or support both?
-- What is the right next cuisine or marketplace category after pizza?
-- Should order status stay simulated, or should it become event-driven through the backend?
-- What metrics best prove that the voice-first ordering experience is working?
+- browser speech capture or an alternative provider;
+- richer natural-language add/edit/remove commands;
+- ambiguity/clarification handling;
+- visible transcript/intent confidence;
+- model-backed interpretation behind a validated deterministic contract;
+- failure/degradation behavior that never blocks the manual path.
+
+### Real Accounts
+
+Only add real authentication if a product use case needs durable customer identity. Any future account system must remain separate from current guest ownership and must define migration, authorization, privacy, recovery, and logout semantics before implementation.
+
+### Real Payments and Restaurant Integrations
+
+Real payment collection, restaurant submission, refunds, dispatch, and live delivery status are future product scopes with materially different security/operational requirements. They must not be inferred from the current mock receipt/checkout UI.
+
+### Broader Marketplace/Product Polish
+
+Possible later work includes more cuisine categories, saved favorites, richer accessibility testing, visual regression coverage, performance budgets, improved operational dashboards, and refined mobile UI.
+
+## Open Decisions for Future Work
+
+- Is voice valuable enough to reintroduce after the manual portfolio release is accepted?
+- If voice returns, should interpretation remain deterministic, model-backed, or hybrid?
+- Is a real account useful before real restaurant/payment integration exists?
+- Which additional observability metrics would meaningfully improve operation of the demo rather than add complexity?
+- What evidence would justify turning this portfolio demo into a product prototype?
 
 ## Maintenance Notes
-- Update this file when project goals, roadmap priorities, or major scope decisions change.
-- Keep detailed implementation tasks in `docs/TASKS.md` and keep this file focused on vision and direction.
-- Keep product constraints aligned with `PRODUCT_CHARTER.md` so the project does not drift away from the MVP promise.
+
+- Keep current implementation facts aligned with `development.md` and `repo_context.md`.
+- Keep release proof in `releases/stabilization-acceptance.md`; do not use roadmap prose as evidence.
+- Preserve historical planning documents as dated history rather than rewriting old decisions to look current.
+- When a future feature changes a contract or security boundary, update its owning architecture/evidence before changing this roadmap.
