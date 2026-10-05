@@ -1,5 +1,7 @@
 # OrderlyApp — Project Plan v0.2.0
 
+> **Historical v0.2.0 plan — superseded for current execution and acceptance as of October 5, 2026.** The checked phases below record the project’s earlier production-demo track; several fallback/Redis/voice assumptions were later replaced by the C1–C8 stabilization contracts. Preserve this document as history rather than rewriting its old checkboxes as current proof. Use [../development.md](../development.md) for the current plan, [repo_context.md](repo_context.md) for the implemented architecture, and [releases/stabilization-acceptance.md](releases/stabilization-acceptance.md) for current release evidence. In particular, API failures do not activate fixture fallback, Redis is not durable cart authority, serving startup does not reseed, and voice is deferred from the stabilization release.
+
 ## Version Goal
 Turn the completed local MVP (`v0.1.0`) into a production-ish portfolio demo with real frontend/backend integration, persistent storage, stronger test coverage, and deployable infrastructure.
 
