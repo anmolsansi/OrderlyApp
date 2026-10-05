@@ -82,9 +82,12 @@ def test_returning_guest_bootstrap_formats_non_utc_database_expiry(
     assert "HttpOnly" in cookie and "Secure" in cookie and "SameSite=lax" in cookie
 
 
+@pytest.mark.parametrize("replacement_fails", [False, True])
 def test_two_guest_cookie_jars_are_isolated_and_reset_revokes_old_scope(
     identity_environment: None,
     postgres_connection,
+    monkeypatch: pytest.MonkeyPatch,
+    replacement_fails: bool,
 ) -> None:
     cleanup_guest_rows(postgres_connection)
     client_a = TestClient(app, base_url=TEST_ORIGIN)
@@ -235,6 +238,28 @@ def test_two_guest_cookie_jars_are_isolated_and_reset_revokes_old_scope(
     assert forged_response.json()["error"]["code"] == "session_invalid"
 
     old_token = token_a
+    if replacement_fails:
+        original_insert = identity_module._insert_guest
+
+        def fail_replacement(*args):
+            raise RuntimeError("synthetic replacement failure")
+
+        monkeypatch.setattr(identity_module, "_insert_guest", fail_replacement)
+        failed_reset = client_a.post("/v1/session/reset", headers={"Origin": TEST_ORIGIN})
+        assert failed_reset.status_code == 503
+        assert failed_reset.json()["error"]["code"] == "storage_unavailable"
+        assert "synthetic replacement failure" not in failed_reset.text
+        assert client_a.cookies.get(COOKIE_NAME) == old_token
+        assert client_a.get("/v1/cart").json()["items"][0]["id"] == "line-a"
+        assert client_a.get(f"/v1/orders/{receipt_id}").status_code == 200
+        assert postgres_connection.execute(
+            "SELECT revoked_at FROM guest_sessions WHERE id = %s", (guest_a,),
+        ).fetchone()[0] is None
+        assert postgres_connection.execute(
+            "SELECT count(*) FROM order_idempotency WHERE owner_id = %s", (guest_a,),
+        ).fetchone()[0] == 1
+        monkeypatch.setattr(identity_module, "_insert_guest", original_insert)
+
     reset = client_a.post("/v1/session/reset", headers={"Origin": TEST_ORIGIN})
     assert reset.status_code == 200
     new_token = client_a.cookies.get(COOKIE_NAME)
