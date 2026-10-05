@@ -1,187 +1,171 @@
 # OrderlyApp — Product Scope, Routes, and User Flows
 
-This document defines the stable product target for the restaurant ordering app. It reflects the current Next.js App Router implementation with FastAPI-backed restaurant, cart, checkout, and order lookup paths plus local fallback behavior for demo resilience.
+This document describes the **current stabilized manual-ordering candidate**. It replaces earlier fallback/session/voice assumptions. The canonical release contract is defined in [`../development.md`](../development.md); this file explains the user-facing flow in practical terms.
 
 ## 1. Product Scope
 
-### In scope for the ordering MVP
-- Restaurant discovery with search and quick filters.
-- Restaurant menu browsing with menu categories and item cards.
-- Item customization with required single-select modifiers, optional multi-select modifiers, quantity, and special instructions.
-- Backend-backed cart persistence while moving between restaurant, menu, item, cart, checkout, and confirmation screens, with local fallback if the API is unavailable.
-- Cart review with quantity edits, clear-cart behavior, subtotal/fee/discount/total summary, and an empty-cart recovery path.
-- Mock checkout with saved address/payment placeholders and explicit no-real-payment behavior.
-- Backend-created mock order confirmation with a status timeline and browse/reorder next actions.
-- Voice and typed command assistance as a visual-control complement, not as the only ordering path.
+### Accepted `api`-mode behavior
 
-### Out of scope for this issue
-- Payment processing.
-- Account creation, full authentication, and saved profile persistence.
-- Driver dispatch, real ETA updates, refunds, support chat, or live order cancellation.
-- Production-grade account-scoped order history; `/orders` is a demo history entry point that uses backend orders when available.
+- Search/browse canonical restaurants and menus from FastAPI.
+- Customize an available item using canonical modifier groups/options.
+- Bootstrap a private server-issued guest session through the same-origin gateway.
+- Add/edit/remove/clear a revisioned PostgreSQL-backed guest cart.
+- Keep the last server-accepted cart visible if a write fails or conflicts.
+- Review a deterministic server quote for the accepted cart.
+- Use a password-free local demo profile/synthetic address as checkout presentation/input only.
+- Submit a mock checkout with one idempotency key/body.
+- Recover an uncertain/lost-response submission by retrying the exact same key/body.
+- Display the immutable server receipt only after a valid accepted response.
+- Reload exact receipts and current-guest history from PostgreSQL snapshots.
 
-## 2. Existing App Audit
+### Explicit `local_demo` preview
 
-### Routes currently implemented
-- `/` is implemented by `app/page.tsx` and acts as the marketplace home page.
-- `/restaurants` is implemented by `app/restaurants/page.tsx` and reads `query` and `filter` search params.
-- `/restaurants/[restaurantId]` is implemented by `app/restaurants/[restaurantId]/page.tsx` and uses `restaurantId` as the restaurant slug/ID.
-- `/restaurants/[restaurantId]/items/[itemId]` is implemented by `app/restaurants/[restaurantId]/items/[itemId]/page.tsx` and uses `restaurantId` plus `itemId` to customize a menu item.
-- `/checkout` is implemented by `app/checkout/page.tsx` and reads/writes backend cart state with local fallback.
-- `/order-confirmation` is implemented by `app/order-confirmation/page.tsx` and loads backend order details by `orderId` with local fallback.
+`local_demo` is a separate, visibly labelled fixture preview. It supports restaurant/menu browsing, item customization, and an isolated browser-local preview basket. It does **not** bootstrap a server guest, call ordering APIs, enable checkout, or claim accepted receipts/history.
 
-### Shared structure and components
-- `app/layout.tsx` provides the root HTML shell and metadata.
-- `app/components/MarketplaceNav.tsx` provides the shared top navigation with Home, Search, Menu, Cart, and Orders entries.
-- `app/globals.css` owns the responsive marketplace visual system, page layouts, cards, buttons, form controls, and flow-specific panels.
+An API error in `api` mode never changes the mode to `local_demo`.
 
-### State management
-- Anonymous backend cart sessions use browser `localStorage` key `orderlyapp.marketplace.backendSession.v1`.
-- Cart state is loaded and saved through `/sessions/{session_id}/cart` first, then mirrored in browser `localStorage` under `orderlyapp.marketplace.cart.v1` as fallback.
-- The latest order is loaded from `/orders/{order_id}` first, then mirrored in browser `localStorage` under `orderlyapp.marketplace.order.v1` as fallback.
-- Special instructions persist in browser `localStorage` under `orderlyapp.marketplace.note.v1`.
-- Checkout and item customization are client components because they read/write browser storage and use client-side navigation.
+### Deferred / out of release scope
 
-### Data loading patterns
-- Restaurants and menu data load from FastAPI first with `lib/mock-data.ts` fallback.
-- Marketplace selectors and pricing helpers live in `lib/marketplace.ts`.
-- Cart validation and mock order ID helpers live in `lib/cart.ts`.
-- Domain TypeScript interfaces and money formatting live in `lib/types.ts`.
-- Route metadata and href builders live in `lib/routes.ts` so follow-up route work has one canonical map.
+- Voice/speech as a required interaction.
+- Real payments/card collection.
+- Real restaurant integrations or dispatch.
+- Real customer account/authentication providers.
+- Real delivery tracking/refunds/support.
+- Multi-vendor ordering.
 
-## 3. Route Map
+## 2. Identity and State Boundaries
 
-| Route | Params | Responsibility | Required layout elements | Navigation behavior |
-| --- | --- | --- | --- | --- |
-| `/` | none | Introduce the marketplace, collect search intent, show featured restaurants/favorites, and explain the screen path. | Global nav, hero search, quick filters, restaurant rails, flow overview. | Search submits to `/restaurants`; restaurant cards open restaurant menu pages; cart state remains in the backend session with local fallback. |
-| `/restaurants` | `query`, `filter` | Show searchable/filterable restaurant results with delivery details and tags. | Global nav, desktop filter panel, search form, result cards, empty-results state in future work. | Filter chips/search update query params; result cards navigate to `/restaurants/:restaurantId`. |
-| `/restaurants/:restaurantId` | `restaurantId` | Show restaurant identity, delivery metadata, menu categories, and menu item cards. | Global nav, restaurant hero, category tabs, menu grid, cart CTA. | Item cards navigate to `/restaurants/:restaurantId/items/:itemId`; cart CTA opens `/checkout`. |
-| `/restaurants/:restaurantId/items/:itemId` | `restaurantId`, `itemId` | Customize a menu item before adding it to cart. | Global nav, item preview, modifier groups, quantity controls, notes field, add-to-cart CTA. | Add-to-cart writes through the backend cart API, mirrors local fallback state, and routes to `/cart`; invalid params show recovery UI. |
-| `/checkout` | none | Review cart, edit quantities, clear cart, review mock address/payment, and submit a mock order. | Global nav, cart lines, empty-cart state, totals, address/payment panel, place-order CTA. | Place order posts to the backend order API, clears backend/local cart, and routes to `/order-confirmation?orderId=...`; empty cart links to discovery. |
-| `/order-confirmation` | `orderId` query | Confirm submitted order, show progress timeline, and offer browse/reorder next actions. | Global nav, confirmation hero, status timeline, next-action buttons. | Hydrates by backend `orderId` first and falls back to local mirrored order data. |
-| `/orders` | none | Secondary entry point for saved mock order history. | Global nav, order list, reorder controls, empty-history state. | Uses backend order list when available and local mirrored history as fallback. |
+### Guest ownership
 
-## 4. Primary User Flow
+The backend issues an opaque signed HttpOnly guest cookie. The browser does not choose, display, or persist the durable owner ID. Protected cart/order routes derive ownership only from the verified cookie.
 
-1. **Browse restaurants**: Customer lands on `/`, reviews featured restaurants or enters a search term.
-2. **Search/filter restaurants**: Customer moves to `/restaurants` with optional `query` and `filter` params, then selects a restaurant card.
-3. **View menu**: Customer lands on `/restaurants/:restaurantId`, reviews restaurant metadata and menu items.
-4. **Customize item**: Customer opens `/restaurants/:restaurantId/items/:itemId`, chooses required modifiers, optional toppings, quantity, and notes.
-5. **Add to cart**: Customer taps the primary add-to-cart action; the cart item is written to the backend cart session, mirrored locally, and the cart page opens.
-6. **Review cart**: Customer reviews line items, adjusts quantities, clears the cart if needed, and confirms totals.
-7. **Checkout**: Customer verifies saved mock address, drop-off instructions, mock payment method, and delivery window.
-8. **Submit order**: Customer taps Place order; the app creates a backend mock order, empties the backend/local cart, and navigates to confirmation.
-9. **View confirmation**: Customer sees the backend order ID, total/item count, progress timeline, and browse/reorder next actions.
+### Demo profile
 
-## 5. Secondary User Flows
+`/sign-in` and `/account` manage a **password-free local demo profile** and synthetic addresses. This is presentation data, not authentication. Renaming/forgetting a profile does not rotate server ownership; an explicit fresh-guest reset is a separate action.
 
-### Search and filter restaurants
-1. Customer submits a search from `/` or `/restaurants`.
-2. App routes to `/restaurants?query=:query` and filters by restaurant name, tag, or menu item.
-3. Customer can combine a quick filter with the search term via `/restaurants?query=:query&filter=:filter`.
-4. Empty results explain no matches and provide a clear reset action.
+### Cart authority
 
-### Edit cart item quantity
-1. Customer opens `/checkout` with at least one cart line.
-2. Customer taps `+` or `-` on a line item.
-3. Quantity updates immediately, never drops below 1, and totals recalculate.
-4. Updated cart state is saved to the backend session and mirrored locally.
+In `api` mode:
 
-### Remove item / clear cart
-1. Current UI supports clearing the cart from cart review and checkout.
-2. Item-level removal is available on the cart review page.
-3. If the final item is removed, checkout should switch to the empty-cart recovery state with a Browse restaurants CTA.
+- `GET /v1/cart` returns `{revision, items}` from PostgreSQL.
+- `PUT /v1/cart` / `DELETE /v1/cart` require `expected_revision`.
+- Accepted writes increment revision exactly once.
+- `409 cart_conflict` returns the current server cart for explicit review/reapply.
+- Failed writes do not overwrite the last accepted basket with local intent.
 
-### Auth prompt
-1. Browsing remains anonymous, but placing an order requires the mock sign-in session.
-2. Account-only features should show a lightweight prompt only when the user asks for saved addresses, saved payments, loyalty, or order history.
-3. Prompt should preserve the current route and cart state so the customer can continue after sign-in or dismiss the prompt.
+Browser storage may retain recovery/presentation state, but it is not durable API cart authority.
 
-### Saved address selection
-1. Checkout shows default mock profile/address details today.
-2. The account page supports local mock profile/address management.
-3. Checkout validates the entered delivery details before submission.
-4. Place order remains disabled for empty or invalid carts.
+### Receipt authority
 
-### Order history entry point
-1. Primary nav exposes an Orders entry.
-2. `/orders` lists backend orders when available and local mirrored history as fallback.
-3. A reorder action should rebuild a cart from an existing order, then route to `/checkout` for review before submission.
+Only a valid C5/C6 server receipt represents an accepted order. Confirmation/history never fabricate a receipt from current fixtures, cart state, or a local mock fallback.
 
-## 6. Required Domain Entities
+## 3. Current Route Map
 
-| Entity | Purpose | Current source / future notes |
-| --- | --- | --- |
-| Restaurant | Represents a storefront with name, cuisine, rating, delivery fee/window, tags, image cue, and menu. | `Restaurant` in `lib/types.ts`; seeded in `lib/mock-data.ts`. |
-| Menu category | Groups menu items into scannable sections such as Popular, Pizza, Sides, Drinks, and Dessert. | Currently static category labels on the menu page; future data should own categories. |
-| Menu item | Represents an orderable item with price, description, popularity, image cue, and modifier groups. | `MenuItem` in `lib/types.ts`; seeded in `lib/mock-data.ts`. |
-| Customization group | Defines required/optional modifier groups such as size, crust, and toppings. | `ModifierGroup` and `ModifierOption` in `lib/types.ts`. |
-| Cart item | Stores selected restaurant, menu item, quantity, base price, and selected modifiers. | `CartItem` in `lib/types.ts`; persisted through backend cart sessions with local fallback. |
-| Customer profile | Stores identity, contact, saved addresses, saved payment references, and preferences. | Mock/local account data supports the portfolio demo; real auth is out of scope. |
-| Address | Stores delivery location, instructions, validation status, and delivery-zone metadata. | Mock/local address data pre-fills checkout and account views. |
-| Order | Stores submitted cart snapshot, totals, status, timestamps, restaurant, and customer/address references. | `Order` in `lib/types.ts`; backend order response is normalized for the frontend receipt/status UI. |
-| Payment summary | Stores subtotal, fees, discount, tax, tip, total, and payment display label. | Calculated in checkout from cart data; real payments are out of scope. |
+| Route | Purpose | API mode | `local_demo` |
+| --- | --- | --- | --- |
+| `/` | Marketplace/discovery entry | Canonical API catalog | Fixture catalog preview |
+| `/restaurants` | Search/filter restaurants | Canonical API catalog | Fixture catalog preview |
+| `/restaurants/:restaurantId` | Restaurant/menu | Canonical API detail | Fixture detail preview |
+| `/restaurants/:restaurantId/items/:itemId` | Customize item | Canonical item/modifiers; accepted add waits for cart write | Local preview customization/cart |
+| `/cart` | Review/edit basket | Revisioned server cart | Labelled local preview basket |
+| `/checkout` | Quote + mock submit | Enabled only for accepted API cart/session | Unavailable |
+| `/order-confirmation?orderId=...` | Exact immutable receipt | Fetch exact current-guest receipt | Unavailable |
+| `/orders` | Current-guest receipt history | Server receipt list only | Unavailable |
+| `/sign-in` | Create/select password-free demo profile | Local presentation only | Local presentation only |
+| `/account` | Rename/forget profile, synthetic address, explicit guest reset | Presentation actions + explicit C1 reset | Presentation only; no ordering authority |
 
-## 7. UI Behavior Requirements
+The frontend calls protected backend behavior through the bounded same-origin `/api/orderly` gateway rather than exposing guest credentials/owner IDs in application payloads.
 
-### Flow clarity
-- Every screen keeps the global marketplace nav visible.
-- Page headings should identify the current step: discovery, results, menu, customize, checkout, or order placed.
-- Primary CTAs should advance the customer one step at a time.
-- Recovery CTAs should always point back to the safest previous step, usually restaurant discovery or checkout.
+## 4. Primary Manual API Journey
 
-### Desktop assumptions
-- Discovery/results screens can show navigation, filters, and content together.
-- Menu pages can use grid layouts for item scanning.
-- Checkout should keep cart review and payment/address review visible side-by-side when space allows.
+1. **Discover** — visitor lands on `/`, searches/filters restaurants, and chooses one from the canonical API response.
+2. **Browse menu** — restaurant detail shows canonical availability/prices/modifier rules.
+3. **Customize** — visitor selects required/optional modifiers, quantity, and bounded special instructions.
+4. **Add to cart** — frontend submits IDs/quantity/modifiers against the current cart revision; success/navigation occurs only after the server accepts the mutation.
+5. **Review cart** — visitor edits/removes/clears lines through serialized revisioned mutations. A stale write shows the current server cart and explicit recovery controls.
+6. **Checkout profile/address** — visitor may use the password-free demo profile and one of the synthetic addresses. These values never become ownership authority.
+7. **Quote** — frontend asks `POST /v1/checkout/quote`; rendered totals come from the server quote.
+8. **Prepare submission** — frontend builds the immutable checkout body and creates one UUID idempotency key for the logical attempt. The exact unresolved key/body is saved in session storage before POST.
+9. **Submit** — `POST /v1/orders` performs atomic idempotent checkout. A first commit returns `201`; identical replay returns `200` with the exact same receipt.
+10. **Recover uncertainty** — if transport fails after send, the UI does not invent success or clear the basket. Retry reuses the exact saved key/body.
+11. **Confirm** — accepted response routes to `/order-confirmation?orderId=...`; the page fetches that exact receipt.
+12. **Reload/history** — receipt reload and `/orders` remain current-guest scoped and server-backed.
 
-### Mobile assumptions
-- Each screen should emphasize one primary action.
-- Item customization and checkout should keep the final Add/Place action easy to reach, ideally as a sticky or bottom action.
-- Filter controls should collapse or stack above results rather than crowding result cards.
+## 5. Important Failure and Recovery Flows
 
-### Cart-state preservation
-- Moving between restaurant, item, checkout, and confirmation must not clear cart state except successful order submission or explicit clear-cart action.
-- Refreshing checkout should restore cart state from the backend session, with local fallback if the API is unavailable.
-- Backend cart/order APIs are primary; local storage mirrors state for demo fallback.
+### Catalog/API failure
 
-## 8. Edge Cases to Preserve for Follow-up Implementation
+Show a loading/error/retry state. Do not switch to fixture data in `api` mode.
 
-- **Empty restaurant catalog**: Show an empty discovery/results state with a retry/reset action and avoid blank rails.
-- **No restaurant search results**: Show no matches, retain the search term/filter, and offer clear filters.
-- **Restaurant unavailable or closed**: Keep the menu readable, disable add-to-cart, and explain availability/next open time.
-- **Unknown restaurant route**: Return the framework not-found route or a friendly recovery screen.
-- **Menu item unavailable**: Disable add-to-cart from menu cards and item customization, and explain that the item is unavailable.
-- **Unknown item route**: Show the current item-not-found recovery state and link back to discovery/menu.
-- **Cart emptied while navigating**: Checkout should switch to the empty-cart state and disable Place order.
-- **One-restaurant cart conflict**: Prevent accidental cross-restaurant ordering or prompt the user to replace the current cart.
-- **Mobile browser refresh during checkout**: Restore cart/order draft from storage and keep the customer on checkout when possible.
-- **Malformed local storage**: Backend data is preferred; future hardening should safely reset corrupt fallback data without crashing the page.
+### Cart write/network failure
 
-## 9. Voice Capture + Transcript Flow
+Keep the last accepted cart visible. Preserve attempted intent separately when needed and offer retry/recovery; do not show unaccepted local state as saved.
 
-1. User taps microphone / voice action.
-2. Browser Web Speech API listens if supported.
-3. App displays live transcript.
-4. Parser turns transcript into a visible intent.
-5. App confirms interpreted action in assistant panel.
-6. Action executes only when confidence/action is clear enough.
-7. Unsupported browsers fall back to mock/text command mode.
+### Revision conflict
 
-## 10. Error Correction Flow
+Show the server-provided current cart. User can review it and deliberately reapply against its revision. Do not silently overwrite another tab’s accepted state.
 
-1. If a command is ambiguous, app does not mutate cart.
-2. Assistant asks a specific clarification.
-3. User can retry voice or use visual controls.
-4. If parser picks the wrong item/modifier, user can correct through UI.
-5. Every failed or corrected attempt remains visible in the assistant panel.
+### Required storage unavailable
 
-## 11. Accessibility Requirements
+Backend returns typed unavailable/not-ready behavior. The system does not claim success through JSON, Redis, or browser-local fallback.
 
-- All interactive controls must be keyboard reachable.
-- Buttons need visible labels and focus states.
-- Voice actions must have visual equivalents.
-- Color cannot be the only state indicator.
-- Assistant responses should be readable as text.
-- Checkout must clearly say mock/non-payment.
-- Cart mutations should provide visible confirmation.
+### Checkout validation/catalog conflict
+
+Keep the durable cart. Refresh/review the current cart/quote as appropriate. No accepted receipt is shown unless the server returns one.
+
+### Checkout response lost/timeout
+
+State is `uncertain`, not failed-as-new and not accepted. Retry only the exact persisted idempotency key/body so at most one durable order exists.
+
+### Unknown/foreign receipt ID
+
+Show a not-found/recovery state. Never display another guest’s order and never substitute a “latest” local receipt.
+
+### Browser profile storage unavailable/corrupt
+
+Offer explicit recovery/temporary synthetic-profile UI. Do not crash, collect a password, or fabricate server ownership.
+
+## 6. Password-Free Profile Flow
+
+1. Visitor may continue/create a local demo profile with a display name.
+2. UI stores only validated presentation data and synthetic-address selection.
+3. No password/email-auth session is created.
+4. Checkout can use the selected synthetic address, but server guest ownership remains the C1 cookie.
+5. “Forget profile” removes local presentation state only.
+6. “Start fresh guest” separately invokes the server guest reset and rotates ownership.
+7. Return navigation from profile/sign-in accepts only known safe internal app paths.
+
+## 7. `local_demo` Flow
+
+1. Environment explicitly selects `NEXT_PUBLIC_ORDERLY_DATA_MODE=local_demo`.
+2. UI shows the fixture-preview label.
+3. Visitor browses fixture restaurants/menu and customizes items.
+4. Preview basket is stored only in the isolated local-demo namespace.
+5. Checkout/history/receipt routes show an unavailable state.
+6. No guest bootstrap/API ordering request is performed.
+
+This mode is for development/visual preview and cannot satisfy public API release acceptance.
+
+## 8. Canonical Data / Pricing Rules
+
+- Restaurant/item/option names, availability, modifier constraints, and price deltas come from the canonical backend catalog in API mode.
+- Client-submitted display names/prices are not trusted as authority.
+- Required single-choice and bounded multi-choice groups are validated server-side.
+- One cart belongs to one restaurant.
+- Quote/receipt totals use deterministic `mock-v1` server pricing.
+- Accepted receipts preserve canonical line/modifier labels/prices and checkout fields as an immutable snapshot; later catalog changes cannot rewrite old receipts.
+
+## 9. Accessibility / Responsive Requirements
+
+- Complete manual ordering without voice.
+- Keyboard-accessible controls and visible focus states.
+- Validation summary/field associations for checkout errors.
+- Clear disabled/pending states while mutations/submissions are in flight.
+- Color is not the only state signal.
+- Mock/no-real-payment language remains visible.
+- Critical checkout journey must work at 375px without horizontal document overflow.
+- Unsafe external/protocol-relative return destinations are rejected.
+
+## 10. Release Evidence Boundary
+
+Repository/browser CI can prove the candidate implementation, but public release acceptance additionally requires the exact deployed frontend/backend identity, fresh unauthenticated access, durable receipt reload, guest isolation, and required recovery rehearsal. Those results are recorded in [`releases/stabilization-acceptance.md`](releases/stabilization-acceptance.md); blocked/unrun scenarios keep the release Not completed.
