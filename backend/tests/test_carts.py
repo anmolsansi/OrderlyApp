@@ -21,7 +21,7 @@ from app.cart_service import (
 )
 from app.identity import VerifiedGuest, verify_request_guest
 from app.main import app
-from app.models import CartDeleteRequest, CartItemInput, CartItemModifier, CartUpsertRequest
+from app.models import CartDeleteRequest, CartItem, CartItemInput, CartItemModifier, CartUpsertRequest
 
 
 TEST_ORIGIN = "https://orderly.test"
@@ -398,3 +398,95 @@ def test_catalog_rejection_precedes_persistence(cart_environment, postgres_conne
     assert response.json()['error']['code'] == 'invalid_cart'
     assert response.json()['error']['fields']
     assert get_cart(owner).model_dump(mode='json') == accepted.model_dump(mode='json')
+
+
+def test_real_api_restart_and_unreachable_postgres_preserve_state(cart_environment, postgres_database_url, postgres_connection):
+    import os
+    import socket
+    import subprocess
+    import sys
+    import time
+    from pathlib import Path
+    import httpx
+    from app.identity import verify_guest_token
+    from app.pricing import build_receipt_snapshot
+    from app.store import get_catalog_snapshot, insert_order_snapshot
+    from app.models import CheckoutDetails
+
+    with socket.socket() as sock:
+        sock.bind(('127.0.0.1', 0))
+        port = sock.getsockname()[1]
+    origin = f'http://127.0.0.1:{port}'
+    backend = Path(__file__).resolve().parents[1]
+    env = {**os.environ, 'PYTHONPATH': str(backend), 'ORDERLY_DATA_MODE': 'api',
+           'ORDERLY_ALLOWED_ORIGINS': origin, 'ORDERLY_SESSION_SECRET': TEST_SECRET,
+           'PYTHONDONTWRITEBYTECODE': '1'}
+    env.pop('REDIS_URL', None)
+    env.pop('ORDERLY_FORCE_JSON_STORE', None)
+    process = None
+    guest_id = None
+    pids = []
+
+    def start(database_url):
+        nonlocal process
+        process = subprocess.Popen([sys.executable, '-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', str(port)], cwd=backend, env={**env, 'DATABASE_URL': database_url}, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        pids.append(process.pid)
+        deadline = time.monotonic() + 15
+        while time.monotonic() < deadline:
+            assert process.poll() is None, 'API exited before readiness'
+            try:
+                if httpx.get(f'{origin}/health/live', timeout=1).status_code == 200:
+                    return
+            except httpx.RequestError:
+                pass
+            time.sleep(.05)
+        pytest.fail('API did not start')
+
+    def stop():
+        if process and process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=5)
+
+    try:
+        start(postgres_database_url)
+        with httpx.Client(base_url=origin, headers={'Origin': origin}, timeout=10) as client:
+            bootstrap = client.post('/v1/session')
+            assert bootstrap.status_code == 200, bootstrap.text
+            guest_id = verify_guest_token(client.cookies.get('orderly_guest')).guest_id
+            saved = client.put('/v1/cart', json={'expected_revision': 0, 'items': [line(cart_environment).model_dump(mode='json')]})
+            assert saved.status_code == 200, saved.text
+            fixture = json.loads((backend.parent / 'tests/fixtures/contracts/c5.json').read_text())['positive']['receipt']
+            receipt = build_receipt_snapshot(order_id=str(uuid4()), created_at=datetime.now(timezone.utc), snapshot=get_catalog_snapshot(), items=[CartItem.model_validate(i) for i in saved.json()['items']], checkout=CheckoutDetails.model_validate(fixture['checkout']), promotion_code='DEMO5')
+            insert_order_snapshot(postgres_connection, guest_id, receipt)
+            postgres_connection.execute('UPDATE menu_items SET price_cents = 2500 WHERE id = %s', (cart_environment['item_id'],))
+            postgres_connection.commit()
+            original_receipt = client.get(f'/v1/orders/{receipt.id}').json()
+            assert original_receipt == receipt.model_dump(mode='json')
+            stop()
+            start(postgres_database_url)
+            assert client.get('/v1/cart').json() == saved.json()
+            assert client.get(f'/v1/orders/{receipt.id}').json() == original_receipt
+            stop()
+            with socket.socket() as unavailable:
+                unavailable.bind(('127.0.0.1', 0))
+                failed_port = unavailable.getsockname()[1]
+                # Bound but not listening: real connection refusal, no provider mock.
+                start(f'postgresql://orderly@127.0.0.1:{failed_port}/unavailable?connect_timeout=1')
+                for path in ('/v1/cart', f'/v1/orders/{receipt.id}'):
+                    failed = client.get(path)
+                    assert failed.status_code == 503, failed.text
+                    assert failed.json()['error']['code'] == 'storage_unavailable'
+                stop()
+            start(postgres_database_url)
+            assert client.get('/v1/cart').json() == saved.json()
+            assert client.get(f'/v1/orders/{receipt.id}').json() == original_receipt
+            assert len(set(pids)) == 4
+    finally:
+        stop()
+        if guest_id:
+            postgres_connection.execute('DELETE FROM guest_sessions WHERE id = %s', (guest_id,))
+            postgres_connection.commit()

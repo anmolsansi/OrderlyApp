@@ -120,6 +120,10 @@
         "message": "Restaurant was not found",
         "request_id": "synthetic-request-1",
         "fields": []
+      },
+      "request": {
+        "method": "GET",
+        "path": "/v1/restaurants/missing"
       }
     },
     {
@@ -132,6 +136,30 @@
         "fields": [
           "items.0.menu_item_id"
         ]
+      },
+      "request": {
+        "method": "PUT",
+        "path": "/v1/cart",
+        "body": {
+          "expected_revision": 1,
+          "items": [
+            {
+              "id": "line-1",
+              "restaurant_id": "fixture-r1",
+              "menu_item_id": "missing",
+              "quantity": 1,
+              "modifiers": [
+                {
+                  "group_id": "size",
+                  "option_ids": [
+                    "small"
+                  ]
+                }
+              ],
+              "special_instructions": "Synthetic fixture only"
+            }
+          ]
+        }
       }
     },
     {
@@ -144,7 +172,32 @@
         "fields": [
           "items.0.restaurant_id"
         ]
-      }
+      },
+      "request": {
+        "method": "PUT",
+        "path": "/v1/cart",
+        "body": {
+          "expected_revision": 1,
+          "items": [
+            {
+              "id": "line-1",
+              "restaurant_id": "fixture-r1",
+              "menu_item_id": "fixture-i1",
+              "quantity": 1,
+              "modifiers": [
+                {
+                  "group_id": "size",
+                  "option_ids": [
+                    "small"
+                  ]
+                }
+              ],
+              "special_instructions": "Synthetic fixture only"
+            }
+          ]
+        }
+      },
+      "catalog_override": "closed"
     },
     {
       "name": "unavailable_item",
@@ -156,7 +209,32 @@
         "fields": [
           "items.0.menu_item_id"
         ]
-      }
+      },
+      "request": {
+        "method": "PUT",
+        "path": "/v1/cart",
+        "body": {
+          "expected_revision": 1,
+          "items": [
+            {
+              "id": "line-1",
+              "restaurant_id": "fixture-r1",
+              "menu_item_id": "fixture-i1",
+              "quantity": 1,
+              "modifiers": [
+                {
+                  "group_id": "size",
+                  "option_ids": [
+                    "small"
+                  ]
+                }
+              ],
+              "special_instructions": "Synthetic fixture only"
+            }
+          ]
+        }
+      },
+      "catalog_override": "unavailable"
     },
     {
       "name": "required_group_below_minimum",
@@ -168,6 +246,23 @@
         "fields": [
           "items.0.modifiers"
         ]
+      },
+      "request": {
+        "method": "PUT",
+        "path": "/v1/cart",
+        "body": {
+          "expected_revision": 1,
+          "items": [
+            {
+              "id": "line-1",
+              "restaurant_id": "fixture-r1",
+              "menu_item_id": "fixture-i1",
+              "quantity": 1,
+              "modifiers": [],
+              "special_instructions": "Synthetic fixture only"
+            }
+          ]
+        }
       }
     },
     {
@@ -180,7 +275,40 @@
         "fields": [
           "items.0.modifiers.1.option_ids"
         ]
-      }
+      },
+      "request": {
+        "method": "PUT",
+        "path": "/v1/cart",
+        "body": {
+          "expected_revision": 1,
+          "items": [
+            {
+              "id": "line-1",
+              "restaurant_id": "fixture-r1",
+              "menu_item_id": "fixture-i1",
+              "quantity": 1,
+              "modifiers": [
+                {
+                  "group_id": "size",
+                  "option_ids": [
+                    "small"
+                  ]
+                },
+                {
+                  "group_id": "extras",
+                  "option_ids": [
+                    "sauce",
+                    "cheese",
+                    "third"
+                  ]
+                }
+              ],
+              "special_instructions": "Synthetic fixture only"
+            }
+          ]
+        }
+      },
+      "catalog_override": "three_available_extras"
     },
     {
       "name": "duplicate_line_id",
@@ -192,6 +320,45 @@
         "fields": [
           "items.1.id"
         ]
+      },
+      "request": {
+        "method": "PUT",
+        "path": "/v1/cart",
+        "body": {
+          "expected_revision": 1,
+          "items": [
+            {
+              "id": "line-1",
+              "restaurant_id": "fixture-r1",
+              "menu_item_id": "fixture-i1",
+              "quantity": 1,
+              "modifiers": [
+                {
+                  "group_id": "size",
+                  "option_ids": [
+                    "small"
+                  ]
+                }
+              ],
+              "special_instructions": "Synthetic fixture only"
+            },
+            {
+              "id": "line-1",
+              "restaurant_id": "fixture-r1",
+              "menu_item_id": "fixture-i1",
+              "quantity": 1,
+              "modifiers": [
+                {
+                  "group_id": "size",
+                  "option_ids": [
+                    "small"
+                  ]
+                }
+              ],
+              "special_instructions": "Synthetic fixture only"
+            }
+          ]
+        }
       }
     },
     {
@@ -204,6 +371,36 @@
         "fields": [
           "items.0.modifiers.1.group_id"
         ]
+      },
+      "request": {
+        "method": "PUT",
+        "path": "/v1/cart",
+        "body": {
+          "expected_revision": 1,
+          "items": [
+            {
+              "id": "line-1",
+              "restaurant_id": "fixture-r1",
+              "menu_item_id": "fixture-i1",
+              "quantity": 1,
+              "modifiers": [
+                {
+                  "group_id": "size",
+                  "option_ids": [
+                    "small"
+                  ]
+                },
+                {
+                  "group_id": "size",
+                  "option_ids": [
+                    "large"
+                  ]
+                }
+              ],
+              "special_instructions": "Synthetic fixture only"
+            }
+          ]
+        }
       }
     },
     {
@@ -216,6 +413,34 @@
         "fields": [
           "items.0.modifiers.0.group_id"
         ]
+      },
+      "request": {
+        "method": "PUT",
+        "path": "/v1/cart",
+        "body": {
+          "expected_revision": 1,
+          "items": [
+            {
+              "id": "line-1",
+              "restaurant_id": "fixture-r1",
+              "menu_item_id": "fixture-i1",
+              "quantity": 1,
+              "modifiers": [
+                {
+                  "group_id": "missing",
+                  "option_ids": []
+                },
+                {
+                  "group_id": "size",
+                  "option_ids": [
+                    "small"
+                  ]
+                }
+              ],
+              "special_instructions": "Synthetic fixture only"
+            }
+          ]
+        }
       }
     },
     {
@@ -228,6 +453,37 @@
         "fields": [
           "items.0.modifiers.0.option_ids.1"
         ]
+      },
+      "request": {
+        "method": "PUT",
+        "path": "/v1/cart",
+        "body": {
+          "expected_revision": 1,
+          "items": [
+            {
+              "id": "line-1",
+              "restaurant_id": "fixture-r1",
+              "menu_item_id": "fixture-i1",
+              "quantity": 1,
+              "modifiers": [
+                {
+                  "group_id": "extras",
+                  "option_ids": [
+                    "sauce",
+                    "sauce"
+                  ]
+                },
+                {
+                  "group_id": "size",
+                  "option_ids": [
+                    "small"
+                  ]
+                }
+              ],
+              "special_instructions": "Synthetic fixture only"
+            }
+          ]
+        }
       }
     },
     {
@@ -240,6 +496,30 @@
         "fields": [
           "items.0.modifiers.0.option_ids.0"
         ]
+      },
+      "request": {
+        "method": "PUT",
+        "path": "/v1/cart",
+        "body": {
+          "expected_revision": 1,
+          "items": [
+            {
+              "id": "line-1",
+              "restaurant_id": "fixture-r1",
+              "menu_item_id": "fixture-i1",
+              "quantity": 1,
+              "modifiers": [
+                {
+                  "group_id": "size",
+                  "option_ids": [
+                    "missing"
+                  ]
+                }
+              ],
+              "special_instructions": "Synthetic fixture only"
+            }
+          ]
+        }
       }
     },
     {
@@ -252,6 +532,36 @@
         "fields": [
           "items.0.modifiers.1.option_ids.0"
         ]
+      },
+      "request": {
+        "method": "PUT",
+        "path": "/v1/cart",
+        "body": {
+          "expected_revision": 1,
+          "items": [
+            {
+              "id": "line-1",
+              "restaurant_id": "fixture-r1",
+              "menu_item_id": "fixture-i1",
+              "quantity": 1,
+              "modifiers": [
+                {
+                  "group_id": "size",
+                  "option_ids": [
+                    "small"
+                  ]
+                },
+                {
+                  "group_id": "extras",
+                  "option_ids": [
+                    "sold-out"
+                  ]
+                }
+              ],
+              "special_instructions": "Synthetic fixture only"
+            }
+          ]
+        }
       }
     },
     {
@@ -264,7 +574,47 @@
         "fields": [
           "items.1.restaurant_id"
         ]
-      }
+      },
+      "request": {
+        "method": "PUT",
+        "path": "/v1/cart",
+        "body": {
+          "expected_revision": 1,
+          "items": [
+            {
+              "id": "line-1",
+              "restaurant_id": "fixture-r1",
+              "menu_item_id": "fixture-i1",
+              "quantity": 1,
+              "modifiers": [
+                {
+                  "group_id": "size",
+                  "option_ids": [
+                    "small"
+                  ]
+                }
+              ],
+              "special_instructions": "Synthetic fixture only"
+            },
+            {
+              "id": "line-2",
+              "restaurant_id": "fixture-r2",
+              "menu_item_id": "fixture-i2",
+              "quantity": 1,
+              "modifiers": [
+                {
+                  "group_id": "size",
+                  "option_ids": [
+                    "small"
+                  ]
+                }
+              ],
+              "special_instructions": "Synthetic fixture only"
+            }
+          ]
+        }
+      },
+      "catalog_override": "second_restaurant"
     },
     {
       "name": "quantity_out_of_range",
@@ -276,6 +626,30 @@
         "fields": [
           "items.0.quantity"
         ]
+      },
+      "request": {
+        "method": "PUT",
+        "path": "/v1/cart",
+        "body": {
+          "expected_revision": 1,
+          "items": [
+            {
+              "id": "line-1",
+              "restaurant_id": "fixture-r1",
+              "menu_item_id": "fixture-i1",
+              "quantity": 0,
+              "modifiers": [
+                {
+                  "group_id": "size",
+                  "option_ids": [
+                    "small"
+                  ]
+                }
+              ],
+              "special_instructions": "Synthetic fixture only"
+            }
+          ]
+        }
       }
     },
     {
@@ -288,6 +662,30 @@
         "fields": [
           "items.0.special_instructions"
         ]
+      },
+      "request": {
+        "method": "PUT",
+        "path": "/v1/cart",
+        "body": {
+          "expected_revision": 1,
+          "items": [
+            {
+              "id": "line-1",
+              "restaurant_id": "fixture-r1",
+              "menu_item_id": "fixture-i1",
+              "quantity": 1,
+              "modifiers": [
+                {
+                  "group_id": "size",
+                  "option_ids": [
+                    "small"
+                  ]
+                }
+              ],
+              "special_instructions": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+            }
+          ]
+        }
       }
     }
   ]
