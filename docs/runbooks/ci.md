@@ -1,46 +1,50 @@
-# ST-01 Verification Runbook
+# Stabilization CI Runbook
 
-This runbook defines the reproducible test vocabulary introduced by ST-01. It describes the baseline only. Product hardening remains owned by later stabilization tickets.
+This runbook describes the current release-candidate verification workflow in `.github/workflows/ci.yml`. The workflow is evidence for the exact candidate SHA that ran. A green workflow does not, by itself, prove that GitHub branch protection or required checks are configured.
 
-## Source identity
+## Trigger and candidate identity
 
-The ST-01 work branch started from `main` at `78b8fa6a7d6a779a8985d34413d81d8b23673403`.
+`Stabilization CI` runs on:
 
-Hosted CI records `GITHUB_SHA` in the `baseline-evidence` job summary. Use that SHA, not a moving branch name, when citing a verification result.
+- pushes to `main`, `feat/**`, `fix/**`, and `chore/**`;
+- pull requests targeting `main`.
 
-## Supported runtimes
+Every release decision must cite the immutable `GITHUB_SHA` from the run, not a moving branch name. The API-backed E2E job also passes that SHA to the backend as `ORDERLY_SOURCE_SHA` and rejects `/health/ready` unless the response reports the same candidate SHA.
 
-- Node.js: `>=20.9.0 <25` from `package.json`.
-- Hosted Node baseline: Node 22.
-- Hosted npm resolver: npm 11.20.0. npm 10.9.9 hit an Arborist `edgesOut` internal error while reconciling the pre-ST-01 lockfile, so ST-01 regenerated the lock with npm 11 and uses that resolver in CI.
-- Python application range: `>=3.9` from `backend/pyproject.toml`.
-- Hosted Python baseline: Python 3.12.
-- Backend test tools: `pytest==8.4.2` and `httpx==0.28.1` from `backend/requirements-test.lock`.
-- Database baseline: PostgreSQL 16.
-- Browser baseline: Playwright Chromium.
+## Supported hosted runtimes
 
-## Command vocabulary
+- Node.js: Node 22; application range remains `>=20.9.0 <25` from `package.json`.
+- npm resolver: npm `11.20.0`.
+- Python: Python 3.12; application range remains `>=3.9` from `backend/pyproject.toml`.
+- Backend test/security tools: `httpx`, `pytest`, and `pip-audit` are pinned in `backend/requirements-test.lock`.
+- PostgreSQL: `postgres:16-alpine`.
+- Redis: `redis:7-alpine`.
+- Browser: Playwright Chromium from the committed frontend dependency graph.
 
-Use these names consistently in issues, CI evidence, and stabilization reviews:
+The workflow summary records the exact Node, npm, Python, `pip-audit`, Playwright, Chromium, PostgreSQL image, ref, and candidate SHA used for the run.
 
-- `WEB`: `npm run test:web`
-- `CONTRACTS-TS`: `npm run test:contracts`
-- `BACKEND`: `python -m pytest backend/tests -q`
-- `E2E-INSTALL`: `npm run test:e2e:install`
-- `E2E`: `npm run test:e2e`
-- `AUDIT`: `npm audit --audit-level=high`
+## Required release jobs
 
-`WEB` covers the frontend unit suite, typecheck, and production build. `BACKEND` includes the ST-01 contract and baseline tests. Hosted BACKEND additionally provisions a real PostgreSQL service before pytest runs.
+A release candidate is complete only when every job below succeeds:
 
-## Clean frontend verification
+1. `Dependency security`
+2. `Web quality`
+3. `Backend and recovery`
+4. `Chromium runtime`
+5. `API product E2E`
+6. `Local fixture preview E2E`
+7. `Release candidate evidence`
 
-From a clean checkout of the exact SHA being assessed:
+`Release candidate evidence` runs even when an upstream job fails, is cancelled, or is skipped. It fails unless every required upstream result is exactly `success`. This prevents a missing product assertion from being presented as a green candidate.
+
+## Frontend quality and dependency verification
+
+From a clean checkout of the exact SHA:
 
 ```bash
-node --version
-npm --version
 npm install --global npm@11.20.0
 npm ci --ignore-scripts
+npm run lint
 npm run test:contracts
 npm run test
 npm run typecheck
@@ -48,73 +52,108 @@ npm run build
 npm audit --audit-level=high
 ```
 
-Expected runtime for hosted evidence is Node 22 with npm 11.20.0. `npm ci` must use the committed `package-lock.json`. Do not replace it with `npm install` during ordinary verification because that would change the resolved dependency graph.
+`npm run lint` is genuine ESLint execution. It is intentionally separate from TypeScript typechecking. The lint stack uses ESLint 9 maintenance packages, `typescript-eslint`, and React's Hooks plugin. Existing synchronous state-in-effect debt in application pages and existing explicit `any` use in the Playwright harness remain visible as warnings so ST-12 does not rewrite non-owned product behavior merely to establish the gate.
 
-A WEB failure is a product or source failure only after dependency installation succeeds. A missing runtime or broken lock is foundation failure and stays owned by ST-01.
+ST-12 removed `eslint-config-next` after the hosted audit showed that its current lint-only dependency chain introduced a high-severity `braces` advisory with no patched release available in that chain. The replacement lint graph preserves TypeScript and React Hooks checks and currently allows `npm audit --audit-level=high` to fail closed with no advisory exception list.
 
-## Backend and PostgreSQL verification
+The committed `package-lock.json` is authoritative. Do not replace `npm ci` with `npm install` during ordinary verification because that would resolve a different graph.
 
-Hosted CI uses PostgreSQL 16 with a disposable `orderlyapp_test` database. For the equivalent local check, start only the database service or point the test environment at an isolated disposable Postgres instance:
+## Backend and Python dependency verification
+
+For the strict security scan, install the backend candidate non-editably so `pip-audit --strict` can inspect the installed environment without treating the application itself as an unresolved editable distribution:
 
 ```bash
-docker compose up -d postgres
-python -m venv .venv
-. .venv/bin/activate
+python -m pip install ./backend
+python -m pip install -r backend/requirements-test.lock
+python -m pip_audit --local --strict --progress-spinner=off
+```
+
+The hosted security job records current JSON results for both npm and Python audits. Each audit is allowed to finish and produce evidence, then a final enforcement step fails the job if either scan outcome is not successful. This keeps one failing ecosystem from hiding the current result of the other.
+
+For backend behavior tests, hosted CI uses an isolated PostgreSQL 16 database and Redis 7 service:
+
+```bash
 python -m pip install -e ./backend
 python -m pip install -r backend/requirements-test.lock
-export DATABASE_URL=postgresql://orderly:orderly@127.0.0.1:5432/orderlyapp
-export ORDERLY_TEST_DATABASE_URL="$DATABASE_URL"
 python backend/scripts/migrate.py
 python -m pytest backend/tests -q
 ```
 
-On Windows, activate the virtual environment using the shell-specific `.venv` activation command and set environment variables with that shell's syntax.
+The backend job also rehearses the existing transaction-consistent receipt backup/restore proof against a disposable restore database. The dump and synthetic proof fixture are deleted before the job completes.
 
-The Postgres integration test may skip when run locally without `DATABASE_URL`/`ORDERLY_TEST_DATABASE_URL`. It does **not** skip in hosted CI. When `CI=true`, a missing database URL fails the fixture because hosted baseline evidence must prove a real database connection.
+## Chromium proof
 
-The unit-style health check uses `ORDERLY_FORCE_JSON_STORE=1` and removes external database/Redis variables through pytest's monkeypatch fixture. That keeps the unit baseline isolated from a developer's services and credentials.
-
-## Chromium and product E2E verification
-
-Install the exact frontend dependency graph first, then provision Chromium:
+`Chromium runtime` answers one question only: can the committed candidate provision and launch the expected browser runtime?
 
 ```bash
 npm ci --ignore-scripts
 npm run test:e2e:install
-npm run test:e2e
 ```
 
-The hosted workflow deliberately separates two questions:
+The hosted job launches headless Chromium, records the browser version, records the Playwright version, and closes the browser. Missing installation or launch is a hard failure.
 
-1. `browser-runtime` installs Chromium and launches/closes a headless browser without running product assertions.
-2. `e2e` provisions its own Postgres database, applies migrations, seeds the current catalog, starts the FastAPI server, waits for `/health`, and then runs the existing Playwright product suite against the Next.js app.
+## API-backed product E2E
 
-This separation is important. A Chromium install/launch failure is a foundation failure owned by ST-01. Once Chromium launches, a failed selector, navigation, cart, checkout, or receipt assertion is a product baseline failure and must remain visible for its owning stabilization ticket.
+`API product E2E` depends on successful dependency-security, web, backend, and Chromium gates. It provisions fresh PostgreSQL and Redis services, applies migrations, seeds explicit test fixtures, starts FastAPI, and waits for `/health/ready`.
 
-The E2E job sets:
+Before browser assertions run, readiness must report:
 
-- `NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000`
-- `NEXT_PUBLIC_APP_URL=http://127.0.0.1:3200`
-- `PLAYWRIGHT_BASE_URL=http://127.0.0.1:3200`
-- `NEXT_PUBLIC_VOICE_MODE=mock`
-- `NEXT_PUBLIC_CHECKOUT_MODE=mock`
-- `NEXT_PUBLIC_AUTH_PROVIDER=none`
+- `schema_version == 1`;
+- `ready == true`;
+- `mode == "api"`;
+- `source_sha == GITHUB_SHA`;
+- PostgreSQL dependency state `ready`;
+- schema dependency state `current`.
 
-`playwright.config.ts` uses `PLAYWRIGHT_BASE_URL` when supplied and otherwise defaults to `http://127.0.0.1:3200`.
+The job then lists Playwright tests with `--grep-invert 'local_demo'` and requires at least one Chromium product case before execution. An empty mandatory API suite fails instead of producing green evidence. The same filtered suite is then executed, so local-demo-only cases are not counted as skipped API assertions.
 
-## Baseline failure ownership
+## Local fixture preview E2E
 
-The hosted run for commit `ca097fe195f30fbab198e3b635a72b6d47788d41` passed WEB, BACKEND with real PostgreSQL, Chromium launch, and the existing product E2E suite. No current product assertion failure needs a downstream owner from this run.
+`Local fixture preview E2E` runs separately with:
 
-Two foundation problems were found and resolved inside ST-01 instead of being hidden:
+```text
+NEXT_PUBLIC_ORDERLY_DATA_MODE=local_demo
+ORDERLY_DATA_MODE=local_demo
+```
 
-- The pre-ST-01 environment could not launch Playwright because Chromium was not provisioned. ST-01 now installs the browser explicitly and proves launch in its own job.
-- npm 10.9.9 crashed inside Arborist with `Cannot read properties of null (reading 'edgesOut')` while updating the old lockfile. The lock was regenerated with npm 11.20.0 and hosted CI uses that resolver consistently.
+It does not provision backend services. The preflight requires at least two `local_demo` Chromium safety cases, then runs only those cases. Those assertions protect the preview boundary, including no backend API requests and no checkout/order-history/receipt behavior in local-demo mode.
 
-Later stabilization tickets still own the product/security changes described in `development.md`. A green ST-01 baseline means the test foundation can execute; it does not mark ST-02 through ST-13 complete or claim the existing app is production-ready.
+Keeping preview coverage separate prevents intentional local-demo exclusions from reducing the mandatory API-mode product count.
 
-## Final completion rule
+## Failure semantics
 
-ST-01 is complete only when the current branch head, not merely an earlier commit, has a successful hosted `ST-01 Baseline` run with WEB, BACKEND/Postgres, standalone Chromium launch, product E2E, and baseline-evidence all green. The closing engineering review also requires the `main...chore/st-01-baseline-contracts` diff to remain limited to ST-01 foundation, contracts, CI, dependency, and documentation paths, with no application behavior changes or committed secrets.
+The workflow is designed to fail closed:
 
-`development.md` now marks ST-01 Completed, checks ST-01.01–ST-01.07, and records AC1–AC5 as PASS. This final authored runbook commit exists after that synchronization so hosted CI validates the exact completed packet state before the PR is opened.
+- PostgreSQL container health failure blocks backend/API jobs.
+- Missing or unlaunchable Chromium fails `Chromium runtime` and prevents browser-dependent release evidence.
+- Unhealthy or mismatched C8 readiness fails before Playwright product assertions.
+- Zero discovered API-mode mandatory tests fails the API E2E job.
+- Fewer than two local-demo safety tests fails the preview job.
+- High/critical npm advisories fail the dependency-security job.
+- Any Python vulnerability or strict dependency-collection failure makes `pip-audit` fail and therefore fails dependency security.
+- Failed, cancelled, or skipped required jobs cause `Release candidate evidence` to fail.
+
+Do not weaken a gate to obtain a green run. Fix the incompatibility, remediate the dependency, or record the candidate as blocked.
+
+## Evidence artifacts and retention
+
+Hosted CI keeps short-lived evidence for 14 days:
+
+- `stabilization-dependency-audit-*`: current npm and Python JSON audit output;
+- `stabilization-api-e2e-*`: API startup log, exact readiness payload, and Playwright `test-results` when present;
+- `stabilization-local-demo-*`: Playwright failure results when the preview suite fails.
+
+Artifacts must not include `.env` files, API tokens, session secrets, private keys, database dumps, production data, or browser credentials. The backup rehearsal removes its database dump instead of uploading it. Only test-environment logs, readiness metadata, dependency audit results, and Playwright diagnostic output are retained.
+
+## Release review
+
+Before merging a candidate:
+
+1. Verify the branch head SHA matches the successful workflow run.
+2. Inspect every required job instead of relying only on the aggregate workflow status.
+3. Confirm `npm audit --audit-level=high` and strict `pip-audit` are current for that SHA.
+4. Review the branch diff for unrelated source changes, generated files, credentials, or temporary workflows.
+5. Confirm documentation still describes the committed commands and failure behavior.
+6. Open or update the PR against the repository's intended base branch and preserve the exact-head CI evidence in the task record.
+
+Rollback remains commit-based. Dependency and configuration changes must retain committed lockfiles so an incompatible candidate can be reverted without silently weakening the security or verification gates.
