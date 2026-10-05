@@ -31,6 +31,80 @@ async function prepareApiCheckout(page: Page): Promise<void> {
   await expect(page.getByRole('button', { name: /place mock order/i })).toBeEnabled();
 }
 
+for (const destination of ['/sign-in', '/account', '/checkout']) {
+  test(`denied localStorage getter recovers on ${destination}`, async ({ page }) => {
+    const pageErrors: Error[] = [];
+    page.on('pageerror', error => pageErrors.push(error));
+    if (destination === '/checkout') await prepareApiCart(page);
+    await page.addInitScript(() => {
+      Object.defineProperty(window, 'localStorage', {
+        configurable: true,
+        get() { throw new DOMException('Synthetic getter block', 'SecurityError'); },
+      });
+    });
+    await page.goto(destination);
+    await expect(page.getByText('Demo profile storage is unavailable', { exact: true })).toBeVisible();
+    if (destination === '/sign-in') {
+      await expect(page.getByRole('button', { name: /continue without saving/i })).toBeVisible();
+    } else {
+      await page.getByRole('button', { name: /use temporary demo profile/i }).click();
+      if (destination === '/checkout') {
+        await expect(page.getByRole('button', { name: /place mock order/i })).toBeEnabled();
+        await page.getByRole('button', { name: /place mock order/i }).click();
+        await expect(page).toHaveURL(/\/order-confirmation\?orderId=/);
+        await expect(page.getByText('100 Demo Street', { exact: false })).toBeVisible();
+      } else {
+        await expect(page.getByText('Temporary demo profile', { exact: true })).toBeVisible();
+      }
+    }
+    expect(pageErrors).toEqual([]);
+  });
+}
+
+test('denied sessionStorage getter blocks new checkout without sending an order', async ({ page }) => {
+  const pageErrors: Error[] = [];
+  page.on('pageerror', error => pageErrors.push(error));
+  await prepareApiCheckout(page);
+  let submittedOrders = 0;
+  page.on('request', request => {
+    if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/orderly/orders') submittedOrders += 1;
+  });
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'sessionStorage', {
+      configurable: true,
+      get() { throw new DOMException('Synthetic recovery getter block', 'SecurityError'); },
+    });
+  });
+  await page.reload();
+  await expect(page.getByText(/enable browser storage and reload before submitting/i)).toBeVisible();
+  await expect(page.getByRole('button', { name: /place mock order/i })).toBeDisabled();
+  await page.locator('#checkout-form').evaluate(form => (form as HTMLFormElement).requestSubmit());
+  expect(submittedOrders).toBe(0);
+  await expect(page).toHaveURL(/\/checkout$/);
+  expect(pageErrors).toEqual([]);
+});
+
+test('sessionStorage access denied after load rejects submission before the API call', async ({ page }) => {
+  const pageErrors: Error[] = [];
+  page.on('pageerror', error => pageErrors.push(error));
+  await prepareApiCheckout(page);
+  let submittedOrders = 0;
+  page.on('request', request => {
+    if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/orderly/orders') submittedOrders += 1;
+  });
+  await page.evaluate(() => {
+    Object.defineProperty(window, 'sessionStorage', {
+      configurable: true,
+      get() { throw new DOMException('Synthetic late recovery getter block', 'SecurityError'); },
+    });
+  });
+  await page.getByRole('button', { name: /place mock order/i }).click();
+  await expect(page.getByText('Checkout recovery storage is unavailable. No order was submitted.', { exact: true })).toBeVisible();
+  expect(submittedOrders).toBe(0);
+  await expect(page).toHaveURL(/\/checkout$/);
+  expect(pageErrors).toEqual([]);
+});
+
 test('unsafe profile return destinations always fall back inside the app', async ({ page }) => {
   const unsafeDestinations = [
     'https://evil.example/steal',
@@ -109,7 +183,8 @@ test('keyboard and 375px checkout preserve the selected address into the durable
   await expect(page.getByLabel('Delivery address')).toHaveValue('200 Sample Avenue');
 
   await addressSelect.focus();
-  await page.keyboard.press('ArrowUp');
+  // Native select type-ahead also works in headless macOS Chromium.
+  await page.keyboard.type('Demo home');
   await expect(addressSelect).toHaveValue('demo-address-1');
   await expect(page.getByLabel('Delivery address')).toHaveValue('100 Demo Street');
 

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { isSignedIn } from '@/lib/auth';
+import { getBrowserStorage } from '@/lib/browser-storage';
 import { routes } from '@/lib/routes';
 
 interface MarketplaceNavProps {
@@ -13,7 +14,7 @@ export function MarketplaceNav({ active = 'Home' }: MarketplaceNavProps) {
   const [profileSelected, setProfileSelected] = useState(false);
 
   useEffect(() => {
-    setProfileSelected(isSignedIn(window.localStorage));
+    setProfileSelected(isSignedIn(getBrowserStorage('localStorage')));
   }, []);
 
   const navItems = [

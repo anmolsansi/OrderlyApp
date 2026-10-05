@@ -44,6 +44,10 @@ C2 remains versioned local presentation data:
 
 Reads still validate exact JSON/schema/address shapes. Storage access continues to catch browser `getItem`, `setItem`, and `removeItem` exceptions instead of throwing into React.
 
+`lib/browser-storage.ts` also guards access to `window.localStorage` and `window.sessionStorage` themselves: browser policy can throw before a Storage method is called. Profile pages and shared navigation use this boundary. An unavailable store is reported as unavailable; no replacement memory store claims that anything was persisted.
+
+If checkout cannot acquire session storage when loading, it shows a recovery-storage message and blocks new submissions until storage is enabled and the page reloaded. If access becomes unavailable later, saving the recovery key/body fails before any order API call. An accepted server response can still be displayed if clearing its local recovery record fails; denied storage cannot turn a failed write into a saved order.
+
 Profile reset never uses `localStorage.clear()`. Unrelated cart/order/browser keys are not intentionally removed.
 
 ### Malformed data
@@ -107,6 +111,8 @@ ST-10 adds or extends coverage for:
 - absolute/protocol-relative/backslash/encoded/unknown return rejection
 - malformed profile and address JSON/schema
 - browser read/write/remove failures
+- denied localStorage getters on sign-in, account, and checkout, with temporary profile recovery
+- denied sessionStorage getters at load or submission, with no new order request
 - preservation of unrelated browser keys during profile reset
 - preferred-address fallback
 - deliberate checkout input surviving profile recovery
