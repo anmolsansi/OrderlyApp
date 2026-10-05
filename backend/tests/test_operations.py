@@ -170,7 +170,7 @@ def test_readiness_fails_when_a_required_migration_is_missing(monkeypatch) -> No
 def test_readiness_rejects_invalid_rate_limit_configuration(monkeypatch) -> None:
     _configure_ready_environment(monkeypatch)
     monkeypatch.setenv("ORDERLY_CHECKOUT_RATE_LIMIT_PER_GUEST", "10")
-    monkeypatch.setenv("ORDERLY_CHECKOUT_RATE_LIMIT_AGGREGATE", "2")
+    monkeypatch.setenv("ORDERLY_CHECKOUT_RATE_LIMIT_AGGREGATE", "0")
 
     @contextmanager
     def fake_connection(*, connect_timeout_seconds: int | None = None) -> Iterator[_ReadyConnection]:
