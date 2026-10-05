@@ -75,7 +75,7 @@ export function getDemoProfile(storage: Storage | undefined): DemoProfileResult<
 
   try {
     const parsed = JSON.parse(stored.value) as unknown;
-    return isDemoProfile(parsed) ? success(parsed) : invalidProfile();
+    return isDemoProfile(parsed) ? success(parsed) : discardInvalidStoredValue(storage, DEMO_PROFILE_STORAGE_KEY);
   } catch {
     return invalidProfile();
   }
@@ -96,7 +96,9 @@ export function getDemoAddresses(storage: Storage | undefined): DemoProfileResul
 
   try {
     const parsed = JSON.parse(stored.value) as unknown;
-    return isSyntheticAddressList(parsed) ? success(parsed.map(address => ({ ...address }))) : invalidProfile();
+    return isSyntheticAddressList(parsed)
+      ? success(parsed.map(address => ({ ...address })))
+      : discardInvalidStoredValue(storage, DEMO_ADDRESSES_STORAGE_KEY);
   } catch {
     return invalidProfile();
   }
@@ -155,6 +157,13 @@ export function removeLegacyProfileStorage(storage: Storage | undefined): DemoPr
     if (!removed.ok) return removed;
   }
   return success(undefined);
+}
+
+function discardInvalidStoredValue(storage: Storage | undefined, key: string): DemoProfileResult<never> {
+  // Rejected decoded records may contain credentials in unknown fields.
+  // Remove only the offending C2 key, and report any failed cleanup honestly.
+  const removed = removeStorage(storage, key);
+  return removed.ok ? invalidProfile() : removed;
 }
 
 function normalizeDemoProfile(value: DemoProfile): DemoProfile | undefined {

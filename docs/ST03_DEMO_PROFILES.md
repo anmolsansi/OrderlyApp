@@ -19,7 +19,7 @@ The stored profile is version 1 and contains only:
 }
 ```
 
-The profile name is trimmed and must contain 1–60 characters. Unknown fields, invalid schema versions, malformed JSON, and unknown default address IDs are rejected.
+The profile name is trimmed and must contain 1–60 characters. Unknown fields, invalid schema versions, malformed JSON, and unknown default address IDs are rejected. Decoded profile/address records that fail validation are removed from their exact C2 key, so an unknown password field cannot remain after successful cleanup. A blocked removal reports `storage_unavailable`; it never claims that cleanup succeeded. Malformed JSON still reports a recoverable error with an explicit clear action.
 
 The local profile ID is a presentation label. Changing it cannot grant access to another guest's server data.
 

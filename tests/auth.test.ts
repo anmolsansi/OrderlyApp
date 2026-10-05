@@ -116,6 +116,34 @@ describe('C2 demo profile storage', () => {
     });
   });
 
+  it('deletes rejected versioned records so unknown password fields are not retained', () => {
+    const { storage, snapshot, clearCalls } = createStorage({
+      [DEMO_PROFILE_STORAGE_KEY]: JSON.stringify({ ...createDefaultDemoProfile(), password: 'synthetic-secret' }),
+      [DEMO_ADDRESSES_STORAGE_KEY]: JSON.stringify([
+        { ...SYNTHETIC_DEMO_ADDRESSES[0], password: 'synthetic-secret' },
+        SYNTHETIC_DEMO_ADDRESSES[1],
+      ]),
+      'unrelated.preference': 'keep-me',
+    });
+    expect(getDemoProfile(storage)).toMatchObject({ ok: false, code: 'invalid_profile' });
+    expect(getDemoAddresses(storage)).toMatchObject({ ok: false, code: 'invalid_profile' });
+    expect(snapshot()).toEqual({ 'unrelated.preference': 'keep-me' });
+    expect(clearCalls()).toBe(0);
+  });
+
+  it('reports failure to delete an invalid versioned record instead of claiming cleanup', () => {
+    const { storage } = createStorage({
+      [DEMO_PROFILE_STORAGE_KEY]: JSON.stringify({ ...createDefaultDemoProfile(), password: 'synthetic-secret' }),
+    });
+    const removeItem = storage.removeItem.bind(storage);
+    storage.removeItem = key => {
+      if (key === DEMO_PROFILE_STORAGE_KEY) throw new Error('synthetic cleanup block');
+      removeItem(key);
+    };
+    expect(getDemoProfile(storage)).toMatchObject({ ok: false, code: 'storage_unavailable' });
+    expect(storage.getItem(DEMO_PROFILE_STORAGE_KEY)).not.toBeNull();
+  });
+
   it('removes exact legacy account/session/profile/address keys without clearing unrelated data', () => {
     const { storage, snapshot, clearCalls } = createStorage({
       [LEGACY_AUTH_ACCOUNTS_STORAGE_KEY]: JSON.stringify([{ email: 'demo@example.com', password: 'legacy-secret' }]),
