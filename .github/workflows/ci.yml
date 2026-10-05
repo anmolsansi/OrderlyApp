@@ -387,8 +387,8 @@ jobs:
           assert health['ready'] is True
           assert health['mode'] == 'api'
           assert health['source_sha'] == os.environ['GITHUB_SHA']
-          assert health['dependencies']['postgres'] == 'ready'
-          assert health['dependencies']['schema'] == 'current'
+          assert health['dependencies']['postgres'] == 'ok'
+          assert health['dependencies']['schema'] == 'ok'
           print(f"Verified readiness for candidate {health['source_sha']}")
           PY
       - name: Provision Chromium
