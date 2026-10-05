@@ -1,28 +1,57 @@
 # OrderlyApp — Release Notes
 
-## Unreleased — Stabilization for Deployment PR
+## Unreleased — Stabilization Candidate (current)
 
-### Highlights
-- Restored restaurant fixture normalization so seeded restaurants expose consistent menu categories, image alt text, open/closed state, and unavailable item edge cases.
-- Fixed the restaurant menu page rendering regression and removed duplicate menu item links from the smoke path.
-- Repaired TypeScript integration imports for API normalization and checkout totals.
-- Stabilized Playwright by pinning the Turbopack project root and running the smoke suite serially.
-- Wired item add, cart review, checkout, order confirmation, and order history to backend cart/order APIs as the primary path with local fallback mirrors.
-- Added API client and browser smoke coverage for backend cart persistence, backend order creation, and confirmation refresh by order ID.
-- Reconciled docs around backend-backed behavior, local fallback behavior, and remaining deployed-demo verification work.
+### Candidate identity
 
-### Verification
-```bash
-npm run typecheck
-npm run test
-npm run build
-PYTHONPYCACHEPREFIX=/private/tmp/orderly-pycache python3 -m py_compile backend/app/*.py backend/scripts/*.py
-npm run test:e2e
-```
+- Repository source: `main`
+- ST-12 merge/source SHA: `934208c36d323e39d9f6ddcfcc3805cbd979507f`
+- Post-merge Stabilization CI: run `37347582799` — all required jobs passed.
+- Current release acceptance: **Not completed**.
 
-## v0.2.0 — Production Demo Release
+### Stabilized behavior
 
-### Completed phases
+- Server-issued private guest ownership through an opaque HttpOnly cookie.
+- Password-free local demo profiles and synthetic addresses that never become server ownership.
+- Canonical API catalog and server-authoritative prices/availability/modifiers.
+- PostgreSQL-only revisioned API carts with explicit conflict/current-cart recovery.
+- Deterministic `mock-v1` server quotes and immutable receipt snapshots.
+- Atomic idempotent mock checkout with exact lost-response replay.
+- Guest-scoped exact receipt/history reads; no local invented-order fallback.
+- Explicit `api|local_demo` browser modes; API failure never activates fixture mode.
+- `local_demo` is a labelled browse/customize/local-basket preview with checkout/history/receipt unavailable.
+- Safe profile/address recovery, internal return-path validation, keyboard/mobile checkout coverage.
+- Separate liveness/readiness, explicit serialized/checksummed migrations, explicit non-production seed, guest retention cleanup, Redis-backed checkout abuse counters, and backup/restore proof.
+- Release CI now includes genuine ESLint, independent typecheck/build, backend/PostgreSQL recovery, real Chromium launch, API product E2E, local-demo safety E2E, and frontend/Python dependency audits.
+
+### Current hosted evidence / blocker
+
+The exact candidate SHA has a READY Vercel production build (`dpl_DiDAHxxRJcCboiSqWiFJjSC2NPsU`), but its current `vercel.app` aliases require Vercel developer authentication. A fresh public visitor therefore has not passed ST-13 AC2.
+
+The observed Render OrderlyApp service is also not the current backend candidate: its only observed deployment is an older ST-09 SHA and ended `update_failed`. INT-02/current public recovery evidence is not present.
+
+Therefore a READY frontend build must **not** be described as an accepted public release yet. See [`releases/stabilization-acceptance.md`](releases/stabilization-acceptance.md).
+
+### Verification already passed for repository candidate
+
+- Dependency security — PASS
+- Genuine lint / contracts / frontend units / typecheck / production build — PASS
+- Backend/PostgreSQL migrations + regression + transaction-consistent recovery — PASS
+- Chromium provision/launch — PASS
+- API-mode product E2E — 23/23 PASS
+- Explicit `local_demo` safety E2E — PASS
+- Fail-closed release evidence — PASS
+
+Public access/current backend/recovery rehearsal remain separate mandatory release gates.
+
+---
+
+## Historical Release Record — v0.2.0 “Production Demo Release”
+
+> This section is retained as the project’s earlier v0.2.0 release record. Its checked phases and old fallback/Redis/voice descriptions are historical context, **not current stabilization acceptance evidence**. Later C1–C8 work replaced several of those assumptions.
+
+### Historical completed phases
+
 - Phase 0 — Branch/setup
 - Phase 1 — Frontend API integration
 - Phase 2 — PostgreSQL backend persistence
@@ -33,18 +62,20 @@ npm run test:e2e
 - Phase 7 — Portfolio polish
 - Phase 8 — Release
 
-### Highlights
-- Frontend reads restaurant data from the FastAPI backend with local fallback behavior for demo resilience.
-- Cart, checkout, and order confirmation use backend APIs as the primary path with local fallback behavior for demo resilience.
-- PostgreSQL-backed restaurant/order persistence with repeatable SQL migration runner.
-- Redis-backed session carts with PostgreSQL fallback and JSON emergency fallback.
-- Docker Compose stack for web, API, Postgres, and Redis.
-- Deployment docs/config for Vercel-style frontend and Render/Railway-style backend services.
-- Playwright smoke tests cover menu customization and typed voice-command checkout.
-- Health endpoint reports dependency status for Postgres and Redis.
+### Historical highlights
 
-### Verification
-Final release gate:
+- Frontend read restaurant data from FastAPI with local fallback behavior for demo resilience.
+- Cart, checkout, and order confirmation used backend APIs as the primary path with local fallback behavior.
+- PostgreSQL-backed restaurant/order persistence with repeatable SQL migration runner.
+- Redis-backed session carts with PostgreSQL/JSON fallback.
+- Docker Compose stack for web, API, Postgres, and Redis.
+- Vercel-style frontend and Render/Railway-style backend deployment guidance.
+- Playwright smoke coverage included menu customization and typed voice-command checkout.
+
+Those statements describe the v0.2.0 stage. The current candidate instead uses private C1 guest ownership, PostgreSQL C4 cart authority, C5/C6 immutable/idempotent checkout, explicit no-fallback C7 web behavior, and C8 operational lifecycle.
+
+### Historical verification
+
 ```bash
 npm run test
 npm run build
@@ -55,19 +86,20 @@ docker compose --env-file .env.example config
 npm run test:e2e
 ```
 
-### Known limitations
-- Payments, restaurant integrations, accounts/auth, and live driver tracking are intentionally out of scope.
-- Browser speech support depends on browser/platform; typed command mode remains the reliable demo path.
-- Hosted deployment still requires provisioning managed Postgres/Redis and setting production environment variables.
+### Historical known limitations
 
-### Recommended next iteration
-- Deploy the portfolio demo.
-- Capture real screenshots/video from the hosted demo.
-- Add auth/user accounts if turning this from portfolio demo into a product prototype.
+- Real payments, restaurant integrations, accounts/auth, and live driver tracking were out of scope.
+- Browser speech support depended on browser/platform.
+- Hosted deployment still required managed service provisioning/configuration.
 
-## v0.1.0 — Local MVP
+---
+
+## Historical Release Record — v0.1.0 Local MVP
+
+> Retained as historical project context; not current acceptance evidence.
 
 ### Completed phases
+
 - Phase 0 — Restart/Foundation
 - Phase 1 — Product Design
 - Phase 2 — Frontend App Shell
@@ -80,7 +112,8 @@ npm run test:e2e
 - Phase 9 — Quality + Safety
 - Phase 10 — Polish + Release
 
-### Highlights
+### Historical highlights
+
 - End-to-end local ordering demo.
 - Voice and typed command path.
 - Cart validation and mock checkout safety copy.
@@ -88,7 +121,12 @@ npm run test:e2e
 - Backend/API scaffold and infrastructure plan.
 - Automated tests for core logic.
 
-### Known limitations
-- Backend persistence was JSON-backed at runtime; PostgreSQL/Redis schema and Docker services were scaffolded for the next hardening step.
-- Browser speech support depends on browser/platform.
-- Real payment and real restaurant integrations are intentionally out of MVP scope.
+### Historical limitations
+
+- Backend persistence was JSON-backed at runtime; PostgreSQL/Redis were scaffolding for the later hardening track.
+- Browser speech support depended on browser/platform.
+- Real payments and real restaurant integrations were intentionally out of scope.
+
+## Current Release Rule
+
+Use [`../development.md`](../development.md) plus [`releases/stabilization-acceptance.md`](releases/stabilization-acceptance.md) to decide whether the current stabilization release is complete. Historical tags/checklists/releases do not override a blocked current public/recovery criterion.

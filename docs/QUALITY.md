@@ -1,49 +1,157 @@
-# OrderlyApp — Quality + Safety
+# OrderlyApp — Quality, Safety, and Release Gates
 
-## Automated checks
-Run before every handoff:
+## Release-CI Principle
+
+A green release candidate must represent the exact source SHA and must not become green because a required environment, browser suite, dependency scan, or backend service was skipped. The ST-12 workflow is intentionally fail-closed.
+
+The current workflow is `.github/workflows/ci.yml` (`Stabilization CI`). It runs on `main`, supported task branches, and pull requests to `main`.
+
+## Required Hosted Jobs
+
+### Dependency security
+
+- clean locked frontend install;
+- Node/npm/Python/audit-tool versions recorded;
+- `npm audit --audit-level=high`;
+- strict installed Python dependency audit with pinned `pip-audit`;
+- current scan artifacts uploaded;
+- job fails if either ecosystem audit fails.
+
+Current ST-12 post-merge evidence on SHA `934208c36d323e39d9f6ddcfcc3805cbd979507f` reported zero npm vulnerabilities and no known Python vulnerabilities.
+
+### Web quality
+
+Runs as separate required checks:
 
 ```bash
-npm run test
-npm run test:e2e
-npm run build
 npm run lint
-python3 -m py_compile backend/app/*.py backend/scripts/*.py
+npm run test:contracts
+npm run test
+npm run typecheck
+npm run build
 ```
 
-On macOS sandboxed runs, use a writable bytecode cache path for the Python compile check:
+`npm run lint` is genuine ESLint. It is not an alias for typecheck.
+
+### Backend and recovery
+
+- isolated PostgreSQL 16 and Redis services;
+- pinned Python test tooling;
+- explicit migrations;
+- complete backend pytest suite;
+- transaction-consistent PostgreSQL backup + restore rehearsal;
+- restored synthetic immutable receipt/migration state verified.
+
+### Chromium runtime
+
+- locked frontend dependencies;
+- Playwright Chromium provisioning;
+- real headless Chromium launch;
+- browser/Playwright version recorded.
+
+Missing browser runtime is a failed release gate, not an accepted product failure.
+
+### API product E2E
+
+Runs only after dependency-security, web, backend, and Chromium gates succeed.
+
+Before browser tests it:
+
+- provisions isolated PostgreSQL/Redis;
+- applies migrations;
+- explicitly seeds test fixtures;
+- starts FastAPI in `api` mode;
+- verifies `/health/ready` reports ready, API mode, required dependencies `ok`, and the exact GitHub source SHA;
+- lists the API-mode Playwright suite and fails if no mandatory tests are discovered.
+
+The current ST-12 candidate discovered and passed 23 API-mode Chromium tests.
+
+### Local fixture preview E2E
+
+Runs separately with `ORDERLY_DATA_MODE=local_demo` / `NEXT_PUBLIC_ORDERLY_DATA_MODE=local_demo` and requires at least the expected fixture-preview safety cases. This proves the preview remains isolated; it is not used as API fallback or checkout acceptance.
+
+### Release candidate evidence
+
+Runs with `if: always()` and fails unless every required upstream job result is `success`. Failed, cancelled, and skipped mandatory jobs are not treated as passes.
+
+It records source/ref, runtime versions, PostgreSQL image, Playwright/Chromium identity, and every required job result.
+
+## Local Narrow Checks
+
+Use the smallest relevant test during development, then run the hosted matrix before merge/release evidence.
+
+Frontend examples:
 
 ```bash
-PYTHONPYCACHEPREFIX=/private/tmp/orderly-pycache python3 -m py_compile backend/app/*.py backend/scripts/*.py
+npm run lint
+npm run test:contracts
+npm run test
+npm run typecheck
+npm run build
 ```
 
-## Test coverage added in Phase 9
-- Schema/fixture validation via `validateFixtures`
-- Voice parser tests for add/view/remove/clear commands
-- Cart logic tests for totals, required modifiers, and restaurant conflicts
-- Checkout primitive tests for mock order IDs and status timeline
-- Backend API client tests for cart load/save, checkout payloads, order normalization, and fallback behavior
-- Telemetry hook tests
-- Playwright E2E smoke tests for restaurant loading, backend-backed cart reload, typed voice command, checkout, confirmation refresh, and status timeline
-- Playwright runs serially against the local Next.js server to avoid dev-manifest races during smoke validation.
+Backend (with the documented test PostgreSQL/Redis environment):
 
-## Accessibility checklist
-- Voice features must always have typed/manual alternatives.
-- Cart mutation confirmations are shown in visible toast/status text.
-- Checkout clearly says no real payment is charged.
-- Interactive controls use buttons/inputs/labels, not only clickable divs.
-- Status updates are text-visible, not color-only.
-- Validation errors use `role="alert"` where applicable.
+```bash
+python -m pytest backend/tests -q
+```
 
-## Error logging strategy
-Current MVP logging lives in `lib/telemetry.ts`:
-- `reportError(error, context)` for local structured console errors
-- `trackEvent(name, properties)` for key app events
+Browser:
 
-Future production integrations can forward this to Sentry, PostHog, OpenTelemetry, or a backend `/events` endpoint.
+```bash
+npm run test:e2e:install
+npm run test:e2e:list
+npm run test:e2e
+```
 
-## Safety notes
-- Checkout is mock-only.
-- No cards/payments are collected.
-- Browser voice support is optional and falls back to typed commands.
-- Current backend JSON persistence is local/dev only.
+Do not substitute a local incomplete environment for hosted release evidence.
+
+## Product Safety Invariants Covered
+
+The regression matrix protects, among other things:
+
+- private guest A/B isolation;
+- password-free demo profiles that do not become ownership;
+- canonical catalog labels/prices/availability;
+- revisioned cart conflict behavior and no hidden failover;
+- deterministic `mock-v1` quote totals;
+- immutable receipt rereads;
+- atomic/idempotent checkout and lost-response replay;
+- API errors never activating fixture success;
+- exact order-ID/history scoping;
+- synthetic address persistence and safe return paths;
+- corrupt/disabled browser-storage recovery;
+- keyboard checkout behavior and 375px overflow protection;
+- truthful readiness/migration/seed lifecycle;
+- rate-limit and retention behavior;
+- backup/restore durability.
+
+## Accessibility / UX Safety
+
+- The complete required release journey is manual; voice is not required.
+- Interactive controls must be keyboard reachable with visible labels/focus.
+- Checkout errors associate feedback with affected fields and move focus to useful recovery information.
+- Color is not the only state signal.
+- Pending/mutation states must not claim success early.
+- Checkout clearly states no real payment is charged.
+- Password-free profile UI must never imply real authentication.
+- `local_demo` must be visibly labelled and keep checkout unavailable.
+
+## Error / Privacy Safety
+
+Never expose in UI logs, CI artifacts, or documentation evidence:
+
+- guest cookies or token hashes;
+- session secret;
+- database/Redis credentials/full connection URLs;
+- real/private checkout contact/address payloads;
+- another guest’s cart/receipt;
+- production secret values.
+
+Error evidence should contain safe error codes, request IDs, states/counts, and redacted operational context only.
+
+## Current Candidate Evidence
+
+ST-12 post-merge run `37347582799` passed all required jobs on exact `main` SHA `934208c36d323e39d9f6ddcfcc3805cbd979507f`.
+
+This establishes repository candidate quality. It does **not** establish ST-13 public deployment acceptance because public unauthenticated access/current backend identity/INT-02 recovery rehearsal remain separate gates. See [`releases/stabilization-acceptance.md`](releases/stabilization-acceptance.md).

@@ -1,135 +1,156 @@
 # OrderlyApp
 
-> **Planning update — October 4, 2026:** [development.md](development.md) is the current stabilization plan for a public manual-ordering mock demo; voice is deferred. The [dated audit](docs/audit-2026-10-04/ASSESSMENT.md) qualifies the historical implementation and verification claims below. Stabilization is planned, not implemented or accepted on a public deployment.
+OrderlyApp is a stabilized **manual food-ordering portfolio demo** built with Next.js and FastAPI. The accepted product path is intentionally mock-only: visitors can browse a canonical pizza catalog, customize items, maintain a private guest basket, review a server-priced quote, place an idempotent mock order, and reopen the immutable receipt. No real payment is collected.
 
-Voice-first food ordering demo app for browsing pizza restaurants, customizing items, managing a cart, placing a mock checkout, and tracking mock order status.
+> **Current release status — October 5, 2026:** implementation and release CI are green on `main` at `934208c36d323e39d9f6ddcfcc3805cbd979507f`, but the public release is **not accepted yet**. The exact Vercel build is protected by developer authentication and the available Render backend is not the current candidate. See [development.md](development.md) and [the stabilization acceptance record](docs/releases/stabilization-acceptance.md) for the current gate state. Voice, real accounts, real payments, and real restaurant integrations are outside this stabilization release.
 
-## Status
-MVP phases 0–10 are complete for the local portfolio demo. The current main branch has backend-backed restaurant, cart, checkout, and order confirmation paths with local fallback behavior for demo resilience. TypeScript, unit tests, production build, backend Python compile, Docker Compose config, and Playwright smoke tests pass locally.
+## What the stabilized candidate supports
 
-## Development root
-`~/Documents/Projects/OrderlyApp`
+- Canonical restaurant/menu discovery from the FastAPI API in `api` mode.
+- Server-issued private guest ownership through an opaque HttpOnly cookie; the browser does not choose or persist an owner ID.
+- Password-free local demo profiles and synthetic demo addresses. They are presentation data only and never grant server ownership.
+- PostgreSQL-only API authority for guest carts, canonical catalog reads, immutable receipt snapshots, and idempotent checkout records.
+- Revisioned cart writes with explicit conflict handling instead of optimistic local authority.
+- Deterministic `mock-v1` quote pricing and immutable receipt totals/labels.
+- Atomic checkout with an idempotency key so a lost response can be retried without creating a second order.
+- Guest-scoped order history and exact receipt lookup.
+- `local_demo` as a separately selected, visibly labelled fixture-preview mode for browse/customize/local-basket behavior only. It does not bootstrap a guest, call the ordering API, or expose checkout/history/receipt acceptance paths.
+- Process liveness at `/health/live` and dependency-aware readiness at `/health/ready`.
+- Explicit migrations and explicit non-production fixture seeding. Serving startup does not migrate or reseed automatically.
+- Bounded anonymous-guest retention cleanup and Redis-backed checkout abuse counters. Redis is not cart/order authority.
+- Hosted release CI with genuine ESLint, unit/contract tests, independent typecheck, production build, PostgreSQL-backed backend/recovery tests, Chromium launch proof, API product E2E, isolated `local_demo` E2E, and dependency security gates.
 
-## What works
-- Restaurant browsing
-- Restaurant detail section
-- Menu/item detail and modifiers
-- Cart add/update/remove/clear
-- Backend-backed anonymous session carts with local fallback
-- Cart validation and one-restaurant conflict handling
-- Typed command fallback
-- Browser voice command capture where supported
-- Voice intent parsing for add/view/remove/clear cart
-- Mock checkout confirmation with explicit no-payment copy
-- Backend order creation with local mock fallback and simulated status timeline
-- FastAPI backend with PostgreSQL primary persistence and JSON fallback
-- Redis-backed session carts with local fallback
-- Dockerized frontend/backend/Postgres/Redis stack
-- Playwright E2E smoke tests
-- Deployment readiness docs for Vercel + Render/Railway + managed Postgres/Redis
-- Portfolio demo checklist and architecture notes
-- Automated tests and quality docs
+## Product modes
+
+| Mode | Purpose | Network / authority | Checkout |
+| --- | --- | --- | --- |
+| `api` | Stabilized ordering candidate | Same-origin `/api/orderly` gateway → FastAPI → PostgreSQL | Mock checkout enabled when the backend is ready |
+| `local_demo` | Explicit fixture preview | Browser-local fixtures/storage only; no guest/API fallback | Disabled |
+
+An API failure never silently switches the application into `local_demo`.
 
 ## Local development
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
-2. Create local environment values from the checked-in template:
-   ```bash
-   cp .env.example .env.local
-   ```
-3. Start the Next.js app:
-   ```bash
-   npm run dev
-   ```
 
-Open `http://localhost:3000` for `npm run dev`, or `http://localhost:3100` for Docker Compose.
+### Frontend dependencies
 
-## Environment configuration
-Environment files stay at the repository root because Next.js loads `.env*` from the project root. The committed `.env.example` contains only safe placeholders; use `.env.local` for local overrides and never commit real secrets.
-
-| Variable | Required for local dev | Production guidance |
-| --- | --- | --- |
-| `NEXT_PUBLIC_APP_URL` | Yes; `http://localhost:3000` for `npm run dev` | Set to the deployed frontend URL. |
-| `NEXT_PUBLIC_API_BASE_URL` | Yes; `http://localhost:8000` when the FastAPI backend runs locally | Set to the deployed backend URL with no trailing slash preferred. |
-| `NEXT_PUBLIC_VOICE_MODE` | Optional; defaults to `browser` | Use `browser` for real browser speech support or `mock` for deterministic demos. |
-| `NEXT_PUBLIC_CHECKOUT_MODE` | Optional; defaults to `mock` | Keep `mock` for portfolio/demo checkout or `disabled` to block checkout. Real payments are not implemented. |
-| `NEXT_PUBLIC_AUTH_PROVIDER` | Optional; defaults to `none` | Placeholder for future auth providers (`none`, `mock`, `clerk`, or `auth0`). |
-| `AUTH_SECRET` | No; leave empty for demo mode | Server-only placeholder for future auth integrations. Do not expose it with `NEXT_PUBLIC_`. |
-| `DATABASE_URL` | Only when running FastAPI directly with Postgres | Set to the managed Postgres connection string. |
-| `REDIS_URL` | Only when running FastAPI directly with Redis | Set to the managed Redis connection string. |
-| `ORDERLY_FORCE_JSON_STORE` | Optional; `0` by default | Set to `1` only to force JSON fallback persistence. |
-| `ORDERLY_CORS_ORIGINS` | Yes for backend/API calls | Set to the comma-separated deployed frontend origins. |
-| `ORDERLY_COMPOSE_APP_URL` | Only for Docker Compose local frontend builds | Defaults to `http://localhost:3100` so copied Docker env values match the exposed Compose port. |
-| `ORDERLY_COMPOSE_DATABASE_URL` / `ORDERLY_COMPOSE_REDIS_URL` | Only for Docker Compose overrides | Usually keep the Compose-internal defaults. |
-| `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` | Only for Docker Compose local database | Use non-demo credentials outside local development. |
-
-## Validation commands
-Use these scripts before opening a PR:
 ```bash
-npm run typecheck
-npm run lint
-npm run test
-npm run build
+npm ci --ignore-scripts
 ```
 
-`npm run lint` currently delegates to the TypeScript typecheck until a dedicated linter is added, so `typecheck` is the canonical no-emit TypeScript validation command.
+Copy the safe environment template before running the stack:
 
-## Backend
+```bash
+cp .env.example .env
+```
+
+Set a private `ORDERLY_SESSION_SECRET` with at least 32 bytes for API mode. Do not commit it.
+
+### Full local API-mode stack
+
+The normal Compose path runs migrations as a separate one-shot dependency. Fixture data is seeded only when explicitly requested.
+
+```bash
+docker compose up -d postgres redis
+docker compose run --rm migrate
+docker compose --profile seed run --rm seed
+docker compose up --build api web
+```
+
+Then use:
+
+- Web: `http://localhost:3100`
+- API liveness: `http://localhost:8000/health/live`
+- API readiness: `http://localhost:8000/health/ready`
+
+### Frontend-only fixture preview
+
+To work without the ordering backend, explicitly select `local_demo` before starting Next.js:
+
+```bash
+NEXT_PUBLIC_ORDERLY_DATA_MODE=local_demo npm run dev
+```
+
+The preview is intentionally limited to browsing, customization, and a local preview basket. It is not release acceptance evidence and it does not support checkout.
+
+## Backend lifecycle
+
+The backend package can be installed directly from the repository root:
+
+```bash
+python -m pip install -e ./backend
+```
+
+Apply migrations explicitly:
+
+```bash
+python backend/scripts/migrate.py
+```
+
+Fixture seeding is development/test/preview-only and must be explicitly enabled:
+
+```bash
+ORDERLY_ENVIRONMENT=development ORDERLY_ALLOW_FIXTURE_SEED=1 \
+  python backend/scripts/seed_postgres.py
+```
+
+Start serving separately:
+
 ```bash
 cd backend
-pip install -e .
 uvicorn app.main:app --reload --port 8000
 ```
 
-API health: `http://localhost:8000/health`
+See [backend/README.md](backend/README.md) and [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the exact lifecycle and deployment boundaries.
 
-## Docker stack
+## Important environment boundaries
+
+- `NEXT_PUBLIC_ORDERLY_DATA_MODE=api|local_demo` chooses the browser data mode. `api` is the release path.
+- `ORDERLY_API_ORIGIN` is the fixed server-side FastAPI origin used by the same-origin Next.js gateway.
+- `ORDERLY_DATA_MODE=api` is required for server-issued guest sessions.
+- `ORDERLY_SESSION_SECRET` must be private and at least 32 bytes.
+- `ORDERLY_ALLOWED_ORIGINS` controls unsafe guest/session mutations.
+- `DATABASE_URL` is required for API-mode durable authority.
+- `REDIS_URL` is required for checkout abuse-limit enforcement; Redis does not own durable carts or receipts.
+- `ORDERLY_ALLOW_FIXTURE_SEED=1` is allowed only for an explicit non-production seed command.
+- `NEXT_PUBLIC_CHECKOUT_MODE=mock` means mock checkout only. Real payment processing is not implemented.
+- Existing voice/auth-provider environment placeholders are retained for compatibility, but voice and real account providers are not part of the stabilization acceptance scope.
+
+## Validation
+
+The hosted release workflow is the authoritative full gate. Useful local commands are:
+
 ```bash
-cp .env.example .env
-docker compose up --build
+npm run lint
+npm run test:contracts
+npm run test
+npm run typecheck
+npm run build
 ```
 
-Services:
-- Web: `http://localhost:3100`
-- API: `http://localhost:8000`
-- Postgres: `localhost:5432`
-- Redis: `localhost:6379`
+Backend tests use the pinned tooling in `backend/requirements-test.lock` and require the documented PostgreSQL test environment. Browser release coverage uses Playwright Chromium and includes separate API-mode and `local_demo` gates.
 
-## Demo voice commands
-Try these in the typed command box or browser speech mode:
-- `add a large pepperoni pizza with jalapeños and extra cheese`
-- `show cart`
-- `remove item`
-- `clear cart`
+Current post-merge ST-12 evidence for source SHA `934208c36d323e39d9f6ddcfcc3805cbd979507f` is GitHub Actions run `37347582799`; every required release-CI job passed. This proves the repository candidate, not public deployment acceptance.
 
-## Screenshots and demo video
-Portfolio capture guidance lives in `docs/SCREENSHOTS.md`. Recommended captures are the hero, restaurant browsing, item customization, cart, typed voice command, checkout, order confirmation, and terminal verification output.
+## Safety and privacy
 
-## Docs
-- `PRODUCT_CHARTER.md` — product promise, non-goals, success criteria
-- `PROJECT_PLAN.md` — restart plan
-- `docs/TASKS.md` — completed checklist
-- `docs/PRODUCT_FLOWS.md` — product scope, route map, primary/secondary flows, domain entities, edge cases, and accessibility requirements
-- `docs/GIT_WORKFLOW.md` — branch/commit/PR rules
-- `docs/ARCHITECTURE.md` — architecture overview
-- `docs/INFRASTRUCTURE.md` — database/infrastructure plan
-- `docs/QUALITY.md` — checks, accessibility, error logging, telemetry
-- `docs/DEPLOYMENT.md` — Vercel/backend/Postgres/Redis deployment guide
-- `docs/DEMO_SCRIPT.md` — demo recording script
-- `docs/RELEASE.md` — release notes
-- `docs/PROJECT_PLAN_V0.2.0.md` — next production-ish portfolio plan
+- No real cards or payment credentials are collected.
+- No password is collected for the demo profile.
+- Synthetic demo addresses are used for the portfolio flow.
+- Guest ownership comes from the server-issued cookie, not profile/localStorage identifiers.
+- Do not log cookies, session secrets, database/Redis URLs, raw checkout contact/address payloads, or idempotency secrets.
 
-## Roadmap
-Immediate next step: deploy the stabilized portfolio demo, run the deployed smoke checklist, and capture real screenshots/video from the hosted app. Product expansion after that should focus on real auth/payments only if the portfolio demo becomes a product prototype.
+## Documentation
 
-## Verification
-Latest stabilization gate:
-- `npm run test`
-- `npm run build`
-- `npm run lint`
-- `PYTHONPYCACHEPREFIX=/private/tmp/orderly-pycache python3 -m py_compile backend/app/*.py backend/scripts/*.py`
-- `docker compose config`
-- `docker compose --env-file .env.example config`
-- `npm run test:e2e`
+- [development.md](development.md) — canonical stabilization plan, contract DAG, integration gates, and completion criteria.
+- [docs/repo_context.md](docs/repo_context.md) — current implementation architecture and provider boundaries.
+- [docs/PRODUCT_FLOWS.md](docs/PRODUCT_FLOWS.md) — current manual ordering and fixture-preview flows.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — current C1–C8 architecture.
+- [docs/QUALITY.md](docs/QUALITY.md) — verification and release-CI gates.
+- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — explicit migration/seed/serve and hosted deployment requirements.
+- [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md) — current manual mock demo script.
+- [docs/releases/stabilization-acceptance.md](docs/releases/stabilization-acceptance.md) — exact candidate/public-release acceptance record.
+- `PROJECT_PLAN.md`, `docs/PROJECT_PLAN_V0.2.0.md`, and `docs/TASKS.md` are retained as dated historical planning/task records and are not current acceptance evidence.
+
+## Deferred scope
+
+After the stabilization release is genuinely accepted, future work may separately evaluate voice interaction, real authentication/accounts, real payments, restaurant integrations, and broader marketplace features. None of those are required to prove the current manual mock demo.
