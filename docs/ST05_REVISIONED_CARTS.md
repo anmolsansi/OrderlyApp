@@ -203,13 +203,8 @@ C1 guest isolation and C3 catalog tests remain active against the C4 boundary. `
 
 Shared GitHub Actions must pass the frontend contracts/tests/typecheck/build, PostgreSQL backend suite and migrations, Chromium runtime, product E2E, and baseline evidence before merge.
 
-## Deliberately deferred work
+## Current consumers and acceptance
 
-ST-05 does not pull later contracts forward:
+C4 is consumed by the existing ST-06 pricing, ST-07 checkout and ST-08 browser adapter. Ticket-wide completion remains separately tracked in `development.md`.
 
-- ST-06 owns immutable quote/receipt pricing snapshots.
-- ST-07 owns atomic idempotent order creation and cart consumption. The legacy order endpoint is not redefined here.
-- ST-08 owns the typed frontend C4 adapter, serialized browser mutations, and two-tab conflict UI.
-- ST-09 owns checkout failure/uncertain-state recovery.
-
-Until ST-08, existing frontend code can still use its legacy/local cart presentation behavior. That compatibility does not change C4 server authority.
+The current acceptance test launches four separate API processes without Redis: save and snapshot, restart, real PostgreSQL connection refusal, then reconnect to the original database. It verifies exact persisted cart and receipt equality. A separate injected failure after the SQL cart update proves transaction rollback preserves the previously accepted revision/items. See [acceptance evidence](qa/st04-st06-acceptance/acceptance.md).

@@ -230,15 +230,8 @@ Focused backend coverage proves:
 
 The shared GitHub Actions workflow also runs the frontend contract suite, frontend unit/type/build checks, full backend suite, Chromium runtime check, product E2E, and baseline evidence job.
 
-## Deferred boundaries
+## Current consumers and acceptance
 
-ST-06 deliberately does not implement:
+Atomic order creation/idempotency belong to ST-07; checkout recovery and receipt UI belong to ST-09; operational release acceptance belongs to ST-11/ST-13. Their code already consumes C5; these boundaries do not imply those tickets have passed their release criteria.
 
-- atomic order creation plus cart clear.
-- idempotency keys or replay behavior.
-- unknown-outcome recovery after connection loss.
-- frontend checkout submission state.
-- frontend receipt/history integration.
-- production readiness/retention scheduling.
-
-Those belong to ST-07, ST-09, and ST-11 as defined in `development.md`.
+The shared C3 → C4 → C5 example now includes the required Small selection, complete catalog fields, deterministic catalog fingerprint, full checkout and 1192-cent receipt. C6 first/replay examples carry that same receipt. Tests cover equal-timestamp cursor ordering, catalog changes and actual API restarts. See [acceptance evidence](qa/st04-st06-acceptance/acceptance.md).
