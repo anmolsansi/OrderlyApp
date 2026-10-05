@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from typing import Iterator
@@ -361,42 +362,38 @@ def test_invalid_http_write_preserves_accepted_basket(cart_environment, change):
     assert get_cart(owner).model_dump(mode='json') == accepted.model_dump(mode='json')
 
 
-@pytest.mark.parametrize('case', [
-    'closed', 'unavailable', 'required', 'max', 'duplicate_line', 'duplicate_group',
-    'unknown_group', 'duplicate_option', 'unknown_option', 'unavailable_option', 'mixed', 'too_many_lines',
-])
+@pytest.mark.parametrize('case', json.loads((Path(__file__).resolve().parents[2] / 'tests/fixtures/contracts/c3.json').read_text())['negative'], ids=lambda case: case['name'])
 def test_catalog_rejection_precedes_persistence(cart_environment, postgres_connection, case):
-    from test_catalog import restaurant
+    from copy import deepcopy
+    from pathlib import Path
+    fixture = json.loads((Path(__file__).resolve().parents[2] / 'tests/fixtures/contracts/c3.json').read_text())
+    groups = fixture['positive']['restaurants'][0]['menu'][0]['modifier_groups']
     owner = cart_environment['owner_id']
-    groups = restaurant().menu[0].model_dump(mode='json')['modifier_groups']
-    # Three available extras make max-selection failure independent of availability.
-    groups[1]['options'].append({'id': 'third', 'name': 'Third', 'available': True, 'price_delta_cents': 0})
     postgres_connection.execute('UPDATE menu_items SET modifier_groups = %s::jsonb WHERE id = %s', (json.dumps(groups), cart_environment['item_id']))
     postgres_connection.commit()
     valid = line(cart_environment).model_copy(update={'modifiers': [CartItemModifier(group_id='size', option_ids=['small'])]})
     accepted = put_cart(owner, 0, [valid])
-    payload = valid.model_dump(mode='json')
-    items = [payload]
-    if case == 'closed':
+    override = case.get('catalog_override')
+    if override == 'closed':
         postgres_connection.execute('UPDATE restaurants SET is_open = FALSE WHERE id = %s', (cart_environment['restaurant_id'],))
-    elif case == 'unavailable':
+    elif override == 'unavailable':
         postgres_connection.execute('UPDATE menu_items SET available = FALSE WHERE id = %s', (cart_environment['item_id'],))
-    elif case == 'required': payload['modifiers'] = []
-    elif case == 'max': payload['modifiers'].append({'group_id': 'extras', 'option_ids': ['sauce', 'cheese', 'third']})
-    elif case == 'duplicate_line': items.append(dict(payload))
-    elif case == 'duplicate_group': payload['modifiers'].append({'group_id': 'size', 'option_ids': ['large']})
-    elif case == 'unknown_group': payload['modifiers'].append({'group_id': 'missing', 'option_ids': []})
-    elif case == 'duplicate_option': payload['modifiers'].append({'group_id': 'extras', 'option_ids': ['sauce', 'sauce']})
-    elif case == 'unknown_option': payload['modifiers'][0]['option_ids'] = ['missing']
-    elif case == 'unavailable_option': payload['modifiers'].append({'group_id': 'extras', 'option_ids': ['sold-out']})
-    elif case == 'mixed': items.append({**payload, 'id': 'line-2', 'restaurant_id': 'other'})
-    elif case == 'too_many_lines': items = [{**payload, 'id': f'line-{n}'} for n in range(51)]
+    elif override == 'three_available_extras':
+        groups[1]['options'].extend([{'id': key, 'name': key, 'price_delta_cents': 0, 'available': True} for key in ('cheese', 'third')])
+        postgres_connection.execute('UPDATE menu_items SET modifier_groups = %s::jsonb WHERE id = %s', (json.dumps(groups), cart_environment['item_id']))
     postgres_connection.commit()
+    request = deepcopy(case['request'])
+    for item in request.get('body', {}).get('items', []):
+        if item['restaurant_id'] == 'fixture-r1': item['restaurant_id'] = cart_environment['restaurant_id']
+        if item['menu_item_id'] == 'fixture-i1': item['menu_item_id'] = cart_environment['item_id']
+    # Mixed-restaurant rejection occurs before the second restaurant lookup.
     app.dependency_overrides[verify_request_guest] = lambda: VerifiedGuest(guest_id=owner, expires_at=datetime.now(timezone.utc) + timedelta(hours=1))
-    response = TestClient(app, base_url=TEST_ORIGIN).put('/v1/cart', headers={'Origin': TEST_ORIGIN}, json={'expected_revision': 1, 'items': items})
-    assert response.status_code == 422, response.text
-    assert response.json()['error']['code'] == 'invalid_cart'
-    assert response.json()['error']['fields']
+    client = TestClient(app, base_url=TEST_ORIGIN)
+    response = client.request(request['method'], request['path'], headers={'Origin': TEST_ORIGIN}, **({'json': request['body']} if 'body' in request else {}))
+    assert response.status_code == case['status'], response.text
+    assert response.json()['error']['code'] == case['error']['code']
+    assert response.json()['error']['fields'] == case['error']['fields']
+    assert response.json()['error']['request_id']
     assert get_cart(owner).model_dump(mode='json') == accepted.model_dump(mode='json')
 
 
