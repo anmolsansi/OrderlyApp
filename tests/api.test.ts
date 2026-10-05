@@ -173,6 +173,18 @@ function memoryStorage(initial: Record<string, string> = {}): Storage {
 }
 
 describe('C7 web API adapter', () => {
+  it('passes bounded receipt pagination and cancellation through the same-origin adapter', async () => {
+    const signal = new AbortController().signal;
+    const cursor = '11111111-1111-4111-8111-111111111112';
+    const fetchMock = gatewayMock((url, init) => {
+      expect(url).toBe(`/api/orderly/orders?limit=2&cursor=${cursor}`);
+      expect(init?.signal).toBeInstanceOf(AbortSignal);
+      return mockJsonResponse([canonicalReceipt]);
+    });
+    const result = await fetchOrderReceipts({ limit: 2, cursor, signal });
+    expect(result).toMatchObject({ ok: true, data: [{ id: canonicalReceipt.id }] });
+    expect(fetchMock.mock.calls.every(([, init]) => init?.credentials === 'same-origin')).toBe(true);
+  });
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllEnvs();

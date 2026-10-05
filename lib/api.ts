@@ -682,14 +682,20 @@ export async function fetchOrderReceipt(orderId: string): Promise<ApiResult<Orde
   );
 }
 
-export async function fetchOrderReceipts(): Promise<ApiResult<OrderReceipt[]>> {
+export async function fetchOrderReceipts(
+  options: { limit?: number; cursor?: string; signal?: AbortSignal } = {},
+): Promise<ApiResult<OrderReceipt[]>> {
   if (getOrderlyDataMode() === 'local_demo') {
     return failure('validation', 'local_demo_orders_unavailable', 'Order history is unavailable in fixture preview');
   }
+  const query = new URLSearchParams();
+  if (options.limit !== undefined) query.set('limit', String(options.limit));
+  if (options.cursor !== undefined) query.set('cursor', options.cursor);
+  const search = query.size ? `?${query}` : '';
   return requestJson(
-    `${getApiBaseUrl()}/orders`,
+    `${getApiBaseUrl()}/orders${search}`,
     normalizeOrderReceiptList,
-    { cache: 'no-store' },
+    { cache: 'no-store', signal: options.signal },
     true,
   );
 }
