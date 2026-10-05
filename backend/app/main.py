@@ -25,6 +25,7 @@ from .identity import (
     IdentityError,
     VerifiedGuest,
     bootstrap_guest,
+    load_identity_settings,
     require_allowed_origin,
     reset_guest,
     set_guest_cookie,
@@ -122,6 +123,20 @@ def _source_sha() -> str:
         if value:
             return value[:64]
     return "unknown"
+
+
+def _expected_migration_versions() -> set[str]:
+    return {migration.name for migration in MIGRATIONS_DIR.glob("*.sql") if migration.is_file()}
+
+
+def _c8_status(*, ready: bool, dependencies: dict[str, str]) -> dict[str, object]:
+    return {
+        "schema_version": 1,
+        "ready": ready,
+        "mode": os.getenv("ORDERLY_DATA_MODE", "").strip() or "unknown",
+        "source_sha": _source_sha(),
+        "dependencies": dependencies,
+    }
 
 
 def _error_response(
@@ -362,6 +377,71 @@ def health_live() -> dict[str, object]:
         "live": True,
         "source_sha": _source_sha(),
     }
+
+
+@app.get("/health/ready")
+def health_ready(request: Request) -> JSONResponse:
+    dependencies = {
+        "configuration": "unknown",
+        "postgres": "unknown",
+        "schema": "unknown",
+    }
+    fields: list[str] = []
+
+    try:
+        load_identity_settings()
+        dependencies["configuration"] = "ok"
+    except IdentityError as exc:
+        dependencies["configuration"] = "invalid"
+        fields.extend(exc.fields)
+
+    if not database_url():
+        dependencies["postgres"] = "not_configured"
+        dependencies["schema"] = "unchecked"
+        fields.append("DATABASE_URL")
+    else:
+        try:
+            with get_connection(connect_timeout_seconds=2) as conn:
+                conn.execute("SELECT 1")
+                dependencies["postgres"] = "ok"
+
+                relation = conn.execute(
+                    "SELECT to_regclass('public.schema_migrations') AS relation"
+                ).fetchone()
+                if not relation or relation["relation"] is None:
+                    dependencies["schema"] = "missing_ledger"
+                    fields.append("schema_migrations")
+                else:
+                    applied = {
+                        row["version"]
+                        for row in conn.execute("SELECT version FROM schema_migrations").fetchall()
+                    }
+                    expected = _expected_migration_versions()
+                    if expected and expected.issubset(applied):
+                        dependencies["schema"] = "ok"
+                    else:
+                        dependencies["schema"] = "missing_migrations"
+                        fields.append("schema_migrations")
+        except Exception:
+            dependencies["postgres"] = "unavailable"
+            dependencies["schema"] = "unchecked"
+            fields.append("DATABASE_URL")
+
+    ready = all(
+        dependencies[key] == "ok"
+        for key in ("configuration", "postgres", "schema")
+    )
+    payload = _c8_status(ready=ready, dependencies=dependencies)
+    if ready:
+        return JSONResponse(status_code=200, content=payload)
+
+    payload["error"] = {
+        "code": "not_ready",
+        "message": "Required application dependencies are not ready",
+        "request_id": _request_id(request),
+        "fields": list(dict.fromkeys(fields)),
+    }
+    return JSONResponse(status_code=503, content=payload)
 
 
 @app.get("/health", response_model=HealthResponse)
