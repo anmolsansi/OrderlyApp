@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import hashlib
 import os
 from pathlib import Path
+import time
 from typing import List, Optional
 from uuid import uuid4
 
@@ -72,6 +74,9 @@ from .store import (
 app = FastAPI(title="OrderlyApp API", version="0.2.0")
 
 MIGRATIONS_DIR = Path(__file__).resolve().parents[1] / "migrations"
+DEFAULT_CHECKOUT_RATE_WINDOW_SECONDS = 60
+DEFAULT_CHECKOUT_RATE_PER_GUEST = 10
+DEFAULT_CHECKOUT_RATE_AGGREGATE = 120
 
 
 class ApiContractError(Exception):
@@ -87,6 +92,16 @@ class ApiContractError(Exception):
         self.code = code
         self.message = message
         self.fields = fields or []
+
+
+class CheckoutRateLimitExceeded(Exception):
+    def __init__(self, retry_after_seconds: int) -> None:
+        super().__init__("Checkout rate limit exceeded")
+        self.retry_after_seconds = retry_after_seconds
+
+
+class CheckoutRateLimitUnavailable(Exception):
+    pass
 
 
 def cors_origins() -> List[str]:
@@ -127,6 +142,66 @@ def _source_sha() -> str:
 
 def _expected_migration_versions() -> set[str]:
     return {migration.name for migration in MIGRATIONS_DIR.glob("*.sql") if migration.is_file()}
+
+
+def _positive_int_setting(name: str, default: int) -> int:
+    raw = os.getenv(name, str(default)).strip()
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be a positive integer") from exc
+    if value < 1:
+        raise ValueError(f"{name} must be a positive integer")
+    return value
+
+
+def checkout_rate_limit_settings() -> tuple[int, int, int]:
+    window_seconds = _positive_int_setting(
+        "ORDERLY_CHECKOUT_RATE_WINDOW_SECONDS",
+        DEFAULT_CHECKOUT_RATE_WINDOW_SECONDS,
+    )
+    per_guest = _positive_int_setting(
+        "ORDERLY_CHECKOUT_RATE_LIMIT_PER_GUEST",
+        DEFAULT_CHECKOUT_RATE_PER_GUEST,
+    )
+    aggregate = _positive_int_setting(
+        "ORDERLY_CHECKOUT_RATE_LIMIT_AGGREGATE",
+        DEFAULT_CHECKOUT_RATE_AGGREGATE,
+    )
+    if aggregate < per_guest:
+        raise ValueError(
+            "ORDERLY_CHECKOUT_RATE_LIMIT_AGGREGATE must be at least the per-guest limit"
+        )
+    return window_seconds, per_guest, aggregate
+
+
+def _enforce_checkout_rate_limit(owner_id: str) -> None:
+    window_seconds, per_guest_limit, aggregate_limit = checkout_rate_limit_settings()
+    client = redis_client()
+    if client is None:
+        raise CheckoutRateLimitUnavailable()
+
+    now_epoch = int(time.time())
+    bucket = now_epoch // window_seconds
+    retry_after = max(1, window_seconds - (now_epoch % window_seconds))
+    owner_hash = hashlib.sha256(owner_id.encode("utf-8")).hexdigest()[:32]
+    guest_key = f"orderly:checkout-rate:guest:{owner_hash}:{bucket}"
+    aggregate_key = f"orderly:checkout-rate:aggregate:{bucket}"
+
+    try:
+        pipeline = client.pipeline(transaction=True)
+        pipeline.incr(guest_key)
+        pipeline.expire(guest_key, window_seconds * 2)
+        pipeline.incr(aggregate_key)
+        pipeline.expire(aggregate_key, window_seconds * 2)
+        results = pipeline.execute()
+        guest_count = int(results[0])
+        aggregate_count = int(results[2])
+    except Exception as exc:
+        raise CheckoutRateLimitUnavailable() from exc
+
+    if guest_count > per_guest_limit or aggregate_count > aggregate_limit:
+        raise CheckoutRateLimitExceeded(retry_after)
 
 
 def _c8_status(*, ready: bool, dependencies: dict[str, str]) -> dict[str, object]:
@@ -267,6 +342,34 @@ def order_storage_exception_handler(
     )
 
 
+@app.exception_handler(CheckoutRateLimitExceeded)
+def checkout_rate_limit_exception_handler(
+    request: Request,
+    exc: CheckoutRateLimitExceeded,
+) -> JSONResponse:
+    response = _error_response(
+        request,
+        429,
+        "checkout_rate_limited",
+        "Checkout is temporarily rate limited",
+    )
+    response.headers["Retry-After"] = str(exc.retry_after_seconds)
+    return response
+
+
+@app.exception_handler(CheckoutRateLimitUnavailable)
+def checkout_rate_limit_unavailable_exception_handler(
+    request: Request,
+    _exc: CheckoutRateLimitUnavailable,
+) -> JSONResponse:
+    return _error_response(
+        request,
+        503,
+        "rate_limit_unavailable",
+        "Checkout is temporarily unavailable",
+    )
+
+
 @app.exception_handler(CatalogChangedError)
 def catalog_changed_exception_handler(request: Request, _exc: CatalogChangedError) -> JSONResponse:
     return _error_response(
@@ -385,6 +488,7 @@ def health_ready(request: Request) -> JSONResponse:
         "configuration": "unknown",
         "postgres": "unknown",
         "schema": "unknown",
+        "rate_limit_configuration": "unknown",
     }
     fields: list[str] = []
 
@@ -394,6 +498,19 @@ def health_ready(request: Request) -> JSONResponse:
     except IdentityError as exc:
         dependencies["configuration"] = "invalid"
         fields.extend(exc.fields)
+
+    try:
+        checkout_rate_limit_settings()
+        dependencies["rate_limit_configuration"] = "ok"
+    except ValueError:
+        dependencies["rate_limit_configuration"] = "invalid"
+        fields.extend(
+            [
+                "ORDERLY_CHECKOUT_RATE_WINDOW_SECONDS",
+                "ORDERLY_CHECKOUT_RATE_LIMIT_PER_GUEST",
+                "ORDERLY_CHECKOUT_RATE_LIMIT_AGGREGATE",
+            ]
+        )
 
     if not database_url():
         dependencies["postgres"] = "not_configured"
@@ -429,7 +546,7 @@ def health_ready(request: Request) -> JSONResponse:
 
     ready = all(
         dependencies[key] == "ok"
-        for key in ("configuration", "postgres", "schema")
+        for key in ("configuration", "postgres", "schema", "rate_limit_configuration")
     )
     payload = _c8_status(ready=ready, dependencies=dependencies)
     if ready:
@@ -557,6 +674,7 @@ def orders_create(
     guest: VerifiedGuest = Depends(verify_request_guest),
 ) -> ReceiptResponse:
     require_allowed_origin(request)
+    _enforce_checkout_rate_limit(guest.guest_id)
     result = submit_order(guest.guest_id, idempotency_key, payload)
     if result.replayed:
         response.status_code = 200
