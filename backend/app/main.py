@@ -50,6 +50,7 @@ from .models import (
 from .order_service import (
     IdempotencyConflictError,
     OrderStorageUnavailableError,
+    normalize_idempotency_key,
     submit_order,
 )
 from .pricing import (
@@ -168,10 +169,6 @@ def checkout_rate_limit_settings() -> tuple[int, int, int]:
         "ORDERLY_CHECKOUT_RATE_LIMIT_AGGREGATE",
         DEFAULT_CHECKOUT_RATE_AGGREGATE,
     )
-    if aggregate < per_guest:
-        raise ValueError(
-            "ORDERLY_CHECKOUT_RATE_LIMIT_AGGREGATE must be at least the per-guest limit"
-        )
     return window_seconds, per_guest, aggregate
 
 
@@ -674,6 +671,7 @@ def orders_create(
     guest: VerifiedGuest = Depends(verify_request_guest),
 ) -> ReceiptResponse:
     require_allowed_origin(request)
+    normalize_idempotency_key(idempotency_key)
     _enforce_checkout_rate_limit(guest.guest_id)
     result = submit_order(guest.guest_id, idempotency_key, payload)
     if result.replayed:
