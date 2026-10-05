@@ -438,6 +438,7 @@ def test_migration_rerun_preserves_legacy_data_and_checksum_drift_fails_closed(
     ).fetchall()
     assert before_rows
     assert all(row[1] for row in before_rows)
+    postgres_connection.commit()
 
     migration_module.main()
 
