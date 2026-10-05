@@ -23,6 +23,8 @@ const API_TIMEOUT_MS = 5_000;
 export const CHECKOUT_RECOVERY_STORAGE_KEY = 'orderlyapp.marketplace.checkoutRecovery.v1';
 let sessionBootstrap: Promise<ApiResult<true>> | undefined;
 let cartMutationTail: Promise<void> = Promise.resolve();
+let guestScope = new AbortController();
+let resettingGuest = false;
 
 class ApiTransportError extends Error {
   constructor(public readonly code: 'request_aborted' | 'network_timeout' | 'network_error', message: string) {
@@ -171,16 +173,19 @@ async function bootstrapGuestSession(force = false): Promise<ApiResult<true>> {
 }
 
 async function fetchProtectedResponse(input: string, init: RequestInit = {}): Promise<ApiResult<Response>> {
+  if (resettingGuest) return failure('session', 'session_resetting', 'Guest session reset is in progress');
+  const scope = guestScope;
+  const signal = init.signal ? AbortSignal.any([scope.signal, init.signal]) : scope.signal;
   const bootstrap = await bootstrapGuestSession();
   if (!bootstrap.ok) return bootstrap;
 
   try {
-    let response = await fetchApi(input, init);
+    let response = await fetchApi(input, { ...init, signal });
     if (response.status !== 401) return success(response);
 
     const refreshed = await bootstrapGuestSession(true);
     if (!refreshed.ok) return refreshed;
-    response = await fetchApi(input, init);
+    response = await fetchApi(input, { ...init, signal });
     return success(response);
   } catch (error) {
     return transportFailure(error);
@@ -193,6 +198,7 @@ async function requestJson<T>(
   init: RequestInit = {},
   protectedRequest = false,
 ): Promise<ApiResult<T>> {
+  const scope = guestScope;
   let responseResult: ApiResult<Response>;
   if (protectedRequest) {
     responseResult = await fetchProtectedResponse(input, init);
@@ -209,6 +215,9 @@ async function requestJson<T>(
   if (!response.ok) return parseErrorResponse(response);
 
   const payload = await readJson(response);
+  if (protectedRequest && scope.signal.aborted) {
+    return failure('network', 'request_aborted', 'Request was superseded by a guest session reset');
+  }
   const parsed = parser(payload);
   if (parsed === undefined) {
     return failure('server', 'invalid_response', 'The API returned an unexpected response shape', {
@@ -519,7 +528,11 @@ function toApiOrderSubmission(input: OrderSubmission): Record<string, unknown> {
 }
 
 function enqueueCartMutation<T>(operation: () => Promise<ApiResult<T>>): Promise<ApiResult<T>> {
-  const run = cartMutationTail.then(operation, operation);
+  const scope = guestScope;
+  const guarded = () => scope.signal.aborted
+    ? Promise.resolve(failure('network', 'request_aborted', 'Request was superseded by a guest session reset'))
+    : operation();
+  const run = cartMutationTail.then(guarded, guarded);
   cartMutationTail = run.then(() => undefined, () => undefined);
   return run;
 }
@@ -739,10 +752,12 @@ export function clearCheckoutRecovery(storage: Storage | undefined): boolean {
 }
 
 export async function resetGuestSession(): Promise<boolean> {
-  if (getOrderlyDataMode() === 'local_demo') return false;
-  const bootstrap = await bootstrapGuestSession();
-  if (!bootstrap.ok) return false;
+  if (getOrderlyDataMode() === 'local_demo' || resettingGuest) return false;
+  resettingGuest = true;
+  guestScope.abort();
   try {
+    const bootstrap = await bootstrapGuestSession();
+    if (!bootstrap.ok) return false;
     const response = await fetchApi(`${getApiBaseUrl()}/session/reset`, {
       method: 'POST',
       headers: { Accept: 'application/json' },
@@ -752,5 +767,8 @@ export async function resetGuestSession(): Promise<boolean> {
   } catch {
     sessionBootstrap = undefined;
     return false;
+  } finally {
+    guestScope = new AbortController();
+    resettingGuest = false;
   }
 }

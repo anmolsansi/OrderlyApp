@@ -19,7 +19,7 @@ The stored profile is version 1 and contains only:
 }
 ```
 
-The profile name is trimmed and must contain 1–60 characters. Unknown fields, invalid schema versions, malformed JSON, and unknown default address IDs are rejected.
+The profile name is trimmed and must contain 1–60 characters. Unknown fields, invalid schema versions, malformed JSON, and unknown default address IDs are rejected. Decoded profile/address records that fail validation are removed from their exact C2 key, so an unknown password field cannot remain after successful cleanup. A blocked removal reports `storage_unavailable`; it never claims that cleanup succeeded. Malformed JSON still reports a recoverable error with an explicit clear action.
 
 The local profile ID is a presentation label. Changing it cannot grant access to another guest's server data.
 
@@ -55,6 +55,8 @@ The migration never calls `localStorage.clear()`. Cart and order-history keys ar
 **Forget local profile** removes only C2 browser presentation data. It does not call the backend and does not rotate the guest cookie.
 
 **Start fresh guest session** calls the existing ST-02 `resetGuestSession()` client operation. On success, the server rotates the private guest scope and the page then clears the local demo profile so the user must choose presentation data again.
+
+The reset also clears this tab's old checkout recovery record. Profile rename and **Forget local profile** do not clear it or rotate the guest. If recovery cleanup is blocked after the server rotates, the page states that partial result explicitly.
 
 If guest reset fails, the existing guest scope remains active and the UI reports the failure. If the guest rotates successfully but local storage cleanup fails, the UI reports that partial local cleanup problem instead of pretending the whole reset failed.
 

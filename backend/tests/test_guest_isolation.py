@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import json
+from contextlib import contextmanager
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 
 import pytest
 from fastapi.testclient import TestClient
 
+import app.identity as identity_module
 from app.identity import COOKIE_NAME, token_hash, token_nonce_from_signed_token
 from app.main import app
 
@@ -53,9 +56,38 @@ def cleanup_guest_rows(postgres_connection) -> None:
     postgres_connection.commit()
 
 
+def test_returning_guest_bootstrap_formats_non_utc_database_expiry(
+    identity_environment: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = TestClient(app, base_url=TEST_ORIGIN)
+    token = bootstrap(client)
+    _, expires_at = token_nonce_from_signed_token(token, TEST_SECRET.encode("utf-8"))
+    original_connection = identity_module.get_connection
+
+    @contextmanager
+    def non_utc_connection():
+        with original_connection() as conn:
+            conn.execute("SET TIME ZONE 'America/New_York'")
+            yield conn
+
+    monkeypatch.setattr(identity_module, "get_connection", non_utc_connection)
+    response = client.post("/v1/session", headers={"Origin": TEST_ORIGIN})
+    assert response.status_code == 200
+    assert client.cookies.get(COOKIE_NAME) == token
+    cookie = response.headers["set-cookie"]
+    expiry_header = cookie.split("expires=", 1)[1].split(";", 1)[0]
+    assert expiry_header.endswith(" GMT")
+    assert parsedate_to_datetime(expiry_header) == expires_at
+    assert "HttpOnly" in cookie and "Secure" in cookie and "SameSite=lax" in cookie
+
+
+@pytest.mark.parametrize("replacement_fails", [False, True])
 def test_two_guest_cookie_jars_are_isolated_and_reset_revokes_old_scope(
     identity_environment: None,
     postgres_connection,
+    monkeypatch: pytest.MonkeyPatch,
+    replacement_fails: bool,
 ) -> None:
     cleanup_guest_rows(postgres_connection)
     client_a = TestClient(app, base_url=TEST_ORIGIN)
@@ -139,6 +171,13 @@ def test_two_guest_cookie_jars_are_isolated_and_reset_revokes_old_scope(
         """,
         (receipt_id, guest_a, json.dumps(receipt), created_at),
     )
+    postgres_connection.execute(
+        """
+        INSERT INTO order_idempotency (owner_id, idempotency_key, payload_sha256, order_id)
+        VALUES (%s, %s, %s, %s::uuid)
+        """,
+        (guest_a, "11111111-1111-4111-8111-111111111114", "a" * 64, receipt_id),
+    )
     postgres_connection.commit()
 
     a_cart = client_a.get("/v1/cart")
@@ -199,12 +238,44 @@ def test_two_guest_cookie_jars_are_isolated_and_reset_revokes_old_scope(
     assert forged_response.json()["error"]["code"] == "session_invalid"
 
     old_token = token_a
+    if replacement_fails:
+        original_insert = identity_module._insert_guest
+
+        def fail_replacement(*args):
+            raise RuntimeError("synthetic replacement failure")
+
+        monkeypatch.setattr(identity_module, "_insert_guest", fail_replacement)
+        failed_reset = client_a.post("/v1/session/reset", headers={"Origin": TEST_ORIGIN})
+        assert failed_reset.status_code == 503
+        assert failed_reset.json()["error"]["code"] == "storage_unavailable"
+        assert "synthetic replacement failure" not in failed_reset.text
+        assert client_a.cookies.get(COOKIE_NAME) == old_token
+        assert client_a.get("/v1/cart").json()["items"][0]["id"] == "line-a"
+        assert client_a.get(f"/v1/orders/{receipt_id}").status_code == 200
+        assert postgres_connection.execute(
+            "SELECT revoked_at FROM guest_sessions WHERE id = %s", (guest_a,),
+        ).fetchone()[0] is None
+        assert postgres_connection.execute(
+            "SELECT count(*) FROM order_idempotency WHERE owner_id = %s", (guest_a,),
+        ).fetchone()[0] == 1
+        monkeypatch.setattr(identity_module, "_insert_guest", original_insert)
+
     reset = client_a.post("/v1/session/reset", headers={"Origin": TEST_ORIGIN})
     assert reset.status_code == 200
     new_token = client_a.cookies.get(COOKIE_NAME)
     assert new_token and new_token != old_token
     assert client_a.get("/v1/cart").json() == {"schema_version": 1, "revision": 0, "items": []}
     assert client_a.get("/v1/orders").json() == []
+    # Access revocation alone is insufficient: C1 promises immediate deletion.
+    for table in ("guest_carts", "guest_orders", "order_idempotency"):
+        assert postgres_connection.execute(
+            f"SELECT count(*) FROM {table} WHERE owner_id = %s", (guest_a,),
+        ).fetchone()[0] == 0
+    assert postgres_connection.execute(
+        "SELECT count(*) FROM guest_sessions WHERE id = %s", (guest_a,),
+    ).fetchone()[0] == 0
+    assert guest_id_for_token(postgres_connection, token_b) == guest_b
+    assert client_b.get("/v1/cart").json() == {"schema_version": 1, "revision": 1, "items": []}
 
     revoked = TestClient(app, base_url=TEST_ORIGIN).get(
         "/v1/cart",

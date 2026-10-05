@@ -1,0 +1,277 @@
+
+> orderlyapp@0.2.0 test:web
+> npm run lint && npm run test && npm run typecheck && npm run build
+
+
+> orderlyapp@0.2.0 lint
+> eslint .
+
+
+/Users/mac/Documents/Projects/OrderlyApp/app/account/page.tsx
+  61:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/mac/Documents/Projects/OrderlyApp/app/account/page.tsx:61:5
+  59 |
+  60 |   useEffect(() => {
+> 61 |     loadProfile();
+     |     ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  62 |   }, []);
+  63 |
+  64 |   function useTemporaryProfile(): void {  react-hooks/set-state-in-effect
+
+/Users/mac/Documents/Projects/OrderlyApp/app/cart/page.tsx
+  51:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/mac/Documents/Projects/OrderlyApp/app/cart/page.tsx:51:5
+  49 |     const controller = new AbortController();
+  50 |     const sequence = ++loadSequence.current;
+> 51 |     setLoaded(false);
+     |     ^^^^^^^^^ Avoid calling setState() directly within an effect
+  52 |     setLoadError(undefined);
+  53 |     setCatalogError(undefined);
+  54 |     setActionError(undefined);  react-hooks/set-state-in-effect
+
+/Users/mac/Documents/Projects/OrderlyApp/app/checkout/page.tsx
+  199:9  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/mac/Documents/Projects/OrderlyApp/app/checkout/page.tsx:199:9
+  197 |     ) {
+  198 |       if (checkoutState !== 'uncertain') {
+> 199 |         setQuote(null);
+      |         ^^^^^^^^ Avoid calling setState() directly within an effect
+  200 |         setQuoteError(null);
+  201 |       }
+  202 |       return;  react-hooks/set-state-in-effect
+
+/Users/mac/Documents/Projects/OrderlyApp/app/components/MarketplaceNav.tsx
+  17:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/mac/Documents/Projects/OrderlyApp/app/components/MarketplaceNav.tsx:17:5
+  15 |
+  16 |   useEffect(() => {
+> 17 |     setProfileSelected(isSignedIn(getBrowserStorage('localStorage')));
+     |     ^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  18 |   }, []);
+  19 |
+  20 |   const navItems = [  react-hooks/set-state-in-effect
+
+/Users/mac/Documents/Projects/OrderlyApp/app/order-confirmation/page.tsx
+  25:7  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/mac/Documents/Projects/OrderlyApp/app/order-confirmation/page.tsx:25:7
+  23 |   useEffect(() => {
+  24 |     if (mode === 'local_demo') {
+> 25 |       setViewState('unavailable');
+     |       ^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  26 |       return;
+  27 |     }
+  28 |     if (!orderId) {  react-hooks/set-state-in-effect
+
+/Users/mac/Documents/Projects/OrderlyApp/app/orders/page.tsx
+  22:7  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/mac/Documents/Projects/OrderlyApp/app/orders/page.tsx:22:7
+  20 |   useEffect(() => {
+  21 |     if (mode === 'local_demo') {
+> 22 |       setOrders([]);
+     |       ^^^^^^^^^ Avoid calling setState() directly within an effect
+  23 |       setViewState('unavailable');
+  24 |       return;
+  25 |     }  react-hooks/set-state-in-effect
+
+/Users/mac/Documents/Projects/OrderlyApp/app/page.tsx
+  21:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/mac/Documents/Projects/OrderlyApp/app/page.tsx:21:5
+  19 |   useEffect(() => {
+  20 |     const controller = new AbortController();
+> 21 |     setLoading(true);
+     |     ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  22 |     setCatalogError(undefined);
+  23 |
+  24 |     void fetchRestaurants({ signal: controller.signal }).then(result => {  react-hooks/set-state-in-effect
+
+/Users/mac/Documents/Projects/OrderlyApp/app/restaurants/[restaurantId]/items/[itemId]/page.tsx
+  48:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/mac/Documents/Projects/OrderlyApp/app/restaurants/[restaurantId]/items/[itemId]/page.tsx:48:5
+  46 |   useEffect(() => {
+  47 |     const controller = new AbortController();
+> 48 |     setLoading(true);
+     |     ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  49 |     setLoadError(undefined);
+  50 |     setRestaurant(undefined);
+  51 |     setItem(undefined);  react-hooks/set-state-in-effect
+
+/Users/mac/Documents/Projects/OrderlyApp/app/restaurants/[restaurantId]/page.tsx
+  22:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/mac/Documents/Projects/OrderlyApp/app/restaurants/[restaurantId]/page.tsx:22:5
+  20 |   useEffect(() => {
+  21 |     const controller = new AbortController();
+> 22 |     setLoading(true);
+     |     ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  23 |     setError(undefined);
+  24 |     setRestaurant(undefined);
+  25 |  react-hooks/set-state-in-effect
+
+/Users/mac/Documents/Projects/OrderlyApp/app/restaurants/page.tsx
+  35:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/mac/Documents/Projects/OrderlyApp/app/restaurants/page.tsx:35:5
+  33 |   useEffect(() => {
+  34 |     const controller = new AbortController();
+> 35 |     setLoading(true);
+     |     ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  36 |     setError(undefined);
+  37 |
+  38 |     void fetchRestaurants({ signal: controller.signal }).then(result => {  react-hooks/set-state-in-effect
+
+/Users/mac/Documents/Projects/OrderlyApp/app/sign-in/page.tsx
+  59:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/mac/Documents/Projects/OrderlyApp/app/sign-in/page.tsx:59:5
+  57 |
+  58 |   useEffect(() => {
+> 59 |     loadProfile();
+     |     ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  60 |   }, []);
+  61 |
+  62 |   function submitProfile(): void {  react-hooks/set-state-in-effect
+
+/Users/mac/Documents/Projects/OrderlyApp/e2e/catalog-cart.spec.ts
+  55:53  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/mac/Documents/Projects/OrderlyApp/e2e/checkout-recovery.spec.ts
+  40:98  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/mac/Documents/Projects/OrderlyApp/e2e/orderly.spec.ts
+   4:20  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   6:39  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  53:56  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+✖ 16 problems (0 errors, 16 warnings)
+
+
+> orderlyapp@0.2.0 test
+> vitest run
+
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.11 /Users/mac/Documents/Projects/OrderlyApp
+
+
+ Test Files  13 passed (13)
+      Tests  89 passed (89)
+   Start at  16:05:49
+   Duration  408ms (transform 744ms, setup 0ms, import 1.12s, tests 196ms, environment 1ms)
+
+
+> orderlyapp@0.2.0 typecheck
+> tsc --noEmit
+
+
+> orderlyapp@0.2.0 build
+> next build
+
+▲ Next.js 16.3.8 (Turbopack)
+✓ Running next.config.mjs took 8ms
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 436ms
+  Running TypeScript ...
+  Finished TypeScript in 2.3s ...
+  Collecting page data using 10 workers ...
+  Generating static pages using 10 workers (0/10) ...
+  Generating static pages using 10 workers (2/10) 
+  Generating static pages using 10 workers (4/10) 
+  Generating static pages using 10 workers (7/10) 
+✓ Generating static pages using 10 workers (10/10) in 171ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /account
+├ ƒ /api/orderly/[...path]
+├ ○ /cart
+├ ○ /checkout
+├ ○ /order-confirmation
+├ ○ /orders
+├ ƒ /restaurants
+├ ƒ /restaurants/[restaurantId]
+├ ƒ /restaurants/[restaurantId]/items/[itemId]
+└ ○ /sign-in
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

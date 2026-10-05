@@ -12,7 +12,7 @@ import {
   saveDemoProfile,
   type DemoProfileErrorCode,
 } from '@/lib/auth';
-import { resetGuestSession } from '@/lib/api';
+import { clearCheckoutRecovery, resetGuestSession } from '@/lib/api';
 import { getBrowserStorage } from '@/lib/browser-storage';
 import { routes } from '@/lib/routes';
 import type { DemoAddress, DemoProfile } from '@/lib/types';
@@ -151,6 +151,12 @@ export default function AccountPage() {
     const reset = await resetGuestSession();
     if (!reset) {
       setError('Could not start a fresh guest session. Your existing guest scope remains active.');
+      setResettingGuest(false);
+      return;
+    }
+
+    if (!clearCheckoutRecovery(getBrowserStorage('sessionStorage'))) {
+      setError('Fresh guest session started, but old checkout recovery data could not be cleared. Enable browser storage and retry cleanup before ordering.');
       setResettingGuest(false);
       return;
     }
