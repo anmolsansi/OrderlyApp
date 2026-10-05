@@ -8,6 +8,14 @@ export default defineConfig([
     files: ['**/*.{js,mjs,cjs}'],
     rules: js.configs.recommended.rules,
   },
+  {
+    files: ['next.config.mjs'],
+    languageOptions: {
+      globals: {
+        process: 'readonly',
+      },
+    },
+  },
   ...tseslint.configs.recommended,
   reactHooks.configs.flat.recommended,
   {
