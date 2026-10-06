@@ -15,9 +15,9 @@ Each check below is complete only when current evidence is recorded. Group relat
 - [x] M08: Regression: real ledger lock returns 503 within bound.
 - [x] M09: Regression: real PostgreSQL readiness succeeds after lock release.
 - [x] M10: Verify process-only liveness during unavailable database.
-- [ ] M11: Verify expired guest cleanup includes complete receipt.
-- [ ] M12: Verify revoked guest cleanup includes idempotency ledger.
-- [ ] M13: Verify active guest receipt and ledger survive cleanup.
+- [x] M11: Verify expired guest cleanup includes complete receipt.
+- [x] M12: Verify revoked guest cleanup includes idempotency ledger.
+- [x] M13: Verify active guest receipt and ledger survive cleanup.
 - [ ] M14: Verify cleanup batch bound and repeat safety.
 - [x] M15: Verify cleanup skips checkout-held guest lock.
 - [x] M16: Verify migration rerun preserves legacy order.
@@ -39,7 +39,7 @@ Each check below is complete only when current evidence is recorded. Group relat
 - [ ] M32: Run full backend suite against isolated PostgreSQL.
 - [ ] M33: Run API-mode Chromium product suite.
 - [ ] M34: Run isolated local_demo safety suite.
-- [ ] M35: Push green operations microcommit.
+- [x] M35: Push green operations microcommit.
 - [ ] M36: Push green CI microcommit.
 - [ ] M37: Reconcile all ST13-owned active and historical docs.
 - [ ] M38: Refresh exact Vercel deployment identity read only.

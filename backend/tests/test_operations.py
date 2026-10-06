@@ -317,10 +317,12 @@ def test_checkout_rate_limit_response_has_retry_after() -> None:
     }
 
 
+@pytest.mark.parametrize("revoked", [False, True])
 def test_cleanup_purges_expired_guest_and_preserves_active_guest(
     postgres_connection: Any,
     postgres_database_url: str,
     monkeypatch,
+    revoked: bool,
 ) -> None:
     now = datetime.now(timezone.utc)
     expired_id = f"guest-{uuid4()}"
@@ -348,6 +350,24 @@ def test_cleanup_purges_expired_guest_and_preserves_active_guest(
         "INSERT INTO guest_carts (owner_id, revision, items) VALUES (%s, 0, '[]'::jsonb), (%s, 0, '[]'::jsonb)",
         (expired_id, active_id),
     )
+    if revoked:
+        postgres_connection.execute(
+            "UPDATE guest_sessions SET expires_at = %s, revoked_at = %s WHERE id = %s",
+            (now + timedelta(days=1), now, expired_id),
+        )
+    receipt_ids = {}
+    fixture = json.loads((REPOSITORY_ROOT / "tests/fixtures/contracts/c5.json").read_text())
+    for owner in (expired_id, active_id):
+        receipt = dict(fixture["positive"]["receipt"], id=str(uuid4()))
+        receipt_ids[owner] = receipt["id"]
+        postgres_connection.execute(
+            "INSERT INTO guest_orders (id, owner_id, snapshot, created_at) VALUES (%s, %s, %s::jsonb, %s)",
+            (receipt["id"], owner, json.dumps(receipt), receipt["created_at"]),
+        )
+        postgres_connection.execute(
+            "INSERT INTO order_idempotency (owner_id, idempotency_key, payload_sha256, order_id) VALUES (%s, %s, %s, %s)",
+            (owner, str(uuid4()), "a" * 64, receipt["id"]),
+        )
     postgres_connection.commit()
 
     cleanup_expired_guests(now=now, batch_size=100)
@@ -373,6 +393,14 @@ def test_cleanup_purges_expired_guest_and_preserves_active_guest(
     assert expired_cart is None
     assert active is not None
     assert active_cart is not None
+    for table in ("guest_orders", "order_idempotency"):
+        assert postgres_connection.execute(
+            f"SELECT count(*) FROM {table} WHERE owner_id = %s", (expired_id,)
+        ).fetchone()[0] == 0
+        assert postgres_connection.execute(
+            f"SELECT count(*) FROM {table} WHERE owner_id = %s", (active_id,)
+        ).fetchone()[0] == 1
+    assert cleanup_expired_guests(now=now, batch_size=100) == 0
 
     postgres_connection.execute("DELETE FROM guest_sessions WHERE id = %s", (active_id,))
     postgres_connection.commit()
