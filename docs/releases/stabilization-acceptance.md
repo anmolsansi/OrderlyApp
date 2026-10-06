@@ -1,106 +1,65 @@
 # OrderlyApp — Stabilization Acceptance Record
 
-**Status:** NOT COMPLETED — public deployment and recovery gates remain blocked.
+**Status:** NOT COMPLETED — public ordering and hosted recovery remain blocked.
+**Record date:** 2026-10-06. No deployment, merge, paid-plan change or Linear write performed in this follow-up.
 
-**Record date:** 2026-10-05
+## Candidate identities
 
-This is the current acceptance ledger for the stabilization release. It distinguishes repository/CI proof from deployed public proof. A READY deployment, tracker status, historical successful run, or owner-authenticated diagnostic does not satisfy a criterion that requires a fresh public visitor or a current staged backend.
-
-## Candidate identity
-
-### Repository / CI candidate
-
-- Repository: `anmolsansi/OrderlyApp`
-- Exact source SHA: `934208c36d323e39d9f6ddcfcc3805cbd979507f`
-- ST-12 post-merge Stabilization CI run: `37347582799`
-- Result: PASS for the repository release-CI matrix.
-
-### Vercel frontend candidate
-
-- Project: `orderly-app`
-- Deployment ID: `dpl_DiDAHxxRJcCboiSqWiFJjSC2NPsU`
-- Immutable URL: `https://orderly-o9w42h6f0-openclawneutron-4687s-projects.vercel.app`
-- Source SHA: `934208c36d323e39d9f6ddcfcc3805cbd979507f`
-- State: `READY`
-- Production alias observed: `https://orderly-app-eight.vercel.app`
-- Protection: Vercel Authentication is enabled for the `vercel.app` deployment surface; fresh public access without developer authentication is not yet proven.
-
-Owner-authenticated diagnostic access returned the expected OrderlyApp HTML, but authenticated bypass is diagnostic evidence only and is not ST-13-AC2 proof.
-
-The same diagnostic showed the frontend gateway request `GET /api/orderly/restaurants` returning `504 upstream_timeout`. Therefore the hosted frontend currently cannot complete the API-mode manual journey against a healthy backend.
-
-### Render backend candidate
-
-- Service: `orderlyapp-int01-api`
-- Service ID: `srv-db1mb4k9v7es7388ksug`
-- URL: `https://orderlyapp-int01-api.onrender.com`
-- Exact-SHA redeploy attempted: `dep-db1v020m7kps73cuhj5g`
-- Source SHA: `934208c36d323e39d9f6ddcfcc3805cbd979507f`
-- Build: PASS
-- Deploy: FAIL
-- Observed failure: PostgreSQL authentication rejected the configured `DATABASE_URL` because no password was supplied.
-- Existing service start command also still combines migration, fixture seed and serving, which is not the merged C8 lifecycle.
-
-A free Render Key Value instance `orderlyapp-stabilization-redis` (`red-db1v0k0m7kps73cuj180`) was created for the stabilization runtime, but safely linking managed database/Redis connection values requires an authenticated Render dashboard session. No credential was exposed or copied into this record.
-
-## ST-12 release-CI evidence
-
-Run `37347582799` executed against exact source SHA `934208c36d323e39d9f6ddcfcc3805cbd979507f`.
-
-| Required job | Result | Evidence summary |
+| Surface | Exact identity | Observed result |
 | --- | --- | --- |
-| Dependency security | PASS | Clean frontend install; npm high-severity audit 0 vulnerabilities; strict installed Python dependency audit clean. |
-| Web quality | PASS | Genuine ESLint, contract fixtures, frontend units, independent typecheck, production build. |
-| Backend and recovery | PASS | Isolated PostgreSQL/Redis, migrations, backend suite, transaction-consistent backup/restore rehearsal. |
-| Chromium runtime | PASS | Playwright Chromium provisioned and launched. |
-| API product E2E | PASS | C8 readiness/source-SHA check, non-empty mandatory suite, API/PostgreSQL product E2E. |
-| Local fixture preview E2E | PASS | Separate `local_demo` safety assertions; never accepted as API fallback or checkout proof. |
-| Release candidate evidence | PASS | Final gate fails closed unless all required upstream results are `success`. |
+| Repository runtime/CI candidate | `a5a46a0e604dc9b4140fb1f5d32a5d41ce28a469` on `fix/st11-st13-acceptance` | [PR CI run 37429346691](https://github.com/anmolsansi/OrderlyApp/actions/runs/37429346691) passed all seven required gates. Subsequent changes are evidence/docs only; final PR checks are recorded separately. |
+| Existing public frontend | Vercel `orderly-app`, deployment `dpl_B2UzqrDyu1uMV9SBmfNjTWWLzBT3`, main SHA `1eaba8e396f1068f5da577aa29b78ed1cc6d2500` | READY in Vercel metadata. It does **not** deploy this follow-up branch. |
+| Public production alias | [orderly-app-eight.vercel.app](https://orderly-app-eight.vercel.app) | Anonymous HTTP 200; frontend access alone is not receipt acceptance. |
+| Immutable frontend URL | [orderly-2wxyqwwn6-openclawneutron-4687s-projects.vercel.app](https://orderly-2wxyqwwn6-openclawneutron-4687s-projects.vercel.app) | Anonymous HTTP 302 to Vercel SSO. No authenticated bypass used. |
+| Public gateway | `GET /api/orderly/restaurants` on public alias | Initially HTTP 504 `upstream_timeout`; later HTTP 200 in two fresh anonymous contexts. Catalog recovered; order success remains unaccepted. |
+| Public guest bootstrap | `POST /api/orderly/session` on public alias | HTTP 503 `invalid_config`, field `ORDERLY_DATA_MODE`: backend must run in API mode. Public manual journey failed. |
+| Existing backend readiness | `https://orderlyapp-int01-api.onrender.com/health/ready` | Request timed out at 45 seconds (HTTP 000); current backend SHA/configuration is unverified. Render control-plane inspection requires explicit workspace selection. |
 
-This evidence proves the repository candidate in CI. It does not substitute for public deployment acceptance or INT-02 staged recovery evidence.
+The earlier October 5 ledger described protected frontend aliases and an unhealthy Render deploy. The public alias now opens; immutable deployment authentication and guest-bootstrap configuration failure remain. Prior Render deployment/configuration observations are historical, not current proof.
 
-## Prerequisite gates
+Dependency identity: unchanged frontend `package-lock.json`; backend audit/test lock now pins pip 26.2, pytest 9.0.3, httpx 0.28.1 and pip-audit 2.10.1. Hosted CI resolves and strictly scans backend runtime dependencies; backend runtime ranges are not a frozen transitive runtime lock. See [CI runbook](../runbooks/ci.md) and [current detailed evidence](../qa/st11-st13-acceptance/results.md).
 
-### INT-01
+## Acceptance criteria
 
-`development.md` still records INT-01 as Not completed and there is no current `docs/qa/int-01.md` report. Automated provider/consumer E2E evidence exists, but the formal checkpoint report required by the plan has not been published. **Result: BLOCKED / NOT RECORDED.**
-
-### INT-02
-
-`development.md` requires `docs/qa/int-02.md` with current release/persistence/recovery rehearsal evidence. That file does not exist on the candidate. The public/staged backend is not currently healthy, so the required rehearsal cannot truthfully be declared complete. **Result: BLOCKED.**
-
-## ST-13 acceptance criteria
-
-| Criterion | Result | Current observed evidence |
+| Criterion | Result | Current evidence |
 | --- | --- | --- |
-| ST-13-AC1 — active owned docs agree with stabilized manual release | PASS for reconciled docs on `chore/st-13-release-reconciliation`; pending final branch review | Active docs now describe API-mode authority, password-free demo profiles, isolated `local_demo`, explicit migration/seed lifecycle, PostgreSQL authority, limiter-only Redis use, mock-only checkout, and deferred voice/real accounts/payments. Historical plans are labelled superseded. |
-| ST-13-AC2 — fresh visitor reaches identified deployment and saves/reopens complete receipt | BLOCKED | Vercel public access is not proven; authenticated diagnostic is not acceptable proof; gateway-to-backend request currently returns 504; current Render exact-SHA deploy fails DB authentication. |
-| ST-13-AC3 — release record maps every mandatory criterion and leaves blocked/unrun gates incomplete | PASS | This record identifies exact SHA/deployments, CI proof, blocked public backend/access, and required follow-up without inventing a pass. |
+| ST-11-AC1: real required DB outage | PASS, isolated local runtime | Same Uvicorn process: live 200, ready 503, guest write 503 while PostgreSQL stopped; ready 200 after recovery. Real ledger lock also returns bounded 503. |
+| ST-11-AC2: restart preserves data, startup does not seed | PASS, isolated local runtime | Database and API restarts preserved complete saved receipts/carts and edited catalog; previous main backend also remained compatible. |
+| ST-11-AC3: safe cleanup and exact receipt backup/restore | PASS, isolated local + hosted CI | Active guests retained; expired/revoked receipts and replay keys removed; held guest locks skipped; batch limit 100 and repeat safety; exported snapshot dump restored into separate DB with all nine public table digests equal. CI compares complete receipt and exact migration ledger. |
+| ST-12-AC1: clean hosted complete matrix | PASS | Exact runtime candidate CI has seven successful jobs: security, web, backend/recovery, Chromium, API E2E, preview E2E, release evidence. Final PR/head identity is an additional gate. |
+| ST-12-AC2: missing/skipped mandatory checks fail | PASS | Real services and Chromium required; focused browser tests forbidden; skip/empty/error/flaky browser guard and skipped-backend subprocess regressions verified. |
+| ST-12-AC3: dependency security | PASS | npm zero vulnerabilities; strict third-party Python audit clean after patching pip installer. Hosted current security job passed. |
+| ST-13-AC1: active owned documentation agrees | PASS for repository candidate | Active docs describe canonical API/private guest data, password-free profiles, isolated checkout-disabled preview, explicit migration/seed/cleanup, mock-only manual release and deferred voice/accounts/payments. Historical plans retain superseded notices. |
+| ST-13-AC2: fresh public visitor saves/reopens exact receipt | BLOCKED | Two fresh contexts load public catalog without developer login, but guest creation returns 503 `invalid_config` for `ORDERLY_DATA_MODE`; public manual journey failed. No receipt was accepted. Immutable URL still redirects to SSO. |
+| ST-13-AC3: honest current release ledger | PASS | Current identities, local/CI evidence, historical observations and public failures are separated here. |
 
-## RELEASE-GATE status
+## Integration and release gates
 
-| Gate | Result | Evidence / blocker |
+INT-01 already has a disclosed separate local report at [int-01.md](../qa/int-01.md), supplemented by this candidate's 35 passing API browser cases. INT-02 has a [current local rehearsal report](../qa/int-02.md); hosted staging recovery is not accepted.
+
+| Gate | Result | Remaining requirement |
 | --- | --- | --- |
-| RG-01 | BLOCKED | ST-12 candidate CI is green, but INT-01/INT-02/ST-13-AC2 are not complete. |
-| RG-02 | PARTIAL / BLOCKED | Provider security/identity/negative tests are green in CI; formal hosted/manual integration report is missing. |
-| RG-03 | PARTIAL / BLOCKED | CI backup/restore and C8 lifecycle tests pass; INT-02 staging migration/restart/restore rehearsal is not recorded. |
-| RG-04 | BLOCKED | Exact frontend SHA is deployed, but fresh unauthenticated public acceptance is not proven and the current backend candidate is unhealthy. |
-| RG-05 | BLOCKED | Hosted manual receipt save/reopen and hosted two-guest isolation cannot run until the backend is healthy. |
-| RG-06 | BLOCKED | Safe CI/runtime signals exist, but current public-platform reviewer/alert evidence is not recorded. |
-| RG-07 | PASS for ST-13 documentation reconciliation; overall release remains blocked | Active ST-13-owned documentation is reconciled; historical plans remain history; accepted limitations and deferred scope are explicit. |
+| RG-01 | BLOCKED | Complete INT-02 hosted recovery and ST-13 public receipt acceptance. |
+| RG-02 | PARTIAL | Local/CI guest/provider negative cases pass; public two-guest evidence is missing. |
+| RG-03 | PARTIAL | Local upgrade, restart, real outage, rollback and full restore pass; hosted staging rehearsal remains unrun. |
+| RG-04 | BLOCKED | Existing frontend is a different SHA from the follow-up; guest bootstrap fails. |
+| RG-05 | BLOCKED | Public receipt save/reopen, exact totals/address and guest isolation remain unrun. |
+| RG-06 | BLOCKED | Live deployment/retention schedule/operational reviewer evidence is unverified. |
+| RG-07 | PASS for documentation | Current docs and explicit limitations are reconciled; overall release is not complete. |
 
-## Required action to unblock final acceptance
+## Tracker reconciliation, read only
 
-1. Sign in to the Render dashboard in the connected browser session.
-2. Link `orderlyapp-int01-api` to the existing managed Postgres and `orderlyapp-stabilization-redis` resources using Render resource references; do not copy credentials into repository or chat.
-3. Set serving to application-only (`uvicorn`) and run migrations as a separate lifecycle operation; explicitly seed only the isolated demo database if needed.
-4. Verify `/health/ready` reports API mode, healthy PostgreSQL/schema/rate-limit configuration and exact source SHA.
-5. Point the Vercel gateway to that backend, allow the intended public production alias without developer sign-in, and redeploy/rebuild only as required for environment changes.
-6. Run the two-fresh-browser public journey, exact receipt reload, guest isolation, and INT-02 recovery rehearsal; attach the resulting evidence before changing any blocked criterion to PASS.
+GitHub #41/#43/#45 were already closed before this follow-up. Linear OPE-335 (ST11) was Done; OPE-336 (ST12) was In Progress. Neither label is acceptance evidence; no exact ST13 Linear ticket was found in the read-only query. No Linear state was changed.
 
-## Safety / rollback
+## Remaining release operation
 
-- Do not expose database passwords, Redis credentials, guest cookies, signing secrets or raw checkout contact/address data in evidence.
-- Do not use `local_demo`, authenticated deployment bypass, fixture fallback, or stale Render services as public acceptance proof.
-- Do not weaken readiness, storage authority, rate limiting or idempotency merely to make a deployment green.
-- If a public candidate violates guest isolation, duplicates an order, changes an immutable receipt, invents success, or reports false readiness, withdraw/disable the candidate and preserve failed evidence before retesting a replacement build.
+1. Select the Render workspace explicitly, inspect the current service/deploy SHA and safe configuration metadata.
+2. Repair database/Redis resource linkage through secure platform references; never publish credentials. Separate migrations from serving and fixture seed. A free-plan service cannot silently gain paid predeploy/cron capabilities.
+3. Set backend `ORDERLY_DATA_MODE=api` through the authorized platform release/configuration operation; validate secret/origin/PostgreSQL/schema/Redis requirements too. Establish the healthy exact-SHA backend and verify gateway routing.
+4. Merge/deploy the reviewed candidate only with release authorization; identify frontend/backend deployed SHAs and public alias.
+5. In two fresh browser contexts, save/reload complete synthetic receipt, test guest isolation and record controlled hosted staging failure/recovery. Verify actual daily cleanup execution and monitoring.
+6. Change blocked criteria to PASS only after those observations.
+
+Rollback was rehearsed locally using previous main backend against the additive schema; local backups restored complete synthetic data. On public isolation, durability, idempotency or false-success regressions, disable the candidate, retain redacted evidence and use the compatible application/backup procedure in [stabilization runbook](../runbooks/stabilization.md). Never use fixture fallback or owner-authenticated bypass as public acceptance.
+
+Current PR: [#50](https://github.com/anmolsansi/OrderlyApp/pull/50). [Two fresh-browser catalog observations](../qa/st11-st13-acceptance/public-access.json) and [public journey/guest-bootstrap failure](../qa/st11-st13-acceptance/public-journey.json) contain only safe status/headings/error evidence; no cookies or contact payloads. Final evidence-only commit checks are attached to the PR, independently of the validated source above.

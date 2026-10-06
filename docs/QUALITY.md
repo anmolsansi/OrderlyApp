@@ -17,7 +17,7 @@ The current workflow is `.github/workflows/ci.yml` (`Stabilization CI`). It runs
 - current scan artifacts uploaded;
 - job fails if either ecosystem audit fails.
 
-Current ST-12 post-merge evidence on SHA `934208c36d323e39d9f6ddcfcc3805cbd979507f` reported zero npm vulnerabilities and no known Python vulnerabilities.
+Current ST-12 candidate evidence on SHA `64a6f412c03731e997c9a96e91e849bc4cf998e4` reported zero npm vulnerabilities and no known Python vulnerabilities.
 
 ### Web quality
 
@@ -64,7 +64,7 @@ Before browser tests it:
 - verifies `/health/ready` reports ready, API mode, required dependencies `ok`, and the exact GitHub source SHA;
 - lists the API-mode Playwright suite and fails if no mandatory tests are discovered.
 
-The current ST-12 candidate discovered and passed 23 API-mode Chromium tests.
+The current ST-12 candidate passed 35 API-mode Chromium tests with zero skipped assertions.
 
 ### Local fixture preview E2E
 
@@ -152,6 +152,6 @@ Error evidence should contain safe error codes, request IDs, states/counts, and 
 
 ## Current Candidate Evidence
 
-ST-12 post-merge run `37347582799` passed all required jobs on exact `main` SHA `934208c36d323e39d9f6ddcfcc3805cbd979507f`.
+ST-12 [run 37428142914](https://github.com/anmolsansi/OrderlyApp/actions/runs/37428142914) passed all seven required jobs on exact candidate SHA `64a6f412c03731e997c9a96e91e849bc4cf998e4`.
 
 This establishes repository candidate quality. It does **not** establish ST-13 public deployment acceptance because public unauthenticated access/current backend identity/INT-02 recovery rehearsal remain separate gates. See [`releases/stabilization-acceptance.md`](releases/stabilization-acceptance.md).

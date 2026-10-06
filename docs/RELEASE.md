@@ -4,9 +4,9 @@
 
 ### Candidate identity
 
-- Repository source: `main`
-- ST-12 merge/source SHA: `934208c36d323e39d9f6ddcfcc3805cbd979507f`
-- Post-merge Stabilization CI: run `37347582799` — all required jobs passed.
+- Repository candidate: `fix/st11-st13-acceptance`; existing public frontend remains on older `main`.
+- ST-12 runtime/audit source SHA: `64a6f412c03731e997c9a96e91e849bc4cf998e4`
+- Stabilization CI: [run 37428142914](https://github.com/anmolsansi/OrderlyApp/actions/runs/37428142914) — all seven jobs passed.
 - Current release acceptance: **Not completed**.
 
 ### Stabilized behavior
@@ -26,9 +26,7 @@
 
 ### Current hosted evidence / blocker
 
-The exact candidate SHA has a READY Vercel production build (`dpl_DiDAHxxRJcCboiSqWiFJjSC2NPsU`), but its current `vercel.app` aliases require Vercel developer authentication. A fresh public visitor therefore has not passed ST-13 AC2.
-
-The observed Render OrderlyApp service is also not the current backend candidate: its only observed deployment is an older ST-09 SHA and ended `update_failed`. INT-02/current public recovery evidence is not present.
+The existing main frontend is READY. Its public alias opens anonymously, while its immutable URL redirects to Vercel SSO. Catalog initially returned 504, then recovered to 200 in two fresh anonymous browsers. Guest creation returns 503 `invalid_config` for `ORDERLY_DATA_MODE`, and public manual checkout failed. The separately observed backend readiness URL times out. This follow-up branch has not been deployed; current Render service identity/configuration is unverified. Local recovery now has a report, but hosted staging/public two-guest receipt evidence remains blocked.
 
 Therefore a READY frontend build must **not** be described as an accepted public release yet. See [`releases/stabilization-acceptance.md`](releases/stabilization-acceptance.md).
 
@@ -38,7 +36,7 @@ Therefore a READY frontend build must **not** be described as an accepted public
 - Genuine lint / contracts / frontend units / typecheck / production build — PASS
 - Backend/PostgreSQL migrations + regression + transaction-consistent recovery — PASS
 - Chromium provision/launch — PASS
-- API-mode product E2E — 23/23 PASS
+- API-mode product E2E — 35/35 PASS
 - Explicit `local_demo` safety E2E — PASS
 - Fail-closed release evidence — PASS
 

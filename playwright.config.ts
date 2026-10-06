@@ -9,10 +9,14 @@ export default defineConfig({
   expect: { timeout: 5_000 },
   fullyParallel: false,
   workers: 1,
-  reporter: 'list',
+  forbidOnly: Boolean(process.env.CI),
+  reporter: process.env.CI
+    ? [['list'], ['json', { outputFile: 'test-results/report.json' }]]
+    : 'list',
   use: {
     baseURL,
-    trace: 'on-first-retry',
+    trace: 'off',
+    screenshot: 'only-on-failure',
   },
   webServer: skipWebServer
     ? undefined

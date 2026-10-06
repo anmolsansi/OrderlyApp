@@ -35,3 +35,11 @@ def postgres_connection(postgres_database_url: str) -> Iterator[Any]:
 
     with psycopg.connect(postgres_database_url) as connection:
         yield connection
+
+
+def pytest_sessionfinish(session, exitstatus: int) -> None:
+    """Mandatory hosted acceptance cannot silently omit a backend assertion."""
+    reporter = session.config.pluginmanager.get_plugin("terminalreporter")
+    if os.getenv("CI", "").lower() == "true" and reporter and reporter.stats.get("skipped"):
+        reporter.write_sep("!", "Hosted backend suite must run without skipped tests")
+        session.exitstatus = pytest.ExitCode.TESTS_FAILED

@@ -2,7 +2,7 @@
 
 OrderlyApp is a stabilized **manual food-ordering portfolio demo** built with Next.js and FastAPI. The accepted product path is intentionally mock-only: visitors can browse a canonical pizza catalog, customize items, maintain a private guest basket, review a server-priced quote, place an idempotent mock order, and reopen the immutable receipt. No real payment is collected.
 
-> **Current release status — October 5, 2026:** implementation and release CI are green on `main` at `934208c36d323e39d9f6ddcfcc3805cbd979507f`, but the public release is **not accepted yet**. The exact Vercel build is protected by developer authentication and the available Render backend is not the current candidate. See [development.md](development.md) and [the stabilization acceptance record](docs/releases/stabilization-acceptance.md) for the current gate state. Voice, real accounts, real payments, and real restaurant integrations are outside this stabilization release.
+> **Current release status — October 6, 2026:** ST-11 operations and ST-12 repository/CI acceptance pass on the follow-up candidate; the public release is **not accepted**. The existing main frontend alias opens anonymously, but guest creation returns 503 `invalid_config` for `ORDERLY_DATA_MODE`. See [development.md](development.md) and [current acceptance identities/blockers](docs/releases/stabilization-acceptance.md). Voice, real accounts, real payments and restaurant integrations remain deferred.
 
 ## What the stabilized candidate supports
 
@@ -129,7 +129,7 @@ npm run build
 
 Backend tests use the pinned tooling in `backend/requirements-test.lock` and require the documented PostgreSQL test environment. Browser release coverage uses Playwright Chromium and includes separate API-mode and `local_demo` gates.
 
-Current post-merge ST-12 evidence for source SHA `934208c36d323e39d9f6ddcfcc3805cbd979507f` is GitHub Actions run `37347582799`; every required release-CI job passed. This proves the repository candidate, not public deployment acceptance.
+Current ST-12 runtime/audit candidate `64a6f412c03731e997c9a96e91e849bc4cf998e4` passed all seven jobs in [run 37428142914](https://github.com/anmolsansi/OrderlyApp/actions/runs/37428142914). This proves the repository candidate, not public deployment acceptance.
 
 ## Safety and privacy
 

@@ -303,3 +303,5 @@ Before declaring ST-11 complete, record one exact source SHA proving:
 - backup/restore rehearsal recovers the selected synthetic receipt
 
 ST-12 may expand CI/dependency gates. ST-13 decides release readiness. ST-11 does not claim those later gates on its own.
+
+Readiness uses a read-only transaction and a two-second PostgreSQL statement timeout as well as the two-second connection timeout. A locked migration ledger returns 503 instead of hanging the probe; liveness remains process-only.

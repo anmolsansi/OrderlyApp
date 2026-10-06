@@ -40,6 +40,8 @@ class _ReadyConnection:
 
     def execute(self, query: str, _params: object = None) -> _Rows:
         normalized = " ".join(query.split())
+        if normalized in ("SET TRANSACTION READ ONLY", "SET LOCAL statement_timeout = '2s'"):
+            return _Rows([])
         if normalized == "SELECT 1":
             return _Rows([{"?column?": 1}])
         if "to_regclass('public.schema_migrations')" in normalized:
@@ -315,10 +317,12 @@ def test_checkout_rate_limit_response_has_retry_after() -> None:
     }
 
 
+@pytest.mark.parametrize("revoked", [False, True])
 def test_cleanup_purges_expired_guest_and_preserves_active_guest(
     postgres_connection: Any,
     postgres_database_url: str,
     monkeypatch,
+    revoked: bool,
 ) -> None:
     now = datetime.now(timezone.utc)
     expired_id = f"guest-{uuid4()}"
@@ -346,6 +350,24 @@ def test_cleanup_purges_expired_guest_and_preserves_active_guest(
         "INSERT INTO guest_carts (owner_id, revision, items) VALUES (%s, 0, '[]'::jsonb), (%s, 0, '[]'::jsonb)",
         (expired_id, active_id),
     )
+    if revoked:
+        postgres_connection.execute(
+            "UPDATE guest_sessions SET expires_at = %s, revoked_at = %s WHERE id = %s",
+            (now + timedelta(days=1), now, expired_id),
+        )
+    receipt_ids = {}
+    fixture = json.loads((REPOSITORY_ROOT / "tests/fixtures/contracts/c5.json").read_text())
+    for owner in (expired_id, active_id):
+        receipt = dict(fixture["positive"]["receipt"], id=str(uuid4()))
+        receipt_ids[owner] = receipt["id"]
+        postgres_connection.execute(
+            "INSERT INTO guest_orders (id, owner_id, snapshot, created_at) VALUES (%s, %s, %s::jsonb, %s)",
+            (receipt["id"], owner, json.dumps(receipt), receipt["created_at"]),
+        )
+        postgres_connection.execute(
+            "INSERT INTO order_idempotency (owner_id, idempotency_key, payload_sha256, order_id) VALUES (%s, %s, %s, %s)",
+            (owner, str(uuid4()), "a" * 64, receipt["id"]),
+        )
     postgres_connection.commit()
 
     cleanup_expired_guests(now=now, batch_size=100)
@@ -371,6 +393,14 @@ def test_cleanup_purges_expired_guest_and_preserves_active_guest(
     assert expired_cart is None
     assert active is not None
     assert active_cart is not None
+    for table in ("guest_orders", "order_idempotency"):
+        assert postgres_connection.execute(
+            f"SELECT count(*) FROM {table} WHERE owner_id = %s", (expired_id,)
+        ).fetchone()[0] == 0
+        assert postgres_connection.execute(
+            f"SELECT count(*) FROM {table} WHERE owner_id = %s", (active_id,)
+        ).fetchone()[0] == 1
+    assert cleanup_expired_guests(now=now, batch_size=100) == 0
 
     postgres_connection.execute("DELETE FROM guest_sessions WHERE id = %s", (active_id,))
     postgres_connection.commit()
@@ -539,3 +569,76 @@ def test_serving_manifests_keep_seed_out_of_api_startup() -> None:
     )[0]
     assert "startCommand: uvicorn app.main:app" in api_render_block
     assert "seed_postgres.py" not in api_render_block
+
+def test_readiness_is_bounded_by_real_ledger_lock(
+    postgres_database_url: str, monkeypatch,
+) -> None:
+    import time
+    import psycopg
+
+    _configure_ready_environment(monkeypatch)
+    monkeypatch.setenv("DATABASE_URL", postgres_database_url)
+    with psycopg.connect(postgres_database_url) as blocker:
+        blocker.execute("LOCK TABLE schema_migrations IN ACCESS EXCLUSIVE MODE")
+        started = time.monotonic()
+        response = TestClient(app).get("/health/ready")
+        assert response.status_code == 503
+        assert time.monotonic() - started < 5
+        assert TestClient(app).get("/health/live").status_code == 200
+        blocker.rollback()
+    assert TestClient(app).get("/health/ready").status_code == 200
+
+
+def test_cleanup_enforces_batch_limit(postgres_connection, postgres_database_url, monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", postgres_database_url)
+    monkeypatch.delenv("REDIS_URL", raising=False)
+    now = datetime.now(timezone.utc)
+    owners = [f"guest-batch-{uuid4()}" for _ in range(101)]
+    for owner in owners:
+        postgres_connection.execute(
+            "INSERT INTO guest_sessions (id, token_hash, created_at, expires_at) VALUES (%s, %s, %s, %s)",
+            (owner, uuid4().hex, now - timedelta(days=2), now - timedelta(days=1)),
+        )
+    postgres_connection.commit()
+    assert cleanup_expired_guests(now=now, batch_size=100) == 100
+    assert postgres_connection.execute(
+        "SELECT count(*) FROM guest_sessions WHERE id = ANY(%s)", (owners,)
+    ).fetchone()[0] == 1
+    assert cleanup_expired_guests(now=now, batch_size=100) == 1
+    assert cleanup_expired_guests(now=now, batch_size=100) == 0
+
+
+def test_additive_upgrade_of_old_ledger_with_concurrent_migrators(
+    postgres_database_url, monkeypatch,
+):
+    import psycopg
+    from psycopg import sql
+    from psycopg.conninfo import make_conninfo
+    from concurrent.futures import ThreadPoolExecutor
+
+    name = f"orderly_upgrade_{uuid4().hex}"
+    admin_url = make_conninfo(postgres_database_url, dbname="postgres")
+    upgrade_url = make_conninfo(postgres_database_url, dbname=name)
+    with psycopg.connect(admin_url, autocommit=True) as admin:
+        admin.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name)))
+        try:
+            with psycopg.connect(upgrade_url) as old:
+                old.execute((REPOSITORY_ROOT / "backend/migrations/001_initial.sql").read_text())
+                old.execute("CREATE TABLE schema_migrations (version TEXT PRIMARY KEY, applied_at TIMESTAMPTZ DEFAULT now())")
+                old.execute("INSERT INTO schema_migrations (version) VALUES ('001_initial.sql')")
+                old.execute("INSERT INTO orders (id, session_id, cart_items, subtotal_cents, status) VALUES ('legacy-upgrade', 'untrusted-old-session', '[]', 0, 'Placed')")
+            monkeypatch.setenv("DATABASE_URL", upgrade_url)
+            monkeypatch.delenv("ORDERLY_FORCE_JSON_STORE", raising=False)
+            migrate = _load_migrate_module()
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                futures = [executor.submit(migrate.main) for _ in range(2)]
+                for future in futures:
+                    future.result(timeout=15)
+            with psycopg.connect(upgrade_url) as upgraded:
+                assert upgraded.execute("SELECT id FROM orders").fetchall() == [("legacy-upgrade",)]
+                assert upgraded.execute("SELECT count(*) FROM guest_orders").fetchone()[0] == 0
+                rows = upgraded.execute("SELECT version, checksum_sha256 FROM schema_migrations").fetchall()
+                assert {row[0] for row in rows} == main_module._expected_migration_versions()
+                assert all(len(row[1]) == 64 for row in rows)
+        finally:
+            admin.execute(sql.SQL("DROP DATABASE {} WITH (FORCE)").format(sql.Identifier(name)))
