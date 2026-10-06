@@ -733,7 +733,7 @@ export function loadCheckoutRecovery(storage: Storage | undefined): CheckoutReco
   if (!storage) return null;
   try {
     const raw = storage.getItem(CHECKOUT_RECOVERY_STORAGE_KEY);
-    if (!raw) return undefined;
+    if (raw === null) return undefined;
     const parsed = JSON.parse(raw) as unknown;
     return isStoredCheckoutRecovery(parsed) ? parsed : null;
   } catch {

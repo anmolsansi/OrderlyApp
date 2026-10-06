@@ -623,6 +623,7 @@ describe('ST-09 recovery corruption', () => {
   it('distinguishes a damaged unresolved record from an empty recovery store', () => {
     const storage = { getItem: () => '{broken' } as unknown as Storage;
     expect(loadCheckoutRecovery(storage)).toBeNull();
+    expect(loadCheckoutRecovery({ getItem: () => '' } as unknown as Storage)).toBeNull();
     expect(loadCheckoutRecovery({ getItem: () => null } as unknown as Storage)).toBeUndefined();
   });
   it('rejects a 36-character non-UUID recovery key', () => {

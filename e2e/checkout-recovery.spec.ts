@@ -164,9 +164,10 @@ test('direct local_demo checkout, receipt, and history routes stay unavailable',
 });
 
 
-test('damaged recovery storage blocks a new order while preserving the durable basket', async ({ page }) => {
+for (const damaged of ['{broken', '']) {
+test(`damaged recovery storage (${damaged || 'empty value'}) blocks a new order while preserving the durable basket`, async ({ page }) => {
   await prepareApiCheckout(page);
-  await page.evaluate(key => sessionStorage.setItem(key, '{broken'), RECOVERY_STORAGE_KEY);
+  await page.evaluate(({ key, value }) => sessionStorage.setItem(key, value), { key: RECOVERY_STORAGE_KEY, value: damaged });
   let submits = 0;
   page.on('request', request => { if (new URL(request.url()).pathname === '/api/orderly/orders' && request.method() === 'POST') submits++; });
   await page.reload();
@@ -174,8 +175,9 @@ test('damaged recovery storage blocks a new order while preserving the durable b
   await expect(page.getByRole('button', { name: /place mock order/i })).toBeDisabled();
   await expect(page.getByText(/pepperoni feast/i)).toBeVisible();
   expect(submits).toBe(0);
-  expect(await page.evaluate(key => sessionStorage.getItem(key), RECOVERY_STORAGE_KEY)).toBe('{broken');
+  expect(await page.evaluate(key => sessionStorage.getItem(key), RECOVERY_STORAGE_KEY)).toBe(damaged);
 });
+}
 
 test('pending submission ignores a second form submit and clears the basket once', async ({ page }) => {
   await prepareApiCheckout(page);
