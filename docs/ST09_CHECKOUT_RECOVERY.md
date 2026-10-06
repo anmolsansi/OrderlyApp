@@ -24,7 +24,7 @@ Checkout has five explicit states:
 - `accepted` — a valid 200/201 immutable receipt was returned by the server.
 - `rejected` — the server returned a definitive failure, or local validation/storage failed before an order could be accepted.
 
-An HTTP 4xx/5xx response is definitive. It is not `uncertain`. Only transport failure or timeout after the POST was sent creates the uncertain state.
+Known 4xx validation/conflict/session responses are definitive. After the order POST, transport failure, any 5xx, or a malformed accepted response is uncertain: none proves whether a commit happened. Preserve the original key/body for replay.
 
 ## Idempotency and recovery
 

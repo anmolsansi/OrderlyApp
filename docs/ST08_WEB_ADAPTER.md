@@ -49,6 +49,7 @@ The default is `api` for compatibility with existing environments. Any other exp
     code: string,
     message: string,
     requestId?: string,
+    status?: number,
     fields?: string[],
     currentCart?: RevisionedCart,
   },
@@ -95,7 +96,7 @@ The accepted basket is not optimistically overwritten.
 3. Wait for the server result.
 4. Replace accepted state only with the successful canonical response.
 5. Clear the API draft.
-6. Update the temporary legacy checkout mirror.
+6. Update the legacy presentation mirror; checkout still reads the authoritative C4 cart.
 
 ### Validation/network/server failure
 
