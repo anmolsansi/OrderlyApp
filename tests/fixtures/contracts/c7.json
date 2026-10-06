@@ -9,8 +9,9 @@
         {
           "id": "fixture-r1",
           "name": "Fixture cafe",
-          "deliveryFeeCents": 199,
+          "cuisine": "Synthetic",
           "isOpen": true,
+          "deliveryFeeCents": 199,
           "menu": [
             {
               "id": "fixture-i1",
@@ -20,18 +21,126 @@
               "modifierGroups": [
                 {
                   "id": "size",
+                  "name": "Size",
+                  "type": "single",
+                  "required": true,
+                  "minSelected": 1,
+                  "maxSelected": 1,
                   "defaultOptionId": "small",
                   "options": [
                     {
                       "id": "small",
+                      "name": "Small",
                       "priceDeltaCents": 0,
+                      "available": true
+                    },
+                    {
+                      "id": "large",
+                      "name": "Large",
+                      "priceDeltaCents": 300,
                       "available": true
                     }
                   ]
+                },
+                {
+                  "id": "extras",
+                  "name": "Extras",
+                  "type": "multiple",
+                  "required": false,
+                  "minSelected": 0,
+                  "maxSelected": 2,
+                  "options": [
+                    {
+                      "id": "sauce",
+                      "name": "Sauce",
+                      "priceDeltaCents": 100,
+                      "available": true
+                    },
+                    {
+                      "id": "sold-out",
+                      "name": "Sold out extra",
+                      "priceDeltaCents": 200,
+                      "available": false
+                    }
+                  ]
+                }
+              ],
+              "description": "Synthetic fixture only",
+              "imageEmoji": "M",
+              "popular": false
+            }
+          ],
+          "rating": 4.8,
+          "deliveryMinutes": "10-20 min",
+          "imageEmoji": "R",
+          "tags": [],
+          "distanceMiles": 0,
+          "imageAlt": "Fixture cafe restaurant image",
+          "menuCategories": [
+            {
+              "id": "menu",
+              "name": "Menu",
+              "items": [
+                {
+                  "id": "fixture-i1",
+                  "name": "Fixture meal",
+                  "priceCents": 1000,
+                  "available": true,
+                  "modifierGroups": [
+                    {
+                      "id": "size",
+                      "name": "Size",
+                      "type": "single",
+                      "required": true,
+                      "minSelected": 1,
+                      "maxSelected": 1,
+                      "defaultOptionId": "small",
+                      "options": [
+                        {
+                          "id": "small",
+                          "name": "Small",
+                          "priceDeltaCents": 0,
+                          "available": true
+                        },
+                        {
+                          "id": "large",
+                          "name": "Large",
+                          "priceDeltaCents": 300,
+                          "available": true
+                        }
+                      ]
+                    },
+                    {
+                      "id": "extras",
+                      "name": "Extras",
+                      "type": "multiple",
+                      "required": false,
+                      "minSelected": 0,
+                      "maxSelected": 2,
+                      "options": [
+                        {
+                          "id": "sauce",
+                          "name": "Sauce",
+                          "priceDeltaCents": 100,
+                          "available": true
+                        },
+                        {
+                          "id": "sold-out",
+                          "name": "Sold out extra",
+                          "priceDeltaCents": 200,
+                          "available": false
+                        }
+                      ]
+                    }
+                  ],
+                  "description": "Synthetic fixture only",
+                  "imageEmoji": "M",
+                  "popular": false
                 }
               ]
             }
-          ]
+          ],
+          "status": "open"
         }
       ]
     },
@@ -48,7 +157,15 @@
             "name": "Fixture meal",
             "basePriceCents": 1000,
             "quantity": 1,
-            "modifiers": []
+            "modifiers": [
+              {
+                "groupId": "size",
+                "optionIds": [
+                  "small"
+                ]
+              }
+            ],
+            "specialInstructions": "Synthetic fixture only"
           }
         ]
       }
@@ -58,7 +175,7 @@
       "data": {
         "schemaVersion": 1,
         "cartRevision": 1,
-        "catalogFingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "catalogFingerprint": "765f7cf419e98eef30e35b65c7a53156f7b72e415155dd019f650278084d7293",
         "totals": {
           "subtotalCents": 1000,
           "discountCents": 500,
@@ -75,7 +192,7 @@
       "idempotencyKey": "11111111-1111-4111-8111-111111111111",
       "submission": {
         "expectedRevision": 1,
-        "catalogFingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "catalogFingerprint": "765f7cf419e98eef30e35b65c7a53156f7b72e415155dd019f650278084d7293",
         "checkout": {
           "name": "Demo Visitor",
           "phone": "+1-555-0100",
@@ -108,7 +225,19 @@
             "unitPriceCents": 1000,
             "quantity": 1,
             "lineTotalCents": 1000,
-            "modifiers": [],
+            "modifiers": [
+              {
+                "groupId": "size",
+                "name": "Size",
+                "options": [
+                  {
+                    "id": "small",
+                    "name": "Small",
+                    "priceDeltaCents": 0
+                  }
+                ]
+              }
+            ],
             "specialInstructions": "Synthetic fixture only"
           }
         ],
@@ -163,13 +292,14 @@
       "error": {
         "code": "cart_conflict",
         "message": "Basket changed",
-        "request_id": "synthetic-request-1",
         "fields": [],
         "currentCart": {
           "schemaVersion": 1,
           "revision": 2,
           "items": []
-        }
+        },
+        "requestId": "synthetic-request-1",
+        "status": 409
       }
     },
     {
@@ -179,8 +309,7 @@
       "error": {
         "code": "invalid_response",
         "message": "The API returned an unexpected response shape",
-        "request_id": "synthetic-request-2",
-        "fields": []
+        "requestId": "synthetic-request-2"
       }
     },
     {
@@ -190,8 +319,11 @@
       "error": {
         "code": "invalid_cart",
         "message": "Cart contains invalid catalog choices",
-        "request_id": "synthetic-request-3",
-        "fields": ["items.0.menu_item_id"]
+        "fields": [
+          "items.0.menu_item_id"
+        ],
+        "requestId": "synthetic-request-3",
+        "status": 422
       }
     },
     {
@@ -201,8 +333,9 @@
       "error": {
         "code": "session_expired",
         "message": "Guest session expired",
-        "request_id": "synthetic-request-4",
-        "fields": []
+        "fields": [],
+        "requestId": "synthetic-request-4",
+        "status": 401
       }
     },
     {
@@ -211,9 +344,7 @@
       "kind": "network",
       "error": {
         "code": "network_error",
-        "message": "The API could not be reached",
-        "request_id": "synthetic-request-5",
-        "fields": []
+        "message": "The API could not be reached"
       }
     },
     {
@@ -223,8 +354,9 @@
       "error": {
         "code": "storage_unavailable",
         "message": "Cart storage is unavailable",
-        "request_id": "synthetic-request-6",
-        "fields": []
+        "fields": [],
+        "requestId": "synthetic-request-6",
+        "status": 503
       }
     },
     {
@@ -234,9 +366,7 @@
       "checkout_state": "uncertain",
       "error": {
         "code": "network_error",
-        "message": "Order result is uncertain; retry with the same key",
-        "request_id": "synthetic-request-7",
-        "fields": []
+        "message": "Order result is uncertain; retry with the same key"
       }
     },
     {
@@ -246,8 +376,9 @@
       "error": {
         "code": "order_not_found",
         "message": "Order not found",
-        "request_id": "synthetic-request-8",
-        "fields": []
+        "fields": [],
+        "requestId": "synthetic-request-8",
+        "status": 404
       }
     },
     {
@@ -256,8 +387,19 @@
       "kind": "validation",
       "error": {
         "code": "local_demo_orders_unavailable",
-        "message": "Order receipts are unavailable in fixture preview",
-        "request_id": "synthetic-request-9",
+        "message": "Order receipts are unavailable in fixture preview"
+      }
+    },
+    {
+      "name": "server_uncertain_after_submit",
+      "ok": false,
+      "kind": "network",
+      "checkout_state": "uncertain",
+      "error": {
+        "code": "storage_unavailable",
+        "message": "Order storage is unavailable",
+        "status": 503,
+        "requestId": "synthetic-request-10",
         "fields": []
       }
     }
