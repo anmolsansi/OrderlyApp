@@ -6,6 +6,7 @@ export interface ApiErrorDetails {
   code: string;
   message: string;
   requestId?: string;
+  status?: number;
   fields?: string[];
   currentCart?: RevisionedCart;
 }

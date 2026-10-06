@@ -140,6 +140,7 @@ async function parseErrorResponse(response: Response): Promise<ApiFailure> {
   const currentCart = normalizeRevisionedCart(envelope?.current_cart);
 
   return failure(errorKind(response.status), code, message, {
+    status: response.status,
     ...(requestId ? { requestId } : {}),
     ...(fields ? { fields } : {}),
     ...(currentCart ? { currentCart } : {}),
@@ -664,7 +665,8 @@ export async function submitCheckoutOrder(
     true,
   );
 
-  if (!result.ok && (result.error.code === 'upstream_timeout' || result.error.code === 'upstream_unavailable')) {
+  // A server/receipt-shape error cannot prove that the checkout did not commit.
+  if (!result.ok && ((result.error.status ?? 0) >= 500 || result.error.code === 'invalid_response')) {
     return { ...result, kind: 'network' };
   }
   return result;
@@ -676,7 +678,10 @@ export async function fetchOrderReceipt(orderId: string): Promise<ApiResult<Orde
   }
   return requestJson(
     `${getApiBaseUrl()}/orders/${encodeURIComponent(orderId)}`,
-    normalizeOrderReceipt,
+    payload => {
+      const receipt = normalizeOrderReceipt(payload);
+      return receipt?.id.toLowerCase() === orderId.toLowerCase() ? receipt : undefined;
+    },
     { cache: 'no-store' },
     true,
   );

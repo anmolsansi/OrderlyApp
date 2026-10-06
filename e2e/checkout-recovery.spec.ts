@@ -113,13 +113,13 @@ test('definitive order API failure keeps the durable basket and never invents co
       return;
     }
     await route.fulfill({
-      status: 503,
+      status: 422,
       contentType: 'application/json',
       body: JSON.stringify({
         error: {
-          code: 'storage_unavailable',
-          message: 'Order storage is unavailable',
-          request_id: 'synthetic-e2e-order-503',
+          code: 'invalid_checkout',
+          message: 'Checkout details were rejected',
+          request_id: 'synthetic-e2e-order-422',
           fields: [],
         },
       }),
@@ -128,7 +128,7 @@ test('definitive order API failure keeps the durable basket and never invents co
 
   await page.getByRole('button', { name: /place mock order/i }).click();
   await expect(page).toHaveURL(/\/checkout/);
-  await expect(page.getByText(/order storage is unavailable/i)).toBeVisible();
+  await expect(page.getByText(/checkout details were rejected/i)).toBeVisible();
   await expect(page.getByText(/pepperoni feast/i)).toBeVisible();
   expect(await page.evaluate(key => sessionStorage.getItem(key), RECOVERY_STORAGE_KEY)).toBeNull();
 
