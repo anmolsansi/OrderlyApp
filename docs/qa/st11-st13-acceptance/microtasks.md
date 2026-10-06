@@ -43,7 +43,7 @@ Each check below is complete only when current evidence is recorded. Group relat
 - [x] M36: Push green CI microcommit.
 - [x] M37: Reconcile all ST13-owned active and historical docs.
 - [x] M38: Refresh exact Vercel deployment identity read only.
-- [ ] M39: Inspect Render service in explicitly selected workspace.
+- [x] M39: Inspect Render service in explicitly selected workspace.
 - [x] M40: Record fresh unauthenticated public access result.
 - [x] M41: Record backend readiness and gateway result.
 - [x] M42: Prepare current acceptance ledger with honest blockers.
@@ -54,4 +54,4 @@ Each check below is complete only when current evidence is recorded. Group relat
 
 Evidence: `docs/qa/st11-st13-acceptance/results.md` and `docs/releases/stabilization-acceptance.md`. Public or staging criteria stay pending when prerequisites are missing.
 
-Publication: [PR50](https://github.com/anmolsansi/OrderlyApp/pull/50). M39 is pending the required explicit Render workspace selection. M46 remains blocked: fresh public browsers load catalog, but guest bootstrap is 503 invalid_config for ORDERLY_DATA_MODE; no public receipt is accepted. M44 has exact green PR candidate a5a46a0; final evidence-only commit checks are tracked in the PR.
+Publication: [PR50](https://github.com/anmolsansi/OrderlyApp/pull/50) is merged; merged-main CI run 37431711534 passed. M39 is complete after the user confirmed Anmol's workspace (`tea-d7so32sm0tmc73dc3cp0`). M46 remains blocked: guest bootstrap, basket and quote now pass, but checkout returns 503 `rate_limit_unavailable`. The free limiter is available; its private URL must be connected before rerunning public receipt/isolation acceptance. Hosted staging recovery and cleanup evidence remain separate pending gates.

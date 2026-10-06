@@ -45,3 +45,13 @@ Document check: all 18 active owned/evidence documents have existing local Markd
 Later public observations supersede the initial catalog-only timeout diagnosis: two fresh anonymous browsers loaded catalog (HTTP 200), but guest bootstrap returns **503 `invalid_config`, field `ORDERLY_DATA_MODE`**, and the public manual journey failed. No successful public receipt or guest isolation is claimed. The immutable URL still redirects to SSO, and the separately observed Render readiness URL still times out. Runtime mode/configuration and actual backend routing must be inspected and repaired in the authorized release operation. The requested Render workspace selection remains pending.
 
 All owned disposable servers were stopped, temporary restore DB/dump cleaned, and generated Next/pytest artifacts removed. Pre-existing unrelated QA and graph artifacts remain untouched.
+
+## Confirmed workspace deployment follow-up — October 6, 2026
+
+PR50 is merged at c0931252fe652d8f14254db6687c228f4db8c5c5; merged-main CI run 37431711534 passed all seven gates. The user confirmed workspace tea-d7so32sm0tmc73dc3cp0 (Anmol's workspace); its OrderlyApp service srv-d7sobtkm0tmc73dcb65g serves https://orderlyapp.onrender.com. The previously inspected Job Grid workspace and orderlyapp-int01-api backend were the wrong account and do not establish this deployment's state.
+
+Set ORDERLY_DATA_MODE=api and configured a secure signing secret through merge-only environment updates. No secret/cookie is included in this report. Automatic deployment dep-db2b4ju0tbcc738jpqn0 became live on merged main. Readiness is 200, ready=true, mode=api, with configuration/PostgreSQL/schema/rate-limit configuration checks passing. Vercel deployment dpl_2FbVtUZmEMggR5ztcLxxac2srLJH is READY at the same source SHA.
+
+Fresh public Chromium journey passes profile, API session, menu customization, persisted basket and server quote; POST /api/orderly/orders fails with 503 rate_limit_unavailable. No saved receipt or guest-isolation PASS is claimed. Redacted statuses: [confirmed-public-journey.json](confirmed-public-journey.json). Created free Virginia Key Value red-db2b6jh7lnhs73earc9g (orderlyapp-checkout-limiter), available, persistence off, noeviction, external access disabled. It is not yet linked: the connector exposes metadata but not connection info; the dashboard requires user sign-in to obtain its authoritative Internal URL. No paid resource or cleanup scheduler was activated.
+
+Earlier dated public failures above are historical; this section supersedes the active mode/secret and wrong-account diagnosis. ST13.03 and INT02 hosted recovery remain Not completed.

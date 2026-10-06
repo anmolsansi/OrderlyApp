@@ -4,9 +4,9 @@
 
 ### Candidate identity
 
-- Repository candidate: `fix/st11-st13-acceptance`; existing public frontend remains on older `main`.
-- ST-12 runtime/audit source SHA: `64a6f412c03731e997c9a96e91e849bc4cf998e4`
-- Stabilization CI: [run 37428142914](https://github.com/anmolsansi/OrderlyApp/actions/runs/37428142914) — all seven jobs passed.
+- Merged source: `c0931252fe652d8f14254db6687c228f4db8c5c5` from [PR #50](https://github.com/anmolsansi/OrderlyApp/pull/50).
+- Merged-main CI: [run 37431711534](https://github.com/anmolsansi/OrderlyApp/actions/runs/37431711534) — all seven jobs passed.
+- Public Vercel and Render deployment identities: [current acceptance ledger](releases/stabilization-acceptance.md).
 - Current release acceptance: **Not completed**.
 
 ### Stabilized behavior
@@ -26,7 +26,7 @@
 
 ### Current hosted evidence / blocker
 
-The existing main frontend is READY. Its public alias opens anonymously, while its immutable URL redirects to Vercel SSO. Catalog initially returned 504, then recovered to 200 in two fresh anonymous browsers. Guest creation returns 503 `invalid_config` for `ORDERLY_DATA_MODE`, and public manual checkout failed. The separately observed backend readiness URL times out. This follow-up branch has not been deployed; current Render service identity/configuration is unverified. Local recovery now has a report, but hosted staging/public two-guest receipt evidence remains blocked.
+PR #50 is merged at `c0931252fe652d8f14254db6687c228f4db8c5c5`; both public platforms deploy that SHA, and all seven merged-main CI jobs passed. In the user-confirmed Render workspace, `OrderlyApp` at `https://orderlyapp.onrender.com` now returns readiness 200 after API-mode and signing-secret configuration repairs. The public alias opens anonymously; guest creation, basket persistence and quote succeed (200). Mock order submission still returns 503 `rate_limit_unavailable`. A free private limiter is available but its connection URL has not yet been linked. Public receipt/isolation acceptance, isolated hosted recovery and actual cleanup scheduling remain pending. See [current acceptance ledger](releases/stabilization-acceptance.md).
 
 Therefore a READY frontend build must **not** be described as an accepted public release yet. See [`releases/stabilization-acceptance.md`](releases/stabilization-acceptance.md).
 

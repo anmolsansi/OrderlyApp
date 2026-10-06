@@ -1,0 +1,72 @@
+{
+  "date": "2026-10-06",
+  "source_sha": "c0931252fe652d8f14254db6687c228f4db8c5c5",
+  "backend": "https://orderlyapp.onrender.com",
+  "frontend": "https://orderly-app-eight.vercel.app",
+  "result": "NOT_COMPLETED",
+  "steps": [
+    {
+      "case": "submit mock order",
+      "result": "FAIL",
+      "error_type": "Error",
+      "message": "Public order submission rejected"
+    }
+  ],
+  "api_statuses": [
+    {
+      "path": "/api/orderly/restaurants/marios-pizza",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/orderly/restaurants/marios-pizza",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/orderly/session",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/api/orderly/cart",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/orderly/cart",
+      "method": "PUT",
+      "status": 200
+    },
+    {
+      "path": "/api/orderly/cart",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/orderly/restaurants",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/orderly/cart",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/orderly/checkout/quote",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/api/orderly/orders",
+      "method": "POST",
+      "status": 503
+    }
+  ],
+  "failure": {
+    "status": 503,
+    "code": "rate_limit_unavailable",
+    "fields": []
+  }
+}

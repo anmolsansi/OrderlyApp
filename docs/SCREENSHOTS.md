@@ -6,7 +6,7 @@ Capture portfolio media from the **stabilized manual mock-ordering flow**. Voice
 
 Prefer an identified, publicly accepted `api`-mode candidate. Before calling hosted media release evidence, verify [`releases/stabilization-acceptance.md`](releases/stabilization-acceptance.md) shows public access/current backend/receipt durability gates passed.
 
-As of October 6, 2026, the public frontend alias opens but guest creation returns 503 `invalid_config` for `ORDERLY_DATA_MODE`. The immutable Vercel URL still redirects to developer SSO. Public order/receipt portfolio media cannot yet demonstrate accepted hosted behavior; see [current release ledger](releases/stabilization-acceptance.md).
+PR #50 is merged at `c0931252fe652d8f14254db6687c228f4db8c5c5`; both public platforms deploy that SHA, and all seven merged-main CI jobs passed. In the user-confirmed Render workspace, `OrderlyApp` at `https://orderlyapp.onrender.com` now returns readiness 200 after API-mode and signing-secret configuration repairs. The public alias opens anonymously; guest creation, basket persistence and quote succeed (200). Mock order submission still returns 503 `rate_limit_unavailable`. A free private limiter is available but its connection URL has not yet been linked. Public receipt/isolation acceptance, isolated hosted recovery and actual cleanup scheduling remain pending. See [current acceptance ledger](releases/stabilization-acceptance.md).
 
 Local captures are fine for development review but must be labelled as local and must not imply public deployment acceptance.
 

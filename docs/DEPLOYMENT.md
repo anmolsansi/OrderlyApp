@@ -166,11 +166,9 @@ Local endpoints:
 
 ## 8. Current Hosted Evidence — October 6, 2026
 
-Existing main frontend SHA `1eaba8e396f1068f5da577aa29b78ed1cc6d2500` is READY in Vercel (`dpl_B2UzqrDyu1uMV9SBmfNjTWWLzBT3`). The public alias `https://orderly-app-eight.vercel.app` returns anonymous HTTP 200. The immutable URL `https://orderly-2wxyqwwn6-openclawneutron-4687s-projects.vercel.app` redirects to Vercel SSO (302). No developer-authentication bypass was used.
+PR #50 is merged at `c0931252fe652d8f14254db6687c228f4db8c5c5`; both public platforms deploy that SHA, and all seven merged-main CI jobs passed. In the user-confirmed Render workspace, `OrderlyApp` at `https://orderlyapp.onrender.com` now returns readiness 200 after API-mode and signing-secret configuration repairs. The public alias opens anonymously; guest creation, basket persistence and quote succeed (200). Mock order submission still returns 503 `rate_limit_unavailable`. A free private limiter is available but its connection URL has not yet been linked. Public receipt/isolation acceptance, isolated hosted recovery and actual cleanup scheduling remain pending. See [current acceptance ledger](releases/stabilization-acceptance.md).
 
-The public catalog gateway initially returned `504 upstream_timeout`, then recovered to 200 in two fresh anonymous browser contexts. Public `POST /api/orderly/session` returns 503 `invalid_config` because backend `ORDERLY_DATA_MODE` is not `api`. The public manual checkout journey failed. The separately observed Render readiness URL timed out; its relationship to the active gateway target is unverified. Current Render service SHA/configuration is unverified pending explicit workspace selection. Historical failed deploys and old serving-command observations are not current evidence. No public receipt acceptance is claimed.
-
-This follow-up branch has not been deployed. Updating services, applying managed resource links, upgrading plans or activating billed cron is a separately authorized release operation. Current exact identities, local/CI checks and remaining public requirements are in [the acceptance ledger](releases/stabilization-acceptance.md).
+Vercel deployment `dpl_2FbVtUZmEMggR5ztcLxxac2srLJH` and Render deployment `dep-db2b4ju0tbcc738jpqn0` identify the merged SHA. The old `orderlyapp-int01-api` service belongs to a different Render account and is not the current backend. No paid plan or billed cron was activated. Configuration updates merged only the required keys; signing credentials are excluded from evidence.
 
 ## 9. Public Acceptance Checklist
 
