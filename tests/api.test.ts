@@ -577,7 +577,7 @@ describe('ST-09 checkout recovery storage', () => {
       }),
     });
 
-    expect(loadCheckoutRecovery(storage)).toBeUndefined();
+    expect(loadCheckoutRecovery(storage)).toBeNull();
   });
 
   it('fails closed when required recovery storage cannot be written', () => {
@@ -615,5 +615,17 @@ describe('ST-09 uncertain outcomes and exact receipt identity', () => {
   it('rejects a successful exact receipt response containing a different ID', async () => {
     gatewayMock(() => mockJsonResponse(canonicalReceipt));
     await expect(fetchOrderReceipt('00000000-0000-4000-8000-000000000000')).resolves.toMatchObject({ ok: false, error: { code: 'invalid_response' } });
+  });
+});
+
+describe('ST-09 recovery corruption', () => {
+  const valid: CheckoutRecovery = { schemaVersion: 1, idempotencyKey: '11111111-1111-4111-8111-111111111111', submission: orderSubmission };
+  it('distinguishes a damaged unresolved record from an empty recovery store', () => {
+    const storage = { getItem: () => '{broken' } as unknown as Storage;
+    expect(loadCheckoutRecovery(storage)).toBeNull();
+    expect(loadCheckoutRecovery({ getItem: () => null } as unknown as Storage)).toBeUndefined();
+  });
+  it('rejects a 36-character non-UUID recovery key', () => {
+    expect(saveCheckoutRecovery({ setItem: vi.fn() } as unknown as Storage, { ...valid, idempotencyKey: '-'.repeat(36) })).toBe(false);
   });
 });

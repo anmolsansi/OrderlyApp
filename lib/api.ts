@@ -725,19 +725,19 @@ function isStoredCheckoutRecovery(value: unknown): value is CheckoutRecovery {
   return isRecord(value)
     && value.schemaVersion === 1
     && typeof value.idempotencyKey === 'string'
-    && /^[0-9a-fA-F-]{36}$/.test(value.idempotencyKey)
+    && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(value.idempotencyKey)
     && isStoredOrderSubmission(value.submission);
 }
 
-export function loadCheckoutRecovery(storage: Storage | undefined): CheckoutRecovery | undefined {
-  if (!storage) return undefined;
+export function loadCheckoutRecovery(storage: Storage | undefined): CheckoutRecovery | null | undefined {
+  if (!storage) return null;
   try {
     const raw = storage.getItem(CHECKOUT_RECOVERY_STORAGE_KEY);
     if (!raw) return undefined;
     const parsed = JSON.parse(raw) as unknown;
-    return isStoredCheckoutRecovery(parsed) ? parsed : undefined;
+    return isStoredCheckoutRecovery(parsed) ? parsed : null;
   } catch {
-    return undefined;
+    return null;
   }
 }
 

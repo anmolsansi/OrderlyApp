@@ -196,3 +196,5 @@ python -m pytest backend/tests -q
 ```
 
 GitHub Actions runs the frontend suite, backend suite against Postgres, Chromium runtime check, and product E2E suite against the real API/Postgres path for every `feat/**` push and pull request.
+
+Damaged or unreadable recovery records block new submissions. `loadCheckoutRecovery` returns `undefined` only for an empty store, `null` for unavailable/damaged storage, and the validated record otherwise. Recovery keys must have UUID shape. Preserve damaged evidence for reconciliation rather than deleting it automatically.
