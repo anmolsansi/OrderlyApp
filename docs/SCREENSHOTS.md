@@ -6,7 +6,7 @@ Capture portfolio media from the **stabilized manual mock-ordering flow**. Voice
 
 Prefer an identified, publicly accepted `api`-mode candidate. Before calling hosted media release evidence, verify [`releases/stabilization-acceptance.md`](releases/stabilization-acceptance.md) shows public access/current backend/receipt durability gates passed.
 
-As of October 5, 2026, the exact ST-12 Vercel build is still behind developer authentication and the current backend candidate has not been established publicly. Hosted portfolio capture is therefore not yet release-acceptance proof.
+As of October 6, 2026, the public frontend alias opens but its ordering gateway returns 504. The immutable Vercel URL still redirects to developer SSO. Public order/receipt portfolio media cannot yet demonstrate accepted hosted behavior; see [current release ledger](releases/stabilization-acceptance.md).
 
 Local captures are fine for development review but must be labelled as local and must not imply public deployment acceptance.
 

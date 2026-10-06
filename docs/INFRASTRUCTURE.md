@@ -113,10 +113,7 @@ Rollback must preserve already accepted receipt/idempotency rows and must never 
 
 The repository supports Vercel-style frontend deployment and Render-style backend infrastructure through checked-in config/docs. A checked-in blueprint is not proof that the public resources are current.
 
-As of October 5, 2026:
-
-- the exact ST-12 frontend SHA has a READY Vercel build, but its `vercel.app` aliases are protected by developer authentication;
-- the observed Render OrderlyApp service has only an older failed ST-09 deployment and is not current backend evidence.
+As of October 6, 2026, the existing main frontend is READY and the public alias opens anonymously; its immutable Vercel URL redirects to SSO. The public catalog gateway returns 504 and the backend readiness request times out. Current Render service identity/configuration and actual cleanup schedule remain unverified; a checked-in cron/predeploy blueprint is not an activated service. The follow-up branch is not deployed.
 
 See [`DEPLOYMENT.md`](DEPLOYMENT.md) and [`releases/stabilization-acceptance.md`](releases/stabilization-acceptance.md) before treating any hosted URL as accepted.
 

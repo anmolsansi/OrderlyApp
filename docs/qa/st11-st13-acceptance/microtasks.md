@@ -36,20 +36,20 @@ Each check below is complete only when current evidence is recorded. Group relat
 - [x] M29: Run current strict Python dependency audit.
 - [x] M30: Run genuine lint and frontend unit/contracts suite.
 - [x] M31: Run independent typecheck and production build.
-- [ ] M32: Run full backend suite against isolated PostgreSQL.
-- [ ] M33: Run API-mode Chromium product suite.
-- [ ] M34: Run isolated local_demo safety suite.
+- [x] M32: Run full backend suite against isolated PostgreSQL.
+- [x] M33: Run API-mode Chromium product suite.
+- [x] M34: Run isolated local_demo safety suite.
 - [x] M35: Push green operations microcommit.
 - [x] M36: Push green CI microcommit.
-- [ ] M37: Reconcile all ST13-owned active and historical docs.
+- [x] M37: Reconcile all ST13-owned active and historical docs.
 - [x] M38: Refresh exact Vercel deployment identity read only.
 - [ ] M39: Inspect Render service in explicitly selected workspace.
 - [x] M40: Record fresh unauthenticated public access result.
 - [x] M41: Record backend readiness and gateway result.
-- [ ] M42: Prepare current acceptance ledger with honest blockers.
+- [x] M42: Prepare current acceptance ledger with honest blockers.
 - [ ] M43: Publish focused PR and attach it to this chat.
 - [ ] M44: Verify all seven hosted CI gates on candidate SHA.
-- [ ] M45: Record ST11 and ST12 acceptance separately from public gate.
+- [x] M45: Record ST11 and ST12 acceptance separately from public gate.
 - [ ] M46: Run authorized public two-guest receipt acceptance after release prerequisites.
 
 Evidence: `docs/qa/st11-st13-acceptance/results.md` and `docs/releases/stabilization-acceptance.md`. Public or staging criteria stay pending when prerequisites are missing.

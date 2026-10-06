@@ -164,28 +164,13 @@ Local endpoints:
 - API: `http://localhost:8000`
 - Ready: `http://localhost:8000/health/ready`
 
-## 8. Current Hosted Evidence — October 5, 2026
+## 8. Current Hosted Evidence — October 6, 2026
 
-### Vercel frontend
+Existing main frontend SHA `1eaba8e396f1068f5da577aa29b78ed1cc6d2500` is READY in Vercel (`dpl_B2UzqrDyu1uMV9SBmfNjTWWLzBT3`). The public alias `https://orderly-app-eight.vercel.app` returns anonymous HTTP 200. The immutable URL `https://orderly-2wxyqwwn6-openclawneutron-4687s-projects.vercel.app` redirects to Vercel SSO (302). No developer-authentication bypass was used.
 
-Vercel project `orderly-app` has a production deployment:
+The public alias gateway `GET /api/orderly/restaurants` returns `504 upstream_timeout`; the Render backend readiness request times out. Current Render service SHA/configuration is unverified pending explicit workspace selection. Historical failed deploys and old serving-command observations are not current evidence. No public receipt acceptance is claimed.
 
-- Deployment ID: `dpl_DiDAHxxRJcCboiSqWiFJjSC2NPsU`
-- Immutable deployment URL: `https://orderly-o9w42h6f0-openclawneutron-4687s-projects.vercel.app`
-- Source SHA: `934208c36d323e39d9f6ddcfcc3805cbd979507f`
-- State: `READY`
-
-Known aliases include `orderly-app-eight.vercel.app`, the project alias, and the `git-main` alias. However, Vercel Authentication is enabled for the `vercel.app` deployment domains (`all_except_custom_domains`). Therefore this exact build is **not current proof of public fresh-visitor access**.
-
-### Render backend
-
-The existing OrderlyApp Render service `orderlyapp-int01-api` is **not a valid current backend candidate**:
-
-- its only observed deployment is from older ST-09 source SHA `03583bb65d0823e8e9c1eda79861ec09e95e0d88`;
-- that deployment ended `update_failed`;
-- its configured serving command still combines migrate + seed + Uvicorn, which is inconsistent with the C8 lifecycle now in `main`.
-
-Do not cite that service as ST-12/ST-13 backend acceptance evidence. Updating/redeploying it is a separate authorized release operation.
+This follow-up branch has not been deployed. Updating services, applying managed resource links, upgrading plans or activating billed cron is a separately authorized release operation. Current exact identities, local/CI checks and remaining public requirements are in [the acceptance ledger](releases/stabilization-acceptance.md).
 
 ## 9. Public Acceptance Checklist
 

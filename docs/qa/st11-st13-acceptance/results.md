@@ -8,9 +8,9 @@ Added a read-only readiness transaction and a two-second statement timeout. Real
 
 `backend/tests/test_operations.py`: **18 passed**, zero skipped, against isolated migrated PostgreSQL. Also verifies cleanup lock safety, checksum drift rejection, legacy preservation and startup without catalog seeding.
 
-## Pending
+## Scope and remaining gate
 
-Full retention cascades, exact backup/restore equality, full suite and hosted candidate CI are not yet accepted. Public deployment and staging operations require separate evidence; no deployment, merge or paid resource change performed.
+The sections below record subsequent acceptance of retention, full backup/restore, complete suites and hosted CI. Public deployment/staging operations remain separate and blocked; no deployment, merge or paid resource change performed.
 
 Retention now checks both expired and explicitly revoked guests: receipt and idempotency rows cascade away, active guest rows remain, and a second cleanup is safe. Operations suite: 18 passed with CI mode enabled.
 
@@ -35,3 +35,5 @@ Final backend suite: **145 passed**, zero skips. Final frontend suite: **110 pas
 Compatible rollback probe: started archived previous main backend on port 8042 against the current synthetic schema; exact prior SHA readiness 200, edited catalog visible, and complete receipt/cart/catalog digest unchanged. Current hosted runtime/audit candidate run [37428142914](https://github.com/anmolsansi/OrderlyApp/actions/runs/37428142914) passed all seven jobs at `64a6f412c03731e997c9a96e91e849bc4cf998e4`.
 
 Browser-report parsing also rejects a missing/noninteger expected count; that negative case runs in the existing guard regression. Current documentation statuses distinguish local ST11, repository/hosted ST12, blocked ST13 public receipt acceptance and INT02 local versus hosted staging. Render inspection remains pending workspace selection; no resource/deployment or Linear writes occurred.
+
+Document check: all 18 active owned/evidence documents have existing local Markdown link targets; historical plans retain dated superseded notices. No edits needed to already-correct charter/flows/architecture/backend README/history. Final PR checks will be recorded by exact SHA separately.

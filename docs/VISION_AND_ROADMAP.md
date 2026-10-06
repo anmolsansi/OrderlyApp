@@ -36,9 +36,9 @@ The stabilization release deliberately narrows the earlier voice-first concept. 
 
 ## Current Release Status
 
-The repository candidate at source SHA `934208c36d323e39d9f6ddcfcc3805cbd979507f` passed the ST-12 hosted release-CI matrix, including genuine lint, independent typecheck/build, backend/PostgreSQL recovery checks, Chromium launch, API product E2E, local fixture-preview E2E, and dependency audits.
+The current runtime/audit candidate `64a6f412c03731e997c9a96e91e849bc4cf998e4` passed all seven required [hosted CI jobs](https://github.com/anmolsansi/OrderlyApp/actions/runs/37428142914). ST11 has current local operation/recovery proof.
 
-That does **not** by itself make the public demo accepted. The exact Vercel production build is currently behind Vercel developer authentication, and the available Render backend deployment is an older failed candidate. INT-02/public acceptance evidence is therefore still missing. The release remains Not completed until the public/recovery gates in [`releases/stabilization-acceptance.md`](releases/stabilization-acceptance.md) are satisfied.
+Public acceptance remains blocked: the existing main frontend alias opens without developer login, but its gateway returns 504 and backend readiness times out. The immutable frontend URL is protected by SSO. The follow-up is not deployed; INT-02 hosted staging and ST-13 public receipt evidence remain missing. See [current acceptance ledger](releases/stabilization-acceptance.md).
 
 ## Immediate Roadmap — Finish Stabilization Acceptance
 

@@ -2,7 +2,7 @@
 
 Revision: 3 • Updated: 2026-10-05 • ST-02/ST-03 acceptance source: `a9537931c57cbf636466bf3f791e440e24ce74bd` on `fix/st02-st03-acceptance` • Release status: **Not completed**.
 
-This is the single execution guide for taking the existing application to a stable **public mock demo**. **ST-01 is implemented and verified; ST-02/ST-03 are merged through PR #47; ST-04/ST-05/ST-06 are merged through PR #48. ST-07/ST-08/ST-09/ST-10 implementation and local acceptance are Completed on `fix/st07-st10-acceptance`; hosted CI and merge remain pending.** The disclosed separate INT-01 local testing pass is Completed. ST-11 through ST-13, INT-02 and public release remain **Not completed**. See [ST-07–ST-10 current evidence](docs/qa/st07-st10-acceptance/acceptance.md) and [INT-01](docs/qa/int-01.md). See [ST-04/ST-05/ST-06 evidence](docs/qa/st04-st06-acceptance/acceptance.md). See [ST-02/ST-03 acceptance](docs/qa/st02-st03-acceptance/acceptance.md) for current criteria and evidence. This guide began as planning-only documentation; the dated ST-01 evidence below records the authorized implementation that followed. No later ticket is implied complete by ST-01.
+This is the single execution guide for taking the application to a stable **public mock demo**. ST-01 through ST-10 are implemented; ST-02/03 merged in PR47, ST-04/05/06 in PR48, and ST-07/08/09/10 in PR49 with seven green hosted jobs. **ST-11 implementation/local acceptance and ST-12 repository/hosted CI acceptance are Completed on the follow-up branch; its merge/deployment are separate. ST-13 documentation is reconciled, but ST-13 public receipt acceptance, INT-02 hosted staging and RELEASE-GATE remain Not completed.** The public frontend alias opens; its ordering gateway returns 504. See [current criterion evidence](docs/qa/st11-st13-acceptance/results.md), [INT-01](docs/qa/int-01.md), [INT-02 local rehearsal](docs/qa/int-02.md) and [exact release identities/blockers](docs/releases/stabilization-acceptance.md). Historical ticket evidence remains in the linked packets. No public completion is inferred from local or CI results.
 
 Think of the app as a shop made from Lego. The screens already look like a shop, but some connections behind them can lose a basket, show another visitor's receipt, or pretend an order succeeded when the server failed. First we strengthen those connections. Then we add more Lego.
 
@@ -427,17 +427,17 @@ Consumers may prepare read-only designs after W0 fixtures; implementation starts
 
 | [ST-06 — Save complete receipts with deterministic money rules](#st-06) — **Completed (merged PR #48; local acceptance)** | W4 | ST-04 via C3; ST-05 via C4 | 3d | Yes |
 
-| [ST-07 — Make checkout atomic and safe to retry](#st-07) — **Completed (local; CI/merge pending)** | W5 | ST-06 via C5; C1/C4 providers complete | 3d | Yes |
+| [ST-07 — Make checkout atomic and safe to retry](#st-07) — **Completed (merged PR49; hosted CI green)** | W5 | ST-06 via C5; C1/C4 providers complete | 3d | Yes |
 
-| [ST-08 — Connect discovery, customization and basket to the API](#st-08) — **Completed (local; CI/merge pending)** | W4 | ST-04 via C3; ST-05 via C4; ST-03 web types released | 3d | Convergence lane |
+| [ST-08 — Connect discovery, customization and basket to the API](#st-08) — **Completed (merged PR49; hosted CI green)** | W4 | ST-04 via C3; ST-05 via C4; ST-03 web types released | 3d | Convergence lane |
 
-| [ST-09 — Make checkout, confirmation and history recover honestly](#st-09) — **Completed (local; CI/merge pending)** | W6 | ST-03 via C2; ST-07 via C6; ST-08 via C7 | 3d | Yes |
+| [ST-09 — Make checkout, confirmation and history recover honestly](#st-09) — **Completed (merged PR49; hosted CI green)** | W6 | ST-03 via C2; ST-07 via C6; ST-08 via C7 | 3d | Yes |
 
-| [ST-10 — Finish address selection, safe navigation and resilient UI](#st-10) — **Completed (local; CI/merge pending)** | W7 | ST-03 via C2; ST-09 via C7; INT-01 manual gate | 2d | Convergence lane |
+| [ST-10 — Finish address selection, safe navigation and resilient UI](#st-10) — **Completed (merged PR49; hosted CI green)** | W7 | ST-03 via C2; ST-09 via C7; INT-01 manual gate | 2d | Convergence lane |
 
-| [ST-11 — Make startup, readiness, retention and recovery truthful](#st-11) — **Not completed** | W6 | ST-07 backend complete via C1/C4/C5/C6 | 3d | Yes |
+| [ST-11 — Make startup, readiness, retention and recovery truthful](#st-11) — **Completed (implementation/local acceptance; public operations separate)** | W6 | ST-07 backend complete via C1/C4/C5/C6 | 3d | Yes |
 
-| [ST-12 — Expand CI and refresh release dependencies](#st-12) — **Not completed** | W7 | ST-01 via C0; ST-11 via C8; source writers released before required upgrade fixes | 2d | Yes |
+| [ST-12 — Expand CI and refresh release dependencies](#st-12) — **Completed (repository/hosted CI; merge/deployment separate)** | W7 | ST-01 via C0; ST-11 via C8; source writers released before required upgrade fixes | 2d | Yes |
 
 | [ST-13 — Reconcile documentation and verify the public candidate](#st-13) — **Not completed** | W9 | INT-02 candidate gate; ST-12 CI gate | 2d | Yes |
 
@@ -945,7 +945,7 @@ Current criterion-indexed proof: [ST-02/ST-03 acceptance](docs/qa/st02-st03-acce
 
 ### ST-07 — Make checkout atomic and safe to retry
 
-**Status:** Completed (implementation/local acceptance; hosted CI/merge pending). **Execution owner:** Codex. **Evidence:** [Current criterion report](docs/qa/st07-st10-acceptance/acceptance.md). **Objective:** At most one order exists per owner/key even with concurrent requests.
+**Status:** Completed (merged PR49; hosted CI green). **Execution owner:** Codex. **Evidence:** [Current criterion report](docs/qa/st07-st10-acceptance/acceptance.md). **Objective:** At most one order exists per owner/key even with concurrent requests.
 
 **Why this task exists:** Clicking twice or losing the response must not create two orders. The basket must also not disappear without an order. A database transaction makes those changes one sealed operation.
 
@@ -1021,7 +1021,7 @@ Current criterion-indexed proof: [ST-02/ST-03 acceptance](docs/qa/st02-st03-acce
 
 ### ST-08 — Connect discovery, customization and basket to the API
 
-**Status:** Completed (implementation/local acceptance; hosted CI/merge pending). **Execution owner:** Codex. **Evidence:** [Current criterion report](docs/qa/st07-st10-acceptance/acceptance.md). **Objective:** API-mode menu and basket prices match canonical backend responses.
+**Status:** Completed (merged PR49; hosted CI green). **Execution owner:** Codex. **Evidence:** [Current criterion report](docs/qa/st07-st10-acceptance/acceptance.md). **Objective:** API-mode menu and basket prices match canonical backend responses.
 
 **Why this task exists:** Good server rules do not help if the screens keep reading a separate toy menu. This ticket connects the visible shop to its real demo stockroom and explains conflicts instead of silently changing baskets.
 
@@ -1104,7 +1104,7 @@ Current criterion-indexed proof: [ST-02/ST-03 acceptance](docs/qa/st02-st03-acce
 
 ### ST-09 — Make checkout, confirmation and history recover honestly
 
-**Status:** Completed (implementation/local acceptance; hosted CI/merge pending). **Execution owner:** Codex. **Evidence:** [Current criterion report](docs/qa/st07-st10-acceptance/acceptance.md). **Objective:** API500/offline/timeout cannot display an invented accepted order or clear a failed basket.
+**Status:** Completed (merged PR49; hosted CI green). **Execution owner:** Codex. **Evidence:** [Current criterion report](docs/qa/st07-st10-acceptance/acceptance.md). **Objective:** API500/offline/timeout cannot display an invented accepted order or clear a failed basket.
 
 **Why this task exists:** The current page can congratulate a visitor after the API failed. An honest checkout has three different outcomes: saved, rejected, or uncertain because the response was lost. Only the saved receipt earns a success screen.
 
@@ -1190,7 +1190,7 @@ Current criterion-indexed proof: [ST-02/ST-03 acceptance](docs/qa/st02-st03-acce
 
 ### ST-10 — Finish address selection, safe navigation and resilient UI
 
-**Status:** Completed (implementation/local acceptance; hosted CI/merge pending). **Execution owner:** Codex. **Evidence:** [Current criterion report](docs/qa/st07-st10-acceptance/acceptance.md). **Objective:** Selected address appears exactly in saved receipt; default fill never overwrites deliberate input.
+**Status:** Completed (merged PR49; hosted CI green). **Execution owner:** Codex. **Evidence:** [Current criterion report](docs/qa/st07-st10-acceptance/acceptance.md). **Objective:** Selected address appears exactly in saved receipt; default fill never overwrites deliberate input.
 
 **Why this task exists:** Saved addresses should actually be used. A malformed browser value should not crash the shop, and a return-link parameter should not send the visitor to an arbitrary destination. These are small details that decide whether the existing journey feels dependable.
 
@@ -1268,7 +1268,7 @@ Current criterion-indexed proof: [ST-02/ST-03 acceptance](docs/qa/st02-st03-acce
 
 ### ST-11 — Make startup, readiness, retention and recovery truthful
 
-**Status:** Not completed. **Execution owner:** Unassigned. **Objective:** Required DB outage yields readiness503 and safe write failures; liveness does not claim storage readiness.
+**Status:** Completed (implementation/local acceptance; public operations separate). **Execution owner:** Codex. **Evidence:** [Current criterion report](docs/qa/st11-st13-acceptance/results.md). **Objective:** Required DB outage yields readiness503 and safe write failures; liveness does not claim storage readiness.
 
 **Why this task exists:** A green health page is misleading if the database is dead. Restart should open the existing shop, not replace its shelves. The public demo also needs bounded guest data lifetime and a practical way to recover.
 
@@ -1307,15 +1307,15 @@ Current criterion-indexed proof: [ST-02/ST-03 acceptance](docs/qa/st02-st03-acce
 
 **Implementation steps / TODOs:**
 
-- [ ] **ST-11.01** — Separate live and ready checks; readiness verifies required PG/schema with bounded read-only operation. Fail missing API mode/secret/origin configuration; emit safe request IDs and dependency status.
+- [x] **ST-11.01** — Separate live and ready checks; readiness verifies required PG/schema with bounded read-only operation. Fail missing API mode/secret/origin configuration; emit safe request IDs and dependency status.
 
-- [ ] **ST-11.02** — Remove migration/reseed from serving startup. Reconcile migration numbering/ledger, serialize one deploy migration job and require explicit nonproduction fixture seed.
+- [x] **ST-11.02** — Remove migration/reseed from serving startup. Reconcile migration numbering/ledger, serialize one deploy migration job and require explicit nonproduction fixture seed.
 
-- [ ] **ST-11.03** — Rehearse additive migrations on a copy of existing schema/data; preserve legacy records offline. Document pre-backup, maintenance cutover, app rollback and restore commands actually proven in ST-01 runtime.
+- [x] **ST-11.03** — Rehearse additive migrations on a copy of existing schema/data; preserve legacy records offline. Document pre-backup, maintenance cutover, app rollback and restore commands actually proven in ST-01 runtime.
 
-- [ ] **ST-11.04** — Create idempotent daily expired/revoked guest cleanup, batching100 under guest locks; verify no cleanup/order race. Apply checkout abuse bounds from C8 using configured edge aggregate limiter and per-guest limit.
+- [x] **ST-11.04** — Create idempotent daily expired/revoked guest cleanup, batching100 under guest locks; verify no cleanup/order race. Apply checkout abuse bounds from C8 using configured edge aggregate limiter and per-guest limit.
 
-- [ ] **ST-11.05** — Record backend restart, DB-off/on, readiness503→200, catalog edit preservation and transaction-consistent backup/restore. Freeze C8 and runbook.
+- [x] **ST-11.05** — Record backend restart, DB-off/on, readiness503→200, catalog edit preservation and transaction-consistent backup/restore. Freeze C8 and runbook.
 
 **Invariants affected:** INV-01, INV-07, INV-10; acceptance/tests below are enforcement proof.
 
@@ -1351,7 +1351,7 @@ Current criterion-indexed proof: [ST-02/ST-03 acceptance](docs/qa/st02-st03-acce
 
 ### ST-12 — Expand CI and refresh release dependencies
 
-**Status:** Not completed. **Execution owner:** Unassigned. **Objective:** Clean-install hosted application CI runs lint/typecheck/build, backend and browser assertions on candidate SHA.
+**Status:** Completed (repository/hosted CI; merge/deployment separate). **Execution owner:** Codex. **Evidence:** [Current criterion report](docs/qa/st11-st13-acceptance/results.md). **Objective:** Clean-install hosted application CI runs lint/typecheck/build, backend and browser assertions on candidate SHA.
 
 **Why this task exists:** ST-01 establishes hosted baseline CI, and behavior tickets add coverage as they land. This ticket completes the full release matrix, adds genuine linting and refreshes dependency evidence on the final candidate; it is not the first CI or dependency assessment.
 
@@ -1385,15 +1385,15 @@ Current criterion-indexed proof: [ST-02/ST-03 acceptance](docs/qa/st02-st03-acce
 
 **Implementation steps / TODOs:**
 
-- [ ] **ST-12.01** — Refresh ST-01's dependency assessment against the candidate and official advisories; classify runtime/development exposure and resolve remaining/new relevant blockers. Prerequisite upgrades already belong to W0. Apply newly necessary compatible patches, pin tested versions and rerun affected suites.
+- [x] **ST-12.01** — Refresh ST-01's dependency assessment against the candidate and official advisories; classify runtime/development exposure and resolve remaining/new relevant blockers. Prerequisite upgrades already belong to W0. Apply newly necessary compatible patches, pin tested versions and rerun affected suites.
 
-- [ ] **ST-12.02** — Introduce genuine lint command/config and retain separate typecheck. Fix only necessary upgrade/lint source issues through the owning ticket and serialize writes; no broad cosmetic rewrite.
+- [x] **ST-12.02** — Introduce genuine lint command/config and retain separate typecheck. Fix only necessary upgrade/lint source issues through the owning ticket and serialize writes; no broad cosmetic rewrite.
 
-- [ ] **ST-12.03** — Extend the existing ST-01 workflow to the complete release matrix: clean frontend/backend install, isolated PG, all provider/consumer suites, genuine lint/typecheck/build and provisioned Chromium API-backed E2E. Resolve every recorded baseline defect required by this release; required jobs fail on missing/skipped product assertions.
+- [x] **ST-12.03** — Extend the existing ST-01 workflow to the complete release matrix: clean frontend/backend install, isolated PG, all provider/consumer suites, genuine lint/typecheck/build and provisioned Chromium API-backed E2E. Resolve every recorded baseline defect required by this release; required jobs fail on missing/skipped product assertions.
 
-- [ ] **ST-12.04** — Capture SHA, runtime/dependency versions, results and trace/screenshots on failure; redact secrets. No production DB credentials in CI or pull-request jobs.
+- [x] **ST-12.04** — Capture SHA, runtime/dependency versions, results and trace/screenshots on failure; redact secrets. No production DB credentials in CI or pull-request jobs.
 
-- [ ] **ST-12.05** — Run upgraded candidate through all affected behavior suites; document workflow triggers, job names and hosted run identity. Do not claim branch protection was enabled unless actually verified/authorized.
+- [x] **ST-12.05** — Run upgraded candidate through all affected behavior suites; document workflow triggers, job names and hosted run identity. Do not claim branch protection was enabled unless actually verified/authorized.
 
 **Invariants affected:** INV-12; acceptance/tests below are enforcement proof.
 
@@ -1429,7 +1429,7 @@ Current criterion-indexed proof: [ST-02/ST-03 acceptance](docs/qa/st02-st03-acce
 
 ### ST-13 — Reconcile documentation and verify the public candidate
 
-**Status:** Not completed. **Execution owner:** Unassigned. **Objective:** README accurately describes password-free mock manual demo and modes; no unsupported voice/payment/account claim.
+**Status:** Not completed — docs/ledger done; public checkout blocked by gateway 504. **Execution owner:** Codex; release owner needed. **Evidence:** [Current release ledger](docs/releases/stabilization-acceptance.md). **Objective:** README accurately describes password-free mock manual demo and modes; no unsupported voice/payment/account claim.
 
 **Why this task exists:** A public demo is not finished when a deployment service says success. A new visitor must actually reach the intended build and complete its mock journey. The documentation must describe what exists rather than promise unavailable voice or real accounts.
 
@@ -1471,15 +1471,15 @@ Current criterion-indexed proof: [ST-02/ST-03 acceptance](docs/qa/st02-st03-acce
 
 **Implementation steps / TODOs:**
 
-- [ ] **ST-13.01** — Reconcile every owned active planning, product, architecture, setup, demo and release document with the verified candidate: API-only public ordering, password-free profiles, fixture-preview limits, guest expiry, explicit seed/migrations and deferred voice. Put a dated superseded notice linking to development.md on retained historical plans/claims; preserve historical release records and checked tasks as history, not current acceptance evidence. Keep the dated audit unchanged. Validate current demo steps and setup commands against actual results; do not rewrite planned behavior as already implemented.
+- [x] **ST-13.01** — Reconcile every owned active planning, product, architecture, setup, demo and release document with the verified candidate: API-only public ordering, password-free profiles, fixture-preview limits, guest expiry, explicit seed/migrations and deferred voice. Put a dated superseded notice linking to development.md on retained historical plans/claims; preserve historical release records and checked tasks as history, not current acceptance evidence. Keep the dated audit unchanged. Validate current demo steps and setup commands against actual results; do not rewrite planned behavior as already implemented.
 
-- [ ] **ST-13.02** — Prepare release record identifying source SHA, dependency lock/build identity, immutable deployment URL where available, environment and exact QA criteria. Public deployment itself requires the separately authorized release operation.
+- [x] **ST-13.02** — Prepare release record identifying source SHA, dependency lock/build identity, immutable deployment URL where available, environment and exact QA criteria. Public deployment itself requires the separately authorized release operation.
 
 - [ ] **ST-13.03** — Open candidate in two fresh browser contexts without developer sign-in; complete manual flow, verify guest isolation, reload exact receipt and exercise controlled failure/recovery against isolated staging.
 
-- [ ] **ST-13.04** — Reconcile existing Linear hardening/acceptance labels as evidence notes only; do not edit tracker without a tracker-write request. Mark this guide tickets Completed only when supporting current evidence exists.
+- [x] **ST-13.04** — Reconcile existing Linear hardening/acceptance labels as evidence notes only; do not edit tracker without a tracker-write request. Mark this guide tickets Completed only when supporting current evidence exists.
 
-- [ ] **ST-13.05** — Record runtime limitations, failed/blocked cases and owner follow-up. Complete release gate only if required public access, identity, durability/recovery and current checks pass.
+- [x] **ST-13.05** — Record runtime limitations, failed/blocked cases and owner follow-up. Complete release gate only if required public access, identity, durability/recovery and current checks pass.
 
 **Invariants affected:** INV-12; acceptance/tests below are enforcement proof.
 
@@ -1535,6 +1535,8 @@ Checkpoints are real stop/go nodes, not a final “test everything” wish. They
 
 ### INT-02 — Release, persistence and recovery rehearsal — Not completed
 
+**Current evidence:** [Local rehearsal report](docs/qa/int-02.md). All six local scenarios pass; hosted staging operations/public acceptance remain unrun. The checklist below stays unchecked for that hosted release gate.
+
 **Owner:** Future release reviewer. **Inputs:** ST-10 and ST-12 completed, INT-01 evidence, C8 runbook, upgraded candidate, isolated staging stack, pre-migration backup. **Outputs:** CREATE `docs/qa/int-02.md` plus identity-linked CI/backup/recovery reports. **Non-owned:** Product/config changes; assign defects to ST-11/ST-12 or relevant provider. **Runtime:** Actual required PG, gateway and staged environment; no production fault injection.
 
 - [ ] **INT-02.01** — Run all candidate unit/backend/contract/browser suites plus actual lint/typecheck/build; ensure jobs did not silently skip tests.
@@ -1544,7 +1546,7 @@ Checkpoints are real stop/go nodes, not a final “test everything” wish. They
 - [ ] **INT-02.05** — Expired/revoked guest cleanup under concurrent requests cannot remove active guest data or commit orphan order; bounded abuse yields429; no secrets appear in probes/logs.
 - [ ] **INT-02.06** — Repeat manual journey on 375px viewport and keyboard; malformed local storage, session expiry, safe return navigation and selected address recover visibly.
 
-**Commands:** WEB, BACKEND and E2E plus migration/backup/restore/cleanup commands proven and recorded by ST-11 runbook. Those operations are not yet verified commands; do not invent production shell instructions here. **Failure semantics:** Any required failed/blocked/unrun case prevents release. **Compatibility:** Additive upgrade and compatible rollback proven with fixture copy; old unsafe client routes remain disabled. **Evidence:** Timestamped reports identify candidate SHA, database fixtures and platform versions. **Exit criteria:** All six scenarios pass; CI SHA/build equals candidate; no further source/dependency changes without affected retest. **Recovery:** Freeze release, assign owning-ticket defect, preserve failed evidence, retest new build. **Handoff:** Candidate evidence unlocks ST-13 public acceptance. **Effort:** 1d excluding fixes and platform waiting.
+**Commands:** WEB, BACKEND and E2E plus migration/backup/restore/cleanup commands proven and recorded by ST-11 runbook. Local commands are now verified in the ST-11 report; hosted execution still requires the actual staging environment and authorized release operation. **Failure semantics:** Any required failed/blocked/unrun case prevents release. **Compatibility:** Additive upgrade and compatible rollback proven with fixture copy; old unsafe client routes remain disabled. **Evidence:** Timestamped reports identify candidate SHA, database fixtures and platform versions. **Exit criteria:** All six scenarios pass; CI SHA/build equals candidate; no further source/dependency changes without affected retest. **Recovery:** Freeze release, assign owning-ticket defect, preserve failed evidence, retest new build. **Handoff:** Candidate evidence unlocks ST-13 public acceptance. **Effort:** 1d excluding fixes and platform waiting.
 
 ## 12. Test matrix
 
