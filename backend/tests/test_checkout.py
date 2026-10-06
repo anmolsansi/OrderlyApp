@@ -500,3 +500,37 @@ def test_checkout_fails_closed_without_postgres(monkeypatch: pytest.MonkeyPatch)
 
     with pytest.raises(order_service.OrderStorageUnavailableError):
         order_service.submit_order("guest-no-postgres", IDEMPOTENCY_KEY, static_submission())
+
+
+@pytest.mark.parametrize('stage', ['insert_order_snapshot', 'insert_order_idempotency_record', 'update_guest_cart_row'])
+def test_failure_after_each_checkout_write_rolls_back_exact_accepted_state(checkout_environment, monkeypatch, stage):
+    from app import order_service
+    owner = checkout_environment['owner_id']
+    request = submission_for(owner)
+    before = current_cart(owner).model_dump(mode='json')
+    write = getattr(order_service, stage)
+
+    def fail_after_write(*args, **kwargs):
+        write(*args, **kwargs)
+        raise RuntimeError('synthetic failure after SQL write')
+
+    monkeypatch.setattr(order_service, stage, fail_after_write)
+    with pytest.raises(order_service.OrderStorageUnavailableError):
+        submit_order(owner, IDEMPOTENCY_KEY, request)
+    assert c6_counts(owner) == (0, 0)
+    assert current_cart(owner).model_dump(mode='json') == before
+
+
+def test_replay_preserves_newer_basket_and_original_receipt_after_catalog_change(checkout_environment, postgres_connection):
+    owner = checkout_environment['owner_id']
+    request = submission_for(owner)
+    first = submit_order(owner, IDEMPOTENCY_KEY, request)
+    postgres_connection.execute('UPDATE menu_items SET price_cents = 2500, name = %s WHERE id = %s', ('Changed catalog meal', checkout_environment['item_id']))
+    postgres_connection.commit()
+    next_cart = put_cart(owner, 2, [CartItemInput(id='next-line', restaurant_id=checkout_environment['restaurant_id'], menu_item_id=checkout_environment['item_id'], quantity=2, modifiers=[CartItemModifier(group_id='size', option_ids=['large'])])])
+    replay = submit_order(owner, IDEMPOTENCY_KEY, request)
+    assert replay.replayed
+    assert replay.receipt.model_dump(mode='json') == first.receipt.model_dump(mode='json')
+    assert current_cart(owner).revision == next_cart.revision == 3
+    assert current_cart(owner).items == next_cart.items
+    assert c6_counts(owner) == (1, 1)
