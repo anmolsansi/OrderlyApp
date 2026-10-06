@@ -13,3 +13,5 @@ Added a read-only readiness transaction and a two-second statement timeout. Real
 Full retention cascades, exact backup/restore equality, full suite and hosted candidate CI are not yet accepted. Public deployment and staging operations require separate evidence; no deployment, merge or paid resource change performed.
 
 Retention now checks both expired and explicitly revoked guests: receipt and idempotency rows cascade away, active guest rows remain, and a second cleanup is safe. Operations suite: 18 passed with CI mode enabled.
+
+CI guard regressions: backend subprocess with a deliberately skipped assertion exits 1; browser report guard accepts a nonempty green report and rejects empty, skipped, failed, flaky, errored or missing stats. Targeted Vitest and independent typecheck pass.

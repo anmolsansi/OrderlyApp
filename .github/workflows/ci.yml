@@ -204,8 +204,12 @@ jobs:
                   (receipt["id"], owner_id, json.dumps(receipt), receipt["created_at"]),
               )
 
+              migrations = conn.execute(
+                  "SELECT version, checksum_sha256 FROM schema_migrations ORDER BY version"
+              ).fetchall()
+
           Path("artifacts/backup-proof.json").write_text(
-              json.dumps({"receipt_id": receipt["id"], "total_cents": 1192}),
+              json.dumps({"receipt": receipt, "migrations": migrations}),
               encoding="utf-8",
           )
           print(f"Prepared synthetic receipt {receipt['id']} for backup proof")
@@ -241,17 +245,18 @@ jobs:
           ) as conn:
               row = conn.execute(
                   "SELECT snapshot FROM guest_orders WHERE id = %s",
-                  (proof["receipt_id"],),
+                  (proof["receipt"]["id"],),
               ).fetchone()
               assert row is not None
               snapshot = row[0]
-              assert snapshot["id"] == proof["receipt_id"]
-              assert snapshot["totals"]["total_cents"] == proof["total_cents"]
-              migration_count = conn.execute("SELECT count(*) FROM schema_migrations").fetchone()[0]
-              assert migration_count > 0
+              assert snapshot == proof["receipt"], "Restored receipt differs from the complete immutable snapshot"
+              migrations = conn.execute(
+                  "SELECT version, checksum_sha256 FROM schema_migrations ORDER BY version"
+              ).fetchall()
+              assert [list(row) for row in migrations] == proof["migrations"]
+              assert migrations
           print(
-              f"Backup/restore verified receipt={proof['receipt_id']} "
-              f"total_cents={proof['total_cents']} migrations={migration_count}"
+              f"Backup/restore verified complete receipt and {len(migrations)} migration checksums"
           )
           PY
           rm -f artifacts/orderlyapp_test.dump artifacts/backup-proof.json
@@ -405,7 +410,9 @@ jobs:
           fi
           echo "Discovered ${count} mandatory API-mode tests"
       - name: Run mandatory API product E2E suite
-        run: npx playwright test --grep-invert 'local_demo'
+        run: |
+          npx playwright test --grep-invert 'local_demo'
+          node scripts/verify-e2e-report.mjs
       - name: Collect E2E runtime evidence
         if: always()
         shell: bash
@@ -458,7 +465,9 @@ jobs:
           fi
           echo "Discovered ${count} local_demo safety tests"
       - name: Run local-demo safety suite
-        run: npx playwright test --grep 'local_demo'
+        run: |
+          npx playwright test --grep 'local_demo'
+          node scripts/verify-e2e-report.mjs
       - name: Upload local-demo failure evidence
         if: failure()
         uses: actions/upload-artifact@v4

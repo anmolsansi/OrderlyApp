@@ -26,12 +26,12 @@ Each check below is complete only when current evidence is recorded. Group relat
 - [ ] M19: Strengthen backup proof to exact full receipt equality.
 - [ ] M20: Strengthen backup proof to exact migration ledger equality.
 - [ ] M21: Rehearse PostgreSQL 16 custom dump and transaction restore.
-- [ ] M22: Reject skipped backend tests in hosted CI.
-- [ ] M23: Regression: backend skip causes failed CI exit.
-- [ ] M24: Reject focused Playwright tests in hosted CI.
-- [ ] M25: Reject skipped browser cases in hosted CI.
-- [ ] M26: Regression: browser report guard rejects skip/empty/error.
-- [ ] M27: Capture safe failure screenshots without credential traces.
+- [x] M22: Reject skipped backend tests in hosted CI.
+- [x] M23: Regression: backend skip causes failed CI exit.
+- [x] M24: Reject focused Playwright tests in hosted CI.
+- [x] M25: Reject skipped browser cases in hosted CI.
+- [x] M26: Regression: browser report guard rejects skip/empty/error.
+- [x] M27: Capture safe failure screenshots without credential traces.
 - [ ] M28: Run current npm high-severity dependency audit.
 - [ ] M29: Run current strict Python dependency audit.
 - [ ] M30: Run genuine lint and frontend unit/contracts suite.

@@ -158,3 +158,7 @@ Before merging a candidate:
 6. Open or update the PR against the repository's intended base branch and preserve the exact-head CI evidence in the task record.
 
 Rollback remains commit-based. Dependency and configuration changes must retain committed lockfiles so an incompatible candidate can be reverted without silently weakening the security or verification gates.
+
+## Mandatory assertion guards
+
+Hosted pytest fails if any backend test is skipped. Playwright forbids focused `.only` cases; its JSON report must contain passing cases and zero skipped, failed, flaky or runtime-error results. `node scripts/verify-e2e-report.mjs` enforces this after each mode suite. Failures retain screenshots and the report; traces are disabled to avoid recording guest credentials. Recovery compares the entire immutable receipt JSON and exact migration versions/checksums after transaction-consistent dump/restore.
