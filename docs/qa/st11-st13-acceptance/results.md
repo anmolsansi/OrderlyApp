@@ -15,3 +15,5 @@ Full retention cascades, exact backup/restore equality, full suite and hosted ca
 Retention now checks both expired and explicitly revoked guests: receipt and idempotency rows cascade away, active guest rows remain, and a second cleanup is safe. Operations suite: 18 passed with CI mode enabled.
 
 CI guard regressions: backend subprocess with a deliberately skipped assertion exits 1; browser report guard accepts a nonempty green report and rejects empty, skipped, failed, flaky, errored or missing stats. Targeted Vitest and independent typecheck pass.
+
+Full backend suite after provisioning required Redis: 143 passed, zero skipped (before two additional operations regressions). Web checks passed genuine lint (19 existing warnings, zero errors), frontend units, independent typecheck and production build. npm audit returned zero vulnerabilities. Public alias returned HTTP 200 without credentials; the Render readiness request timed out at 45 seconds. Historical protection claims must be corrected; a functioning public ordering backend is still unproven.

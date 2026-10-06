@@ -1,4 +1,6 @@
 import { readFileSync } from 'node:fs';
+import process from 'node:process';
+import console from 'node:console';
 
 const report = JSON.parse(readFileSync(process.argv[2] ?? 'test-results/report.json', 'utf8'));
 if (!report.stats || report.stats.expected < 1 || report.stats.skipped !== 0 ||

@@ -587,3 +587,58 @@ def test_readiness_is_bounded_by_real_ledger_lock(
         assert TestClient(app).get("/health/live").status_code == 200
         blocker.rollback()
     assert TestClient(app).get("/health/ready").status_code == 200
+
+
+def test_cleanup_enforces_batch_limit(postgres_connection, postgres_database_url, monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", postgres_database_url)
+    monkeypatch.delenv("REDIS_URL", raising=False)
+    now = datetime.now(timezone.utc)
+    owners = [f"guest-batch-{uuid4()}" for _ in range(101)]
+    for owner in owners:
+        postgres_connection.execute(
+            "INSERT INTO guest_sessions (id, token_hash, created_at, expires_at) VALUES (%s, %s, %s, %s)",
+            (owner, uuid4().hex, now - timedelta(days=2), now - timedelta(days=1)),
+        )
+    postgres_connection.commit()
+    assert cleanup_expired_guests(now=now, batch_size=100) == 100
+    assert postgres_connection.execute(
+        "SELECT count(*) FROM guest_sessions WHERE id = ANY(%s)", (owners,)
+    ).fetchone()[0] == 1
+    assert cleanup_expired_guests(now=now, batch_size=100) == 1
+    assert cleanup_expired_guests(now=now, batch_size=100) == 0
+
+
+def test_additive_upgrade_of_old_ledger_with_concurrent_migrators(
+    postgres_database_url, monkeypatch,
+):
+    import psycopg
+    from psycopg import sql
+    from psycopg.conninfo import make_conninfo
+    from concurrent.futures import ThreadPoolExecutor
+
+    name = f"orderly_upgrade_{uuid4().hex}"
+    admin_url = make_conninfo(postgres_database_url, dbname="postgres")
+    upgrade_url = make_conninfo(postgres_database_url, dbname=name)
+    with psycopg.connect(admin_url, autocommit=True) as admin:
+        admin.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name)))
+        try:
+            with psycopg.connect(upgrade_url) as old:
+                old.execute((REPOSITORY_ROOT / "backend/migrations/001_initial.sql").read_text())
+                old.execute("CREATE TABLE schema_migrations (version TEXT PRIMARY KEY, applied_at TIMESTAMPTZ DEFAULT now())")
+                old.execute("INSERT INTO schema_migrations (version) VALUES ('001_initial.sql')")
+                old.execute("INSERT INTO orders (id, session_id, cart_items, subtotal_cents, status) VALUES ('legacy-upgrade', 'untrusted-old-session', '[]', 0, 'Placed')")
+            monkeypatch.setenv("DATABASE_URL", upgrade_url)
+            monkeypatch.delenv("ORDERLY_FORCE_JSON_STORE", raising=False)
+            migrate = _load_migrate_module()
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                futures = [executor.submit(migrate.main) for _ in range(2)]
+                for future in futures:
+                    future.result(timeout=15)
+            with psycopg.connect(upgrade_url) as upgraded:
+                assert upgraded.execute("SELECT id FROM orders").fetchall() == [("legacy-upgrade",)]
+                assert upgraded.execute("SELECT count(*) FROM guest_orders").fetchone()[0] == 0
+                rows = upgraded.execute("SELECT version, checksum_sha256 FROM schema_migrations").fetchall()
+                assert {row[0] for row in rows} == main_module._expected_migration_versions()
+                assert all(len(row[1]) == 64 for row in rows)
+        finally:
+            admin.execute(sql.SQL("DROP DATABASE {} WITH (FORCE)").format(sql.Identifier(name)))
