@@ -1,0 +1,64 @@
+{
+  "date": "2026-10-06",
+  "frontend_main_sha": "1eaba8e396f1068f5da577aa29b78ed1cc6d2500",
+  "visitors": [
+    {
+      "visitor": 1,
+      "navigation_status": 200,
+      "developer_login": false,
+      "api_responses": [
+        {
+          "path": "/api/orderly/restaurants",
+          "status": 200
+        }
+      ],
+      "headings": [
+        "Find your next order",
+        "Refine results",
+        "Pizza restaurants near you",
+        "Neapolitan Nova",
+        "Brooklyn Basil Works",
+        "Mario's Pizza Lab",
+        "California Crust Co.",
+        "Detroit Depth",
+        "Dough & Co.",
+        "Spice Route Pizza",
+        "Chicago Square Cut",
+        "Mountain Pie Lodge",
+        "Slice Station",
+        "Vegan Vinyl Pizza",
+        "Midnight Marinara"
+      ],
+      "public_receipt_acceptance": "BLOCKED"
+    },
+    {
+      "visitor": 2,
+      "navigation_status": 200,
+      "developer_login": false,
+      "api_responses": [
+        {
+          "path": "/api/orderly/restaurants",
+          "status": 200
+        }
+      ],
+      "headings": [
+        "Find your next order",
+        "Refine results",
+        "Pizza restaurants near you",
+        "Neapolitan Nova",
+        "Brooklyn Basil Works",
+        "Mario's Pizza Lab",
+        "California Crust Co.",
+        "Detroit Depth",
+        "Dough & Co.",
+        "Spice Route Pizza",
+        "Chicago Square Cut",
+        "Mountain Pie Lodge",
+        "Slice Station",
+        "Vegan Vinyl Pizza",
+        "Midnight Marinara"
+      ],
+      "public_receipt_acceptance": "BLOCKED"
+    }
+  ]
+}

@@ -37,3 +37,11 @@ Compatible rollback probe: started archived previous main backend on port 8042 a
 Browser-report parsing also rejects a missing/noninteger expected count; that negative case runs in the existing guard regression. Current documentation statuses distinguish local ST11, repository/hosted ST12, blocked ST13 public receipt acceptance and INT02 local versus hosted staging. Render inspection remains pending workspace selection; no resource/deployment or Linear writes occurred.
 
 Document check: all 18 active owned/evidence documents have existing local Markdown link targets; historical plans retain dated superseded notices. No edits needed to already-correct charter/flows/architecture/backend README/history. Final PR checks will be recorded by exact SHA separately.
+
+## Final publication and public recheck
+
+[PR50](https://github.com/anmolsansi/OrderlyApp/pull/50) contains focused pushed microcommits. All seven hosted checks passed on exact PR candidate `a5a46a0e604dc9b4140fb1f5d32a5d41ce28a469`: [PR run 37429346691](https://github.com/anmolsansi/OrderlyApp/actions/runs/37429346691) and [push run 37429334322](https://github.com/anmolsansi/OrderlyApp/actions/runs/37429334322). Later changes are documentation/public-observation evidence only. Final head checks remain visible on the PR.
+
+Later public observations supersede the initial catalog-only timeout diagnosis: two fresh anonymous browsers loaded catalog (HTTP 200), but guest bootstrap returns **503 `invalid_config`, field `ORDERLY_DATA_MODE`**, and the public manual journey failed. No successful public receipt or guest isolation is claimed. The immutable URL still redirects to SSO, and the separately observed Render readiness URL still times out. Runtime mode/configuration and actual backend routing must be inspected and repaired in the authorized release operation. The requested Render workspace selection remains pending.
+
+All owned disposable servers were stopped, temporary restore DB/dump cleaned, and generated Next/pytest artifacts removed. Pre-existing unrelated QA and graph artifacts remain untouched.

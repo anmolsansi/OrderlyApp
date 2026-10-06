@@ -2,7 +2,7 @@
 
 OrderlyApp is a stabilized **manual food-ordering portfolio demo** built with Next.js and FastAPI. The accepted product path is intentionally mock-only: visitors can browse a canonical pizza catalog, customize items, maintain a private guest basket, review a server-priced quote, place an idempotent mock order, and reopen the immutable receipt. No real payment is collected.
 
-> **Current release status — October 6, 2026:** ST-11 operations and ST-12 repository/CI acceptance pass on the follow-up candidate; the public release is **not accepted**. The existing main frontend alias opens anonymously, but its ordering gateway returns 504. See [development.md](development.md) and [current acceptance identities/blockers](docs/releases/stabilization-acceptance.md). Voice, real accounts, real payments and restaurant integrations remain deferred.
+> **Current release status — October 6, 2026:** ST-11 operations and ST-12 repository/CI acceptance pass on the follow-up candidate; the public release is **not accepted**. The existing main frontend alias opens anonymously, but guest creation returns 503 `invalid_config` for `ORDERLY_DATA_MODE`. See [development.md](development.md) and [current acceptance identities/blockers](docs/releases/stabilization-acceptance.md). Voice, real accounts, real payments and restaurant integrations remain deferred.
 
 ## What the stabilized candidate supports
 

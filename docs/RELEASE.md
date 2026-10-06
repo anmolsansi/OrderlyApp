@@ -26,7 +26,7 @@
 
 ### Current hosted evidence / blocker
 
-The existing main frontend is READY. Its public alias opens anonymously, while its immutable URL redirects to Vercel SSO. The public gateway returns 504 and backend readiness times out. This follow-up branch has not been deployed; current Render service identity/configuration is unverified. Local recovery now has a report, but hosted staging/public two-guest receipt evidence remains blocked.
+The existing main frontend is READY. Its public alias opens anonymously, while its immutable URL redirects to Vercel SSO. Catalog initially returned 504, then recovered to 200 in two fresh anonymous browsers. Guest creation returns 503 `invalid_config` for `ORDERLY_DATA_MODE`, and public manual checkout failed. The separately observed backend readiness URL times out. This follow-up branch has not been deployed; current Render service identity/configuration is unverified. Local recovery now has a report, but hosted staging/public two-guest receipt evidence remains blocked.
 
 Therefore a READY frontend build must **not** be described as an accepted public release yet. See [`releases/stabilization-acceptance.md`](releases/stabilization-acceptance.md).
 

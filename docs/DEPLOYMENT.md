@@ -168,7 +168,7 @@ Local endpoints:
 
 Existing main frontend SHA `1eaba8e396f1068f5da577aa29b78ed1cc6d2500` is READY in Vercel (`dpl_B2UzqrDyu1uMV9SBmfNjTWWLzBT3`). The public alias `https://orderly-app-eight.vercel.app` returns anonymous HTTP 200. The immutable URL `https://orderly-2wxyqwwn6-openclawneutron-4687s-projects.vercel.app` redirects to Vercel SSO (302). No developer-authentication bypass was used.
 
-The public alias gateway `GET /api/orderly/restaurants` returns `504 upstream_timeout`; the Render backend readiness request times out. Current Render service SHA/configuration is unverified pending explicit workspace selection. Historical failed deploys and old serving-command observations are not current evidence. No public receipt acceptance is claimed.
+The public catalog gateway initially returned `504 upstream_timeout`, then recovered to 200 in two fresh anonymous browser contexts. Public `POST /api/orderly/session` returns 503 `invalid_config` because backend `ORDERLY_DATA_MODE` is not `api`. The public manual checkout journey failed. The separately observed Render readiness URL timed out; its relationship to the active gateway target is unverified. Current Render service SHA/configuration is unverified pending explicit workspace selection. Historical failed deploys and old serving-command observations are not current evidence. No public receipt acceptance is claimed.
 
 This follow-up branch has not been deployed. Updating services, applying managed resource links, upgrading plans or activating billed cron is a separately authorized release operation. Current exact identities, local/CI checks and remaining public requirements are in [the acceptance ledger](releases/stabilization-acceptance.md).
 

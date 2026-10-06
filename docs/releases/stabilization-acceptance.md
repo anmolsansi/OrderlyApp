@@ -7,14 +7,15 @@
 
 | Surface | Exact identity | Observed result |
 | --- | --- | --- |
-| Repository runtime/CI candidate | `64a6f412c03731e997c9a96e91e849bc4cf998e4` on `fix/st11-st13-acceptance` | [CI run 37428142914](https://github.com/anmolsansi/OrderlyApp/actions/runs/37428142914) passed all seven required gates. Subsequent changes are evidence/docs only; final PR checks are recorded separately. |
+| Repository runtime/CI candidate | `a5a46a0e604dc9b4140fb1f5d32a5d41ce28a469` on `fix/st11-st13-acceptance` | [PR CI run 37429346691](https://github.com/anmolsansi/OrderlyApp/actions/runs/37429346691) passed all seven required gates. Subsequent changes are evidence/docs only; final PR checks are recorded separately. |
 | Existing public frontend | Vercel `orderly-app`, deployment `dpl_B2UzqrDyu1uMV9SBmfNjTWWLzBT3`, main SHA `1eaba8e396f1068f5da577aa29b78ed1cc6d2500` | READY in Vercel metadata. It does **not** deploy this follow-up branch. |
 | Public production alias | [orderly-app-eight.vercel.app](https://orderly-app-eight.vercel.app) | Anonymous HTTP 200; frontend access alone is not receipt acceptance. |
 | Immutable frontend URL | [orderly-2wxyqwwn6-openclawneutron-4687s-projects.vercel.app](https://orderly-2wxyqwwn6-openclawneutron-4687s-projects.vercel.app) | Anonymous HTTP 302 to Vercel SSO. No authenticated bypass used. |
-| Public gateway | `GET /api/orderly/restaurants` on public alias | HTTP 504, `upstream_timeout`; safe request ID returned. No catalog or order success accepted. |
+| Public gateway | `GET /api/orderly/restaurants` on public alias | Initially HTTP 504 `upstream_timeout`; later HTTP 200 in two fresh anonymous contexts. Catalog recovered; order success remains unaccepted. |
+| Public guest bootstrap | `POST /api/orderly/session` on public alias | HTTP 503 `invalid_config`, field `ORDERLY_DATA_MODE`: backend must run in API mode. Public manual journey failed. |
 | Existing backend readiness | `https://orderlyapp-int01-api.onrender.com/health/ready` | Request timed out at 45 seconds (HTTP 000); current backend SHA/configuration is unverified. Render control-plane inspection requires explicit workspace selection. |
 
-The earlier October 5 ledger described protected frontend aliases and an unhealthy Render deploy. The public alias now opens; immutable deployment authentication and public gateway failure remain. Prior Render deployment/configuration observations are historical, not current proof.
+The earlier October 5 ledger described protected frontend aliases and an unhealthy Render deploy. The public alias now opens; immutable deployment authentication and guest-bootstrap configuration failure remain. Prior Render deployment/configuration observations are historical, not current proof.
 
 Dependency identity: unchanged frontend `package-lock.json`; backend audit/test lock now pins pip 26.2, pytest 9.0.3, httpx 0.28.1 and pip-audit 2.10.1. Hosted CI resolves and strictly scans backend runtime dependencies; backend runtime ranges are not a frozen transitive runtime lock. See [CI runbook](../runbooks/ci.md) and [current detailed evidence](../qa/st11-st13-acceptance/results.md).
 
@@ -29,7 +30,7 @@ Dependency identity: unchanged frontend `package-lock.json`; backend audit/test 
 | ST-12-AC2: missing/skipped mandatory checks fail | PASS | Real services and Chromium required; focused browser tests forbidden; skip/empty/error/flaky browser guard and skipped-backend subprocess regressions verified. |
 | ST-12-AC3: dependency security | PASS | npm zero vulnerabilities; strict third-party Python audit clean after patching pip installer. Hosted current security job passed. |
 | ST-13-AC1: active owned documentation agrees | PASS for repository candidate | Active docs describe canonical API/private guest data, password-free profiles, isolated checkout-disabled preview, explicit migration/seed/cleanup, mock-only manual release and deferred voice/accounts/payments. Historical plans retain superseded notices. |
-| ST-13-AC2: fresh public visitor saves/reopens exact receipt | BLOCKED | Public alias opens but gateway catalog request is 504; immutable URL redirects to developer SSO. Two-guest public order acceptance cannot run successfully. |
+| ST-13-AC2: fresh public visitor saves/reopens exact receipt | BLOCKED | Two fresh contexts load public catalog without developer login, but guest creation returns 503 `invalid_config` for `ORDERLY_DATA_MODE`; public manual journey failed. No receipt was accepted. Immutable URL still redirects to SSO. |
 | ST-13-AC3: honest current release ledger | PASS | Current identities, local/CI evidence, historical observations and public failures are separated here. |
 
 ## Integration and release gates
@@ -41,7 +42,7 @@ INT-01 already has a disclosed separate local report at [int-01.md](../qa/int-01
 | RG-01 | BLOCKED | Complete INT-02 hosted recovery and ST-13 public receipt acceptance. |
 | RG-02 | PARTIAL | Local/CI guest/provider negative cases pass; public two-guest evidence is missing. |
 | RG-03 | PARTIAL | Local upgrade, restart, real outage, rollback and full restore pass; hosted staging rehearsal remains unrun. |
-| RG-04 | BLOCKED | Existing frontend is a different SHA from the follow-up; public gateway fails. |
+| RG-04 | BLOCKED | Existing frontend is a different SHA from the follow-up; guest bootstrap fails. |
 | RG-05 | BLOCKED | Public receipt save/reopen, exact totals/address and guest isolation remain unrun. |
 | RG-06 | BLOCKED | Live deployment/retention schedule/operational reviewer evidence is unverified. |
 | RG-07 | PASS for documentation | Current docs and explicit limitations are reconciled; overall release is not complete. |
@@ -54,9 +55,11 @@ GitHub #41/#43/#45 were already closed before this follow-up. Linear OPE-335 (ST
 
 1. Select the Render workspace explicitly, inspect the current service/deploy SHA and safe configuration metadata.
 2. Repair database/Redis resource linkage through secure platform references; never publish credentials. Separate migrations from serving and fixture seed. A free-plan service cannot silently gain paid predeploy/cron capabilities.
-3. Establish a healthy identified API-mode backend with exact source SHA and limiter dependency; verify gateway routing.
+3. Set backend `ORDERLY_DATA_MODE=api` through the authorized platform release/configuration operation; validate secret/origin/PostgreSQL/schema/Redis requirements too. Establish the healthy exact-SHA backend and verify gateway routing.
 4. Merge/deploy the reviewed candidate only with release authorization; identify frontend/backend deployed SHAs and public alias.
 5. In two fresh browser contexts, save/reload complete synthetic receipt, test guest isolation and record controlled hosted staging failure/recovery. Verify actual daily cleanup execution and monitoring.
 6. Change blocked criteria to PASS only after those observations.
 
 Rollback was rehearsed locally using previous main backend against the additive schema; local backups restored complete synthetic data. On public isolation, durability, idempotency or false-success regressions, disable the candidate, retain redacted evidence and use the compatible application/backup procedure in [stabilization runbook](../runbooks/stabilization.md). Never use fixture fallback or owner-authenticated bypass as public acceptance.
+
+Current PR: [#50](https://github.com/anmolsansi/OrderlyApp/pull/50). [Two fresh-browser catalog observations](../qa/st11-st13-acceptance/public-access.json) and [public journey/guest-bootstrap failure](../qa/st11-st13-acceptance/public-journey.json) contain only safe status/headings/error evidence; no cookies or contact payloads. Final evidence-only commit checks are attached to the PR, independently of the validated source above.
