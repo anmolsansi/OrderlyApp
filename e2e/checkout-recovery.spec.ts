@@ -176,3 +176,31 @@ test('damaged recovery storage blocks a new order while preserving the durable b
   expect(submits).toBe(0);
   expect(await page.evaluate(key => sessionStorage.getItem(key), RECOVERY_STORAGE_KEY)).toBe('{broken');
 });
+
+test('pending submission ignores a second form submit and clears the basket once', async ({ page }) => {
+  await prepareApiCheckout(page);
+  let release!: () => void;
+  const barrier = new Promise<void>(resolve => { release = resolve; });
+  let submits = 0;
+  await page.route('**/api/orderly/orders', async route => {
+    if (route.request().method() !== 'POST') { await route.continue(); return; }
+    submits++;
+    await barrier;
+    const response = await route.fetch();
+    await route.fulfill({ response });
+  });
+  await page.getByRole('button', { name: /place mock order/i }).click();
+  await expect(page.getByRole('button', { name: /placing order/i })).toBeDisabled();
+  await page.locator('#checkout-form').evaluate((form: HTMLFormElement) => form.requestSubmit());
+  expect(submits).toBe(1);
+  release();
+  await expect(page.getByRole('heading', { name: /order placed/i })).toBeVisible();
+  const state = await page.evaluate(async () => ({
+    cart: await (await fetch('/api/orderly/cart')).json(),
+    orders: await (await fetch('/api/orderly/orders')).json(),
+  }));
+  expect(submits).toBe(1);
+  expect(state.cart.revision).toBe(2);
+  expect(state.cart.items).toEqual([]);
+  expect(state.orders).toHaveLength(1);
+});
