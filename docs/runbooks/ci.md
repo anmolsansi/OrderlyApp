@@ -162,3 +162,5 @@ Rollback remains commit-based. Dependency and configuration changes must retain 
 ## Mandatory assertion guards
 
 Hosted pytest fails if any backend test is skipped. Playwright forbids focused `.only` cases; its JSON report must contain passing cases and zero skipped, failed, flaky or runtime-error results. `node scripts/verify-e2e-report.mjs` enforces this after each mode suite. Failures retain screenshots and the report; traces are disabled to avoid recording guest credentials. Recovery compares the entire immutable receipt JSON and exact migration versions/checksums after transaction-consistent dump/restore.
+
+The audit/test lock also pins pip 26.2: it is installation tooling, but strict audits include it. This version fixes the installer URL/extraction advisories documented in the [official pip changelog](https://pip.pypa.io/en/stable/news/#v26-2). No application dependency upgrade is needed when current candidate audits are clean.

@@ -23,9 +23,9 @@ Each check below is complete only when current evidence is recorded. Group relat
 - [x] M16: Verify migration rerun preserves legacy order.
 - [x] M17: Verify checksum drift fails closed without ledger mutation.
 - [x] M18: Verify startup preserves edited catalog and orders.
-- [ ] M19: Strengthen backup proof to exact full receipt equality.
-- [ ] M20: Strengthen backup proof to exact migration ledger equality.
-- [ ] M21: Rehearse PostgreSQL 16 custom dump and transaction restore.
+- [x] M19: Strengthen backup proof to exact full receipt equality.
+- [x] M20: Strengthen backup proof to exact migration ledger equality.
+- [x] M21: Rehearse PostgreSQL 16 custom dump and transaction restore.
 - [x] M22: Reject skipped backend tests in hosted CI.
 - [x] M23: Regression: backend skip causes failed CI exit.
 - [x] M24: Reject focused Playwright tests in hosted CI.
@@ -33,7 +33,7 @@ Each check below is complete only when current evidence is recorded. Group relat
 - [x] M26: Regression: browser report guard rejects skip/empty/error.
 - [x] M27: Capture safe failure screenshots without credential traces.
 - [x] M28: Run current npm high-severity dependency audit.
-- [ ] M29: Run current strict Python dependency audit.
+- [x] M29: Run current strict Python dependency audit.
 - [x] M30: Run genuine lint and frontend unit/contracts suite.
 - [x] M31: Run independent typecheck and production build.
 - [ ] M32: Run full backend suite against isolated PostgreSQL.
