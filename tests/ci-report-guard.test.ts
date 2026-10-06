@@ -17,6 +17,7 @@ test('CI browser gate rejects empty, skipped, failed, flaky and invalid reports'
       [{ ...valid, flaky: 1 }, [], false],
       [valid, [{ message: 'runtime failed' }], false],
       [undefined, [], false],
+      [{ ...valid, expected: undefined }, [], false],
     ] as const) {
       writeFileSync(path, JSON.stringify({ stats, errors }));
       expect(spawnSync(process.execPath, ['scripts/verify-e2e-report.mjs', path]).status === 0).toBe(passes);
