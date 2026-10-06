@@ -47,6 +47,20 @@ describe('cart logic', () => {
     vi.unstubAllGlobals();
   });
 
+  it.each(['instructions', 'lines', 'duplicate'])('rejects invalid persisted %s without clearing unrelated storage', kind => {
+    const memory = makeMemoryWindow();
+    vi.stubGlobal('window', memory.window);
+    const line: CartItem = { id: 'line', restaurantId: restaurants[0].id, menuItemId: item.id, name: item.name, quantity: 1, basePriceCents: item.priceCents, modifiers: validModifiers };
+    const items = kind === 'instructions' ? [{ ...line, specialInstructions: 'x'.repeat(501) }]
+      : kind === 'lines' ? Array.from({ length: 51 }, (_, index) => ({ ...line, id: String(index) }))
+      : [line, line];
+    memory.values.set(LOCAL_DEMO_CART_STORAGE_KEY, JSON.stringify({ schemaVersion: 1, items }));
+    memory.values.set('unrelated', 'preserve');
+    expect(readLocalDemoCart()).toEqual([]);
+    expect(memory.values.get('unrelated')).toBe('preserve');
+    expect(memory.values.has(LOCAL_DEMO_CART_STORAGE_KEY)).toBe(true);
+  });
+
   it('calculates modifier totals', () => {
     expect(getItemTotal(item, validModifiers)).toBe(2424);
   });
