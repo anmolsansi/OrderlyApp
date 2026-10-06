@@ -1,0 +1,121 @@
+{
+  "date": "2026-10-06",
+  "source_sha": "c0931252fe652d8f14254db6687c228f4db8c5c5",
+  "backend": "https://orderlyapp.onrender.com",
+  "frontend": "https://orderly-app-eight.vercel.app",
+  "result": "PASS_PUBLIC_JOURNEY",
+  "steps": [
+    {
+      "case": "fresh_A_save_and_exact_complete_receipt_reload",
+      "result": "PASS",
+      "receipt_sha256": "8eeee9c3b1d6572774152d218034d25efcdb16c4ff0d382361d384d92fa9bfe9"
+    },
+    {
+      "case": "fresh_B_cannot_list_or_read_A_receipt",
+      "result": "PASS"
+    }
+  ],
+  "api_statuses": [
+    {
+      "path": "/api/orderly/restaurants/marios-pizza",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/orderly/restaurants/marios-pizza",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/orderly/session",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/api/orderly/cart",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/orderly/cart",
+      "method": "PUT",
+      "status": 200
+    },
+    {
+      "path": "/api/orderly/restaurants",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/orderly/cart",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/orderly/cart",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/orderly/checkout/quote",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/api/orderly/orders",
+      "method": "POST",
+      "status": 201
+    },
+    {
+      "path": "/api/orderly/checkout/quote",
+      "method": "POST",
+      "status": 409
+    },
+    {
+      "path": "/api/orderly/cart",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/orderly/orders/[receipt]",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/orderly/session",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/api/orderly/orders/[receipt]",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "guest": "B",
+      "path": "/api/orderly/session",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "guest": "B",
+      "path": "/api/orderly/orders",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "guest": "B",
+      "path": "/api/orderly/orders/[foreign-receipt]",
+      "method": "GET",
+      "status": 404
+    }
+  ],
+  "deployments": {
+    "render": "dep-db2b9ucs728c73br6m10",
+    "vercel": "dpl_2FbVtUZmEMggR5ztcLxxac2srLJH"
+  },
+  "limitations": [
+    "Hosted staging failure/recovery, backup/rollback and actual daily cleanup scheduling are not accepted by this public journey.",
+    "The immutable Vercel URL returns anonymous 302; the public alias was tested without developer authentication."
+  ]
+}

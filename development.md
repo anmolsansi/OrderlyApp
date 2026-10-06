@@ -2,7 +2,7 @@
 
 Revision: 3 • Updated: 2026-10-05 • ST-02/ST-03 acceptance source: `a9537931c57cbf636466bf3f791e440e24ce74bd` on `fix/st02-st03-acceptance` • Release status: **Not completed**.
 
-This is the single execution guide for taking the application to a stable **public mock demo**. ST-01 through ST-10 are implemented; ST-02/03 merged in PR47, ST-04/05/06 in PR48, and ST-07/08/09/10 in PR49 with seven green hosted jobs. **ST-11 implementation/local acceptance and ST-12 repository/hosted CI acceptance are Completed on the follow-up branch; its merge/deployment are separate. ST-13 documentation is reconciled, but ST-13 public receipt acceptance, INT-02 hosted staging and RELEASE-GATE remain Not completed.** The public frontend alias opens; guest creation returns 503 `invalid_config` for `ORDERLY_DATA_MODE`. See [current criterion evidence](docs/qa/st11-st13-acceptance/results.md), [INT-01](docs/qa/int-01.md), [INT-02 local rehearsal](docs/qa/int-02.md) and [exact release identities/blockers](docs/releases/stabilization-acceptance.md). Historical ticket evidence remains in the linked packets. No public completion is inferred from local or CI results.
+This is the single execution guide for taking the application to a stable **public mock demo**. ST-01 through ST-10 are implemented; ST-02/03 merged in PR47, ST-04/05/06 in PR48, and ST-07/08/09/10 in PR49. **ST-11 implementation/local acceptance and ST-12 repository/hosted CI acceptance are Completed and merged in PR50. Both public platforms deploy merged main `c093125` with seven green CI gates. ST-13 public receipt acceptance, INT-02 hosted staging and RELEASE-GATE remain Not completed.** Backend readiness and the public manual journey now pass after configuration repair: a fresh guest saves/reopens an exact receipt, and a second guest cannot read it. Isolated hosted recovery and actual cleanup scheduling remain unverified. See [current criterion evidence](docs/qa/st11-st13-acceptance/results.md), [INT-01](docs/qa/int-01.md), [INT-02 local rehearsal](docs/qa/int-02.md) and [exact release identities/blockers](docs/releases/stabilization-acceptance.md). No public completion is inferred from local or CI results.
 
 Think of the app as a shop made from Lego. The screens already look like a shop, but some connections behind them can lose a basket, show another visitor's receipt, or pretend an order succeeded when the server failed. First we strengthen those connections. Then we add more Lego.
 
@@ -410,7 +410,7 @@ Consumers may prepare read-only designs after W0 fixtures; implementation starts
 
 ## 9. Task index and remaining work
 
-**ST-01 is Completed; ST-02/ST-03 are merged (PR #47). ST-04/ST-05/ST-06 are Completed for branch implementation/local acceptance; hosted CI and merge remain pending.** ST-07 through ST-13, INT-01, INT-02, and RELEASE-GATE remain **Not completed**. See [current evidence](docs/qa/st04-st06-acceptance/acceptance.md). Effort is an estimate for one engineer familiar with the stack, excluding queue time and unavailable infrastructure. Split a ticket before starting if its concrete diff will exceed three engineer-days; preserve its contract seam, owned files and acceptance tests.
+**ST-01–ST-12 implementation/required acceptance is Completed; PR47, PR48, PR49 and PR50 are merged, and current main CI is green. INT-01 has a separate local pass. Public exact-receipt and guest-isolation checks now pass on merged main `c093125`. ST-13, INT-02 hosted staging and RELEASE-GATE remain Not completed pending hosted recovery and actual retention scheduling.** See [current release evidence](docs/releases/stabilization-acceptance.md). Effort is an estimate for one engineer familiar with the stack, excluding queue time and unavailable infrastructure. Split a ticket before starting if its concrete diff will exceed three engineer-days; preserve its contract seam, owned files and acceptance tests.
 
 | Ticket / outcome / status | Wave | Dependencies | Effort | Critical path |
 |---|---|---|---|---|
@@ -437,7 +437,7 @@ Consumers may prepare read-only designs after W0 fixtures; implementation starts
 
 | [ST-11 — Make startup, readiness, retention and recovery truthful](#st-11) — **Completed (implementation/local acceptance; public operations separate)** | W6 | ST-07 backend complete via C1/C4/C5/C6 | 3d | Yes |
 
-| [ST-12 — Expand CI and refresh release dependencies](#st-12) — **Completed (repository/hosted CI; merge/deployment separate)** | W7 | ST-01 via C0; ST-11 via C8; source writers released before required upgrade fixes | 2d | Yes |
+| [ST-12 — Expand CI and refresh release dependencies](#st-12) — **Completed (merged PR50; hosted CI green)** | W7 | ST-01 via C0; ST-11 via C8; source writers released before required upgrade fixes | 2d | Yes |
 
 | [ST-13 — Reconcile documentation and verify the public candidate](#st-13) — **Not completed** | W9 | INT-02 candidate gate; ST-12 CI gate | 2d | Yes |
 
@@ -1351,7 +1351,7 @@ Current criterion-indexed proof: [ST-02/ST-03 acceptance](docs/qa/st02-st03-acce
 
 ### ST-12 — Expand CI and refresh release dependencies
 
-**Status:** Completed (repository/hosted CI; merge/deployment separate). **Execution owner:** Codex. **Evidence:** [Current criterion report](docs/qa/st11-st13-acceptance/results.md). **Objective:** Clean-install hosted application CI runs lint/typecheck/build, backend and browser assertions on candidate SHA.
+**Status:** Completed (merged PR50; hosted CI green). **Execution owner:** Codex. **Evidence:** [Current criterion report](docs/qa/st11-st13-acceptance/results.md). **Objective:** Clean-install hosted application CI runs lint/typecheck/build, backend and browser assertions on candidate SHA.
 
 **Why this task exists:** ST-01 establishes hosted baseline CI, and behavior tickets add coverage as they land. This ticket completes the full release matrix, adds genuine linting and refreshes dependency evidence on the final candidate; it is not the first CI or dependency assessment.
 
@@ -1429,7 +1429,7 @@ Current criterion-indexed proof: [ST-02/ST-03 acceptance](docs/qa/st02-st03-acce
 
 ### ST-13 — Reconcile documentation and verify the public candidate
 
-**Status:** Not completed — docs/ledger done; public checkout blocked by guest configuration 503. **Execution owner:** Codex; release owner needed. **Evidence:** [Current release ledger](docs/releases/stabilization-acceptance.md). **Objective:** README accurately describes password-free mock manual demo and modes; no unsupported voice/payment/account claim.
+**Status:** Not completed — public receipt/isolation and docs pass; isolated hosted recovery and cleanup scheduling pending. **Execution owner:** Codex; release owner needed. **Evidence:** [Current release ledger](docs/releases/stabilization-acceptance.md). **Objective:** README accurately describes password-free mock manual demo and modes; no unsupported voice/payment/account claim.
 
 **Why this task exists:** A public demo is not finished when a deployment service says success. A new visitor must actually reach the intended build and complete its mock journey. The documentation must describe what exists rather than promise unavailable voice or real accounts.
 
@@ -1535,7 +1535,7 @@ Checkpoints are real stop/go nodes, not a final “test everything” wish. They
 
 ### INT-02 — Release, persistence and recovery rehearsal — Not completed
 
-**Current evidence:** [Local rehearsal report](docs/qa/int-02.md). All six local scenarios pass; hosted staging operations/public acceptance remain unrun. The checklist below stays unchecked for that hosted release gate.
+**Current evidence:** [Local rehearsal report](docs/qa/int-02.md). [Hosted staging setup](docs/qa/st13-staging-2026-10-06.md): schema-only Neon branch and free Render backend created; database connection/deployment and recovery tests pending. All six local scenarios pass; public receipt/isolation also pass separately. Hosted staging recovery, backup/rollback and actual cleanup scheduling remain unrun. The checklist below stays unchecked for that hosted release gate.
 
 **Owner:** Future release reviewer. **Inputs:** ST-10 and ST-12 completed, INT-01 evidence, C8 runbook, upgraded candidate, isolated staging stack, pre-migration backup. **Outputs:** CREATE `docs/qa/int-02.md` plus identity-linked CI/backup/recovery reports. **Non-owned:** Product/config changes; assign defects to ST-11/ST-12 or relevant provider. **Runtime:** Actual required PG, gateway and staged environment; no production fault injection.
 
@@ -1621,7 +1621,7 @@ No additional user product decision blocks this document: audience, profiles and
 
 ## 16. Delegation readiness report
 
-The guide remains a **staged handoff plan**. **Execution readiness: ST-01 is complete; later waves remain gated by their named dependencies and provider conformance/freeze points.** ST-01 now proves the executable baseline, while the remaining stabilization tickets are not complete until their own evidence gates pass.
+The guide now records **executed stabilization work and the remaining release handoff**. ST-01–ST-12 are complete at their documented scope; both public platforms deploy the merged source and the public receipt/isolation checks pass. INT-02 hosted operations and ST-13's hosted recovery obligations remain gated by isolated staging access and cleanup scheduling evidence.
 
 | Readiness check | Document state | Execution condition |
 |---|---|---|
@@ -1634,9 +1634,9 @@ The guide remains a **staged handoff plan**. **Execution readiness: ST-01 is com
 | DAG, start/merge/runtime semantics and shared-file release gates | Specified | Enforce wave ownership and documented handoff |
 | Every invariant and named defect has verification route | Specified in test matrix | Tests run on same candidate |
 | Backend runner and clean-install reproduction | Verified by ST-01 | Preserve the pinned commands and rerun them on each assessed candidate |
-| Cross-component integration and public release proof | INT-01 local integration verified; public release not verified | INT-02, ST-13 and RELEASE-GATE remain pending |
-| True blockers/product ambiguity disclosed | ST-01 runtime/hosted baseline resolved; later deployment access remains | Product scope is confirmed; satisfy each later ticket's explicit runtime/release prerequisites |
-| Completion/publishing claims truthful | ST-01–ST-10 local evidence recorded; no public release claimed | Hosted CI/merge are separate; ST-11–ST-13 and release gates remain incomplete |
+| Cross-component integration and public release proof | INT-01 local and named public receipt/isolation verified | INT-02 hosted recovery, ST-13 and RELEASE-GATE remain pending |
+| True blockers/product ambiguity disclosed | Public access resolved; Neon provider identified; staging linkage and cleanup scheduler remain | Connect created staging resources and collect hosted operational evidence |
+| Completion/publishing claims truthful | ST-01–ST-12 evidence, merges, CI and exact public receipt/isolation recorded | ST-13 and overall release remain incomplete until hosted operations pass |
 
 **Provider→consumer test:** Section6 records schema, positive/negative errors, fixtures, retry/security/lifecycle and conformance for every named interface. Section7 records each consumer gate. Consumers do not need private SQL or pricing code; they need the public contracts and executable fixtures ST-01 supplies. A provider may not freeze incomplete examples and ask the consumer to guess missing fields. If fixture/conformance fails, repair it in the provider before releasing the dependent wave.
 

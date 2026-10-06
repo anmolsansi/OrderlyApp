@@ -43,15 +43,15 @@ Each check below is complete only when current evidence is recorded. Group relat
 - [x] M36: Push green CI microcommit.
 - [x] M37: Reconcile all ST13-owned active and historical docs.
 - [x] M38: Refresh exact Vercel deployment identity read only.
-- [ ] M39: Inspect Render service in explicitly selected workspace.
+- [x] M39: Inspect Render service in explicitly selected workspace.
 - [x] M40: Record fresh unauthenticated public access result.
 - [x] M41: Record backend readiness and gateway result.
 - [x] M42: Prepare current acceptance ledger with honest blockers.
 - [x] M43: Publish focused PR and attach it to this chat.
 - [x] M44: Verify all seven hosted CI gates on candidate SHA.
 - [x] M45: Record ST11 and ST12 acceptance separately from public gate.
-- [ ] M46: Run authorized public two-guest receipt acceptance after release prerequisites.
+- [x] M46: Run authorized public two-guest receipt acceptance after release prerequisites.
 
 Evidence: `docs/qa/st11-st13-acceptance/results.md` and `docs/releases/stabilization-acceptance.md`. Public or staging criteria stay pending when prerequisites are missing.
 
-Publication: [PR50](https://github.com/anmolsansi/OrderlyApp/pull/50). M39 is pending the required explicit Render workspace selection. M46 remains blocked: fresh public browsers load catalog, but guest bootstrap is 503 invalid_config for ORDERLY_DATA_MODE; no public receipt is accepted. M44 has exact green PR candidate a5a46a0; final evidence-only commit checks are tracked in the PR.
+Publication: [PR50](https://github.com/anmolsansi/OrderlyApp/pull/50) is merged; merged-main CI run 37431711534 passed. M39 is complete after the user confirmed Anmol's workspace (`tea-d7so32sm0tmc73dc3cp0`). M46 passes after connecting the available free limiter privately: guest A saves/reopens an exact complete receipt; independent guest B has empty history and receives 404 for A's receipt. These 46 implementation/public microtasks do not close the separate hosted staging recovery, retention scheduling or overall release gates. Evidence follow-up: [draft PR51](https://github.com/anmolsansi/OrderlyApp/pull/51).

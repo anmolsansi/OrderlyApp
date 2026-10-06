@@ -38,7 +38,7 @@ The stabilization release deliberately narrows the earlier voice-first concept. 
 
 The current runtime/audit candidate `64a6f412c03731e997c9a96e91e849bc4cf998e4` passed all seven required [hosted CI jobs](https://github.com/anmolsansi/OrderlyApp/actions/runs/37428142914). ST11 has current local operation/recovery proof.
 
-Public acceptance remains blocked: the existing main frontend alias opens without developer login, but its catalog recovered after a 504, while guest creation returns 503 `invalid_config` for `ORDERLY_DATA_MODE`. The immutable frontend URL is protected by SSO. The follow-up is not deployed; INT-02 hosted staging and ST-13 public receipt evidence remain missing. See [current acceptance ledger](releases/stabilization-acceptance.md).
+PR #50 is merged at `c0931252fe652d8f14254db6687c228f4db8c5c5`; both public platforms deploy that SHA, and all seven merged-main CI jobs passed. In the user-confirmed Render workspace, `OrderlyApp` at `https://orderlyapp.onrender.com` returns readiness 200 after API-mode, signing-secret and private limiter configuration repairs. A fresh visitor saves a mock order (201) and reloads the exact complete receipt (200); a second guest has empty history and receives 404 for that receipt. The public alias opens anonymously; the immutable Vercel URL returns 302. ST-13 remains Not completed pending isolated hosted recovery and actual cleanup scheduling. See [current acceptance ledger](releases/stabilization-acceptance.md).
 
 ## Immediate Roadmap — Finish Stabilization Acceptance
 

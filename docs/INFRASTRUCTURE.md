@@ -113,7 +113,7 @@ Rollback must preserve already accepted receipt/idempotency rows and must never 
 
 The repository supports Vercel-style frontend deployment and Render-style backend infrastructure through checked-in config/docs. A checked-in blueprint is not proof that the public resources are current.
 
-As of October 6, 2026, the existing main frontend is READY and the public alias opens anonymously; its immutable Vercel URL redirects to SSO. The public catalog recovered from an initial 504 to 200, but public guest creation returns 503 `invalid_config` for `ORDERLY_DATA_MODE`, blocking checkout. The separately observed Render readiness URL timed out. Current Render service identity/configuration and actual cleanup schedule remain unverified; a checked-in cron/predeploy blueprint is not an activated service. The follow-up branch is not deployed.
+PR #50 is merged at `c0931252fe652d8f14254db6687c228f4db8c5c5`; both public platforms deploy that SHA, and all seven merged-main CI jobs passed. In the user-confirmed Render workspace, `OrderlyApp` at `https://orderlyapp.onrender.com` returns readiness 200 after API-mode, signing-secret and private limiter configuration repairs. A fresh visitor saves a mock order (201) and reloads the exact complete receipt (200); a second guest has empty history and receives 404 for that receipt. The public alias opens anonymously; the immutable Vercel URL returns 302. ST-13 remains Not completed pending isolated hosted recovery and actual cleanup scheduling. See [current acceptance ledger](releases/stabilization-acceptance.md).
 
 See [`DEPLOYMENT.md`](DEPLOYMENT.md) and [`releases/stabilization-acceptance.md`](releases/stabilization-acceptance.md) before treating any hosted URL as accepted.
 
