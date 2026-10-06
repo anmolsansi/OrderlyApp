@@ -63,8 +63,16 @@ def test_contract_negative_envelopes_are_explicit() -> None:
             error = case["error"]
             assert error["code"]
             assert error["message"]
-            assert error["request_id"].startswith("synthetic-request-")
-            assert isinstance(error["fields"], list)
+            if contract == "C7":
+                # Browser-only failures have no invented server request ID/fields.
+                assert "request_id" not in error
+                if "requestId" in error:
+                    assert error["requestId"].startswith("synthetic-request-")
+                if "fields" in error:
+                    assert isinstance(error["fields"], list)
+            else:
+                assert error["request_id"].startswith("synthetic-request-")
+                assert isinstance(error["fields"], list)
 
 
 def test_contract_schema_versions_are_stable() -> None:
