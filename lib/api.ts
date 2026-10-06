@@ -140,6 +140,7 @@ async function parseErrorResponse(response: Response): Promise<ApiFailure> {
   const currentCart = normalizeRevisionedCart(envelope?.current_cart);
 
   return failure(errorKind(response.status), code, message, {
+    status: response.status,
     ...(requestId ? { requestId } : {}),
     ...(fields ? { fields } : {}),
     ...(currentCart ? { currentCart } : {}),
@@ -664,7 +665,8 @@ export async function submitCheckoutOrder(
     true,
   );
 
-  if (!result.ok && (result.error.code === 'upstream_timeout' || result.error.code === 'upstream_unavailable')) {
+  // A server/receipt-shape error cannot prove that the checkout did not commit.
+  if (!result.ok && ((result.error.status ?? 0) >= 500 || result.error.code === 'invalid_response')) {
     return { ...result, kind: 'network' };
   }
   return result;
@@ -676,7 +678,10 @@ export async function fetchOrderReceipt(orderId: string): Promise<ApiResult<Orde
   }
   return requestJson(
     `${getApiBaseUrl()}/orders/${encodeURIComponent(orderId)}`,
-    normalizeOrderReceipt,
+    payload => {
+      const receipt = normalizeOrderReceipt(payload);
+      return receipt?.id.toLowerCase() === orderId.toLowerCase() ? receipt : undefined;
+    },
     { cache: 'no-store' },
     true,
   );
@@ -720,19 +725,19 @@ function isStoredCheckoutRecovery(value: unknown): value is CheckoutRecovery {
   return isRecord(value)
     && value.schemaVersion === 1
     && typeof value.idempotencyKey === 'string'
-    && /^[0-9a-fA-F-]{36}$/.test(value.idempotencyKey)
+    && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(value.idempotencyKey)
     && isStoredOrderSubmission(value.submission);
 }
 
-export function loadCheckoutRecovery(storage: Storage | undefined): CheckoutRecovery | undefined {
-  if (!storage) return undefined;
+export function loadCheckoutRecovery(storage: Storage | undefined): CheckoutRecovery | null | undefined {
+  if (!storage) return null;
   try {
     const raw = storage.getItem(CHECKOUT_RECOVERY_STORAGE_KEY);
-    if (!raw) return undefined;
+    if (raw === null) return undefined;
     const parsed = JSON.parse(raw) as unknown;
-    return isStoredCheckoutRecovery(parsed) ? parsed : undefined;
+    return isStoredCheckoutRecovery(parsed) ? parsed : null;
   } catch {
-    return undefined;
+    return null;
   }
 }
 

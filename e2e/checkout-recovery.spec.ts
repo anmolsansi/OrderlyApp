@@ -30,7 +30,8 @@ async function assertFreshGuestHasNoOrders(browser: Browser): Promise<void> {
   }
 }
 
-test('lost accepted response replays the exact key and body into one durable receipt', async ({ page, browser }) => {
+for (const lostResponse of ['connection', '500', '503', 'malformed'] as const) {
+test(`lost ${lostResponse} accepted response survives reload and replays the exact receipt`, async ({ page, browser }) => {
   await prepareApiCheckout(page);
 
   await expect(page.getByLabel('Delivery address')).toHaveValue('200 Sample Avenue');
@@ -56,7 +57,8 @@ test('lost accepted response replays the exact key and body into one durable rec
     });
 
     if (attempts.length === 1) {
-      await route.abort('failed');
+      if (lostResponse === 'connection') await route.abort('failed');
+      else await route.fulfill({ status: lostResponse === 'malformed' ? 201 : Number(lostResponse), contentType: 'application/json', body: JSON.stringify(lostResponse === 'malformed' ? { schema_version: 1 } : { error: { code: 'storage_unavailable', message: 'Order outcome unavailable', fields: [] } }) });
       return;
     }
 
@@ -73,6 +75,9 @@ test('lost accepted response replays the exact key and body into one durable rec
   await expect(page.getByLabel('Delivery address')).toBeDisabled();
   expect(await page.evaluate(key => sessionStorage.getItem(key), RECOVERY_STORAGE_KEY)).not.toBeNull();
 
+  await page.reload();
+  await expect(page.getByText(/order result is uncertain/i)).toBeVisible();
+  await expect(page.getByLabel('Delivery address')).toHaveValue('100 Demo Street');
   await page.getByRole('button', { name: /retry same order safely/i }).click();
   await expect(page).toHaveURL(/\/order-confirmation\?orderId=/);
   await expect(page.getByRole('heading', { name: /order placed/i })).toBeVisible();
@@ -104,6 +109,8 @@ test('lost accepted response replays the exact key and body into one durable rec
   await assertFreshGuestHasNoOrders(browser);
 });
 
+}
+
 test('definitive order API failure keeps the durable basket and never invents confirmation', async ({ page }) => {
   await prepareApiCheckout(page);
 
@@ -113,13 +120,13 @@ test('definitive order API failure keeps the durable basket and never invents co
       return;
     }
     await route.fulfill({
-      status: 503,
+      status: 422,
       contentType: 'application/json',
       body: JSON.stringify({
         error: {
-          code: 'storage_unavailable',
-          message: 'Order storage is unavailable',
-          request_id: 'synthetic-e2e-order-503',
+          code: 'invalid_checkout',
+          message: 'Checkout details were rejected',
+          request_id: 'synthetic-e2e-order-422',
           fields: [],
         },
       }),
@@ -128,7 +135,7 @@ test('definitive order API failure keeps the durable basket and never invents co
 
   await page.getByRole('button', { name: /place mock order/i }).click();
   await expect(page).toHaveURL(/\/checkout/);
-  await expect(page.getByText(/order storage is unavailable/i)).toBeVisible();
+  await expect(page.getByText(/checkout details were rejected/i)).toBeVisible();
   await expect(page.getByText(/pepperoni feast/i)).toBeVisible();
   expect(await page.evaluate(key => sessionStorage.getItem(key), RECOVERY_STORAGE_KEY)).toBeNull();
 
@@ -154,4 +161,48 @@ test('direct local_demo checkout, receipt, and history routes stay unavailable',
   await page.goto('/orders');
   await expect(page.getByRole('heading', { name: /order history unavailable in fixture preview/i })).toBeVisible();
   expect(apiRequests).toEqual([]);
+});
+
+
+for (const damaged of ['{broken', '']) {
+test(`damaged recovery storage (${damaged || 'empty value'}) blocks a new order while preserving the durable basket`, async ({ page }) => {
+  await prepareApiCheckout(page);
+  await page.evaluate(({ key, value }) => sessionStorage.setItem(key, value), { key: RECOVERY_STORAGE_KEY, value: damaged });
+  let submits = 0;
+  page.on('request', request => { if (new URL(request.url()).pathname === '/api/orderly/orders' && request.method() === 'POST') submits++; });
+  await page.reload();
+  await expect(page.getByRole('alert').filter({ hasText: /recovery storage is unavailable or damaged/i })).toBeVisible();
+  await expect(page.getByRole('button', { name: /place mock order/i })).toBeDisabled();
+  await expect(page.getByText(/pepperoni feast/i)).toBeVisible();
+  expect(submits).toBe(0);
+  expect(await page.evaluate(key => sessionStorage.getItem(key), RECOVERY_STORAGE_KEY)).toBe(damaged);
+});
+}
+
+test('pending submission ignores a second form submit and clears the basket once', async ({ page }) => {
+  await prepareApiCheckout(page);
+  let release!: () => void;
+  const barrier = new Promise<void>(resolve => { release = resolve; });
+  let submits = 0;
+  await page.route('**/api/orderly/orders', async route => {
+    if (route.request().method() !== 'POST') { await route.continue(); return; }
+    submits++;
+    await barrier;
+    const response = await route.fetch();
+    await route.fulfill({ response });
+  });
+  await page.getByRole('button', { name: /place mock order/i }).click();
+  await expect(page.getByRole('button', { name: /placing order/i })).toBeDisabled();
+  await page.locator('#checkout-form').evaluate((form: HTMLFormElement) => form.requestSubmit());
+  expect(submits).toBe(1);
+  release();
+  await expect(page.getByRole('heading', { name: /order placed/i })).toBeVisible();
+  const state = await page.evaluate(async () => ({
+    cart: await (await fetch('/api/orderly/cart')).json(),
+    orders: await (await fetch('/api/orderly/orders')).json(),
+  }));
+  expect(submits).toBe(1);
+  expect(state.cart.revision).toBe(2);
+  expect(state.cart.items).toEqual([]);
+  expect(state.orders).toHaveLength(1);
 });

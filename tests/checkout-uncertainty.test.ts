@@ -56,7 +56,7 @@ describe('C6 gateway uncertainty classification', () => {
     });
   });
 
-  it('keeps a real backend storage 503 as a definitive server rejection', async () => {
+  it('keeps the original recovery key when backend storage 503 cannot prove rejection', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
       const url = String(input);
       if (url === '/api/orderly/session') {
@@ -75,7 +75,7 @@ describe('C6 gateway uncertainty classification', () => {
 
     await expect(submitCheckoutOrder('22222222-2222-4222-8222-222222222222', submission)).resolves.toMatchObject({
       ok: false,
-      kind: 'server',
+      kind: 'network',
       error: { code: 'storage_unavailable', requestId: 'synthetic-storage' },
     });
   });

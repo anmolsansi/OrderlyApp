@@ -24,7 +24,7 @@ Checkout has five explicit states:
 - `accepted` — a valid 200/201 immutable receipt was returned by the server.
 - `rejected` — the server returned a definitive failure, or local validation/storage failed before an order could be accepted.
 
-An HTTP 4xx/5xx response is definitive. It is not `uncertain`. Only transport failure or timeout after the POST was sent creates the uncertain state.
+Known 4xx validation/conflict/session responses are definitive. After the order POST, transport failure, any 5xx, or a malformed accepted response is uncertain: none proves whether a commit happened. Preserve the original key/body for replay.
 
 ## Idempotency and recovery
 
@@ -154,7 +154,7 @@ render an unavailable-in-fixture-preview state. These routes do not bootstrap a 
 - Re-read C4 and refresh the C5 quote.
 - Require a new deliberate submission and a new idempotency key.
 
-### 422 validation failure or 5xx server failure
+### Definitive 4xx rejection
 
 - Treat the attempt as rejected.
 - Keep the basket.
@@ -162,10 +162,11 @@ render an unavailable-in-fixture-preview state. These routes do not bootstrap a 
 - Show the server error.
 - Never manufacture an order or receipt.
 
-### Malformed 2xx response
+### 5xx server failure or malformed 2xx response
 
-- C7 rejects the payload as `invalid_response`.
-- No local replacement receipt is created.
+The response does not prove whether the transaction committed. Preserve the original key/body and stay uncertain, with same-key retry. This also covers a storage error caused by losing a database commit acknowledgement. A malformed receipt is `invalid_response`; never invent a replacement or unlock a fresh key.
+
+Exact receipt reads also verify the response ID matches the requested UUID. A different receipt is an invalid response, never an acceptable substitute. C7 errors retain HTTP `status` for distinguishing definitive rejection from ambiguous server results.
 
 ## Verification
 
@@ -175,7 +176,7 @@ ST-09 adds or updates:
 - `tests/fixtures/contracts/c7.json` to freeze the browser quote/submission/receipt/recovery extension.
 - `tests/fixtures-checkout.test.ts` for both synthetic C2 address inputs.
 - `e2e/orderly.spec.ts` so the existing product checkout harness speaks C5/C6.
-- `e2e/checkout-recovery.spec.ts` for real API/Postgres lost-response replay, definitive 503 behavior, exact-ID not-found behavior, guest-history isolation, address persistence, and local-demo route guards.
+- `e2e/checkout-recovery.spec.ts` for real API/Postgres lost-response replay, definitive 422 and ambiguous 5xx behavior, exact-ID not-found behavior, guest-history isolation, address persistence, and local-demo route guards.
 
 The real E2E lost-response test lets the first C6 POST reach the backend, captures its 201 receipt, then intentionally aborts that response before the browser receives it. The browser must enter `uncertain`; retry must send the identical idempotency key and body and receive the same durable receipt as a C6 replay.
 
@@ -195,3 +196,5 @@ python -m pytest backend/tests -q
 ```
 
 GitHub Actions runs the frontend suite, backend suite against Postgres, Chromium runtime check, and product E2E suite against the real API/Postgres path for every `feat/**` push and pull request.
+
+Damaged or unreadable recovery records block new submissions. `loadCheckoutRecovery` returns `undefined` only for an empty store, `null` for unavailable/damaged storage, and the validated record otherwise. Recovery keys must have UUID shape. Preserve damaged evidence for reconciliation rather than deleting it automatically.

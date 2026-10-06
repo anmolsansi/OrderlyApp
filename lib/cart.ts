@@ -1,8 +1,8 @@
 import { createMockOrderId as createSeededMockOrderId, restaurants as localDemoRestaurants } from './mock-data';
 import type { CartItem, CartItemModifier, CheckoutDetails, MenuItem, Restaurant } from './types';
 
-// Legacy accepted-cart mirror retained only until ST-09 migrates checkout. ST-08
-// pages never read it as API authority and only write it after an accepted API response.
+// Legacy accepted-cart mirror is never API authority. Pages write it only after
+// an accepted API response; local preview and failed drafts have separate keys.
 export const CART_STORAGE_KEY = 'orderlyapp.marketplace.cart.v1';
 export const LOCAL_DEMO_CART_STORAGE_KEY = 'orderlyapp.marketplace.localDemoCart.v1';
 export const API_CART_DRAFT_STORAGE_KEY = 'orderlyapp.marketplace.apiCartDraft.v1';
@@ -41,7 +41,7 @@ function isStoredCartItem(value: unknown): value is CartItem {
     || Number(value.basePriceCents) <= 0
     || !Array.isArray(value.modifiers)
   ) return false;
-  if (value.specialInstructions !== undefined && typeof value.specialInstructions !== 'string') return false;
+  if (value.specialInstructions !== undefined && (typeof value.specialInstructions !== 'string' || value.specialInstructions.length > 500)) return false;
 
   return value.modifiers.every(modifier => isRecord(modifier)
     && typeof modifier.groupId === 'string'
@@ -54,7 +54,8 @@ function parseStoredCart(raw: string | null): CartItem[] {
   try {
     const parsed = JSON.parse(raw) as unknown;
     if (!isRecord(parsed) || parsed.schemaVersion !== 1 || !Array.isArray(parsed.items)) return [];
-    return parsed.items.every(isStoredCartItem) ? parsed.items : [];
+    if (parsed.items.length > 50 || !parsed.items.every(isStoredCartItem)) return [];
+    return new Set(parsed.items.map(item => item.id)).size === parsed.items.length ? parsed.items : [];
   } catch {
     return [];
   }

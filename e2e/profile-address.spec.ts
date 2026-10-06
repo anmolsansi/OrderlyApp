@@ -76,7 +76,7 @@ test('denied sessionStorage getter blocks new checkout without sending an order'
     });
   });
   await page.reload();
-  await expect(page.getByText(/enable browser storage and reload before submitting/i)).toBeVisible();
+  await expect(page.getByText(/restore browser recovery storage and reload before submitting/i)).toBeVisible();
   await expect(page.getByRole('button', { name: /place mock order/i })).toBeDisabled();
   await page.locator('#checkout-form').evaluate(form => (form as HTMLFormElement).requestSubmit());
   expect(submittedOrders).toBe(0);

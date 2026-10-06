@@ -30,7 +30,7 @@ describe('browser Storage property access', () => {
   });
 
   it('never claims to save or clear checkout recovery without storage', () => {
-    expect(loadCheckoutRecovery(undefined)).toBeUndefined();
+    expect(loadCheckoutRecovery(undefined)).toBeNull();
     expect(saveCheckoutRecovery(undefined, {} as CheckoutRecovery)).toBe(false);
     expect(clearCheckoutRecovery(undefined)).toBe(false);
   });

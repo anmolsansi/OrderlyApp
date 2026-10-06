@@ -125,7 +125,7 @@ The existing ST-09 checkout recovery E2E remains responsible for lost-response r
 
 ## Dependency note
 
-The implementation is based on merged C2 and C7/ST-09 providers. `development.md` still lists the separate INT-01 manual journey gate as not completed. ST-10 does not silently mark that canonical gate complete. Branch-level automated browser evidence is recorded independently, and final merge readiness must still respect the stabilization plan's dependency bookkeeping.
+Current C2/C7 providers are verified on the ST-07–ST-10 candidate. The disclosed separate INT-01 pass combines a manual real-stack checkout walkthrough with explicitly identified automated negative checks; see `docs/qa/int-01.md` and `docs/qa/st07-st10-acceptance/acceptance.md`. Local acceptance is separate from hosted CI, merge, INT-02 and public release.
 
 ## Rollback
 
@@ -137,3 +137,12 @@ If ST-10 causes a regression, revert the ST-10 web hardening while keeping:
 - ST-09 truthful checkout and idempotent recovery
 
 Do not restore password simulation, local order authority, fixture fallback on API failure, or unsafe external `next` navigation.
+
+## 2026-10-06 cache boundary check
+
+Versioned local preview baskets and failed API drafts reject more than 50 lines,
+repeated line IDs and instructions longer than 500 characters on read. Invalid
+cache data returns an empty presentation cache without deleting that record or
+unrelated browser storage. API carts remain authoritative. The parameterized
+persisted-cache regression reproduces all three failures before the shared
+parser fix and passes afterward.

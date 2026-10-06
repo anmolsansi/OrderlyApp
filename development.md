@@ -2,7 +2,7 @@
 
 Revision: 3 • Updated: 2026-10-05 • ST-02/ST-03 acceptance source: `a9537931c57cbf636466bf3f791e440e24ce74bd` on `fix/st02-st03-acceptance` • Release status: **Not completed**.
 
-This is the single execution guide for taking the existing application to a stable **public mock demo**. **ST-01 is implemented and verified; ST-02/ST-03 are merged through PR #47. ST-04/ST-05/ST-06 implementation and local acceptance are Completed on `fix/st04-st06-acceptance`; hosted CI and merge remain pending.** ST-07 through ST-13 and integration/release gates remain **Not completed**. See [ST-04/ST-05/ST-06 evidence](docs/qa/st04-st06-acceptance/acceptance.md). See [ST-02/ST-03 acceptance](docs/qa/st02-st03-acceptance/acceptance.md) for current criteria and evidence. This guide began as planning-only documentation; the dated ST-01 evidence below records the authorized implementation that followed. No later ticket is implied complete by ST-01.
+This is the single execution guide for taking the existing application to a stable **public mock demo**. **ST-01 is implemented and verified; ST-02/ST-03 are merged through PR #47; ST-04/ST-05/ST-06 are merged through PR #48. ST-07/ST-08/ST-09/ST-10 implementation and local acceptance are Completed on `fix/st07-st10-acceptance`; hosted CI and merge remain pending.** The disclosed separate INT-01 local testing pass is Completed. ST-11 through ST-13, INT-02 and public release remain **Not completed**. See [ST-07–ST-10 current evidence](docs/qa/st07-st10-acceptance/acceptance.md) and [INT-01](docs/qa/int-01.md). See [ST-04/ST-05/ST-06 evidence](docs/qa/st04-st06-acceptance/acceptance.md). See [ST-02/ST-03 acceptance](docs/qa/st02-st03-acceptance/acceptance.md) for current criteria and evidence. This guide began as planning-only documentation; the dated ST-01 evidence below records the authorized implementation that followed. No later ticket is implied complete by ST-01.
 
 Think of the app as a shop made from Lego. The screens already look like a shop, but some connections behind them can lose a basket, show another visitor's receipt, or pretend an order succeeded when the server failed. First we strengthen those connections. Then we add more Lego.
 
@@ -31,7 +31,7 @@ Think of the app as a shop made from Lego. The screens already look like a shop,
 
 **Goal:** A visitor can browse an authoritative restaurant menu, customize an item, edit a basket, select a demo delivery address, submit mock checkout once, and reopen the same complete receipt. Reloads, retries, another browser tab and temporary server failures must not corrupt this journey.
 
-**Confirmed user decisions:** Stabilize before adding features; target a public mock demo; use password-free demo profiles; postpone voice until stabilization. The user requested a detailed `development.md` and explicitly said **no coding** for this documentation task.
+**Confirmed user decisions:** Stabilize before adding features; target a public mock demo; use password-free demo profiles; postpone voice until stabilization. The original documentation task requested **no coding**; subsequent explicit requests authorize ticket implementation and microcommit publication.
 
 **Scope:** Existing manual ordering, demo profile/address screens, scoped guest data, canonical pricing, cart persistence, honest error states, receipt/history correctness, safe startup, reproducible checks and verified public access. The mock payment screen must collect no real card information. A stored order means “mock order saved,” not a restaurant accepted it or a driver is coming.
 
@@ -289,10 +289,10 @@ The contract designs below remain authoritative. **C0 is frozen by completed ST-
 3. **Interface type:** TypeScript / UI.
 4. **Source of truth:** lib/api.ts; lib/types.ts; CREATE tests/fixtures/contracts/adapter.json.
 5. **Inputs:** C1/C3/C4 responses, later C5/C6 responses; explicit data mode.
-6. **Outputs:** Discriminated {ok:true,data}|{ok:false,error:{code,message,requestId?,currentCart?},kind:"validation"|"conflict"|"session"|"network"|"server"}; checkout state idle/submitting/uncertain/accepted/rejected.
+6. **Outputs:** Discriminated {ok:true,data}|{ok:false,error:{code,message,requestId?,status?,currentCart?},kind:"validation"|"conflict"|"session"|"network"|"server"}; checkout state idle/submitting/uncertain/accepted/rejected.
 7. **Preconditions:** Frozen response fixtures; browser calls same origin only.
 8. **Postconditions:** No undefined-as-success; API failures never switch to local mode; stale response cannot replace newer cart/session. local_demo supports only the charter's fixture preview: no checkout, accepted orders, receipt/history or guest bootstrap.
-9. **Errors:** Timeout/connection lost after submit -> uncertain; validation -> rejected; missing exact order -> not-found state.
+9. **Errors:** Timeout/connection loss, 5xx or malformed accepted response after submit -> uncertain with original key/body; known validation/conflict/session 4xx -> rejected; missing exact order -> not-found state. Exact receipt IDs must match.
 10. **Retry / idempotency:** Mutations not automatically retried except deliberate same-key checkout recovery; reads bounded retry; refresh/conflict requires user review.
 11. **Ordering / concurrency:** Abort obsolete read; sequence guard; serialize cart mutations; changing checkout requires a new key after reconciliation.
 12. **Security / privacy:** No public owner IDs; safe text rendering; internal return path allowlist; checkout recovery persisted sessionStorage with synthetic data only.
@@ -417,23 +417,23 @@ Consumers may prepare read-only designs after W0 fixtures; implementation starts
 
 | [ST-01 — Reproduce the baseline and publish executable contracts](#st-01) — **Completed** | W0 | None | 3d | Yes |
 
-| [ST-02 — Give each visitor a private server-issued guest session](#st-02) — **Completed — branch/local acceptance; PR CI/merge pending** | W1 | ST-01 via C0 | 3d | Yes |
+| [ST-02 — Give each visitor a private server-issued guest session](#st-02) — **Completed — merged PR #47; local acceptance** | W1 | ST-01 via C0 | 3d | Yes |
 
-| [ST-03 — Replace local passwords with honest demo profiles](#st-03) — **Completed — branch/local acceptance; PR CI/merge pending** | W2 | ST-02 via C1 | 2d | Convergence lane |
+| [ST-03 — Replace local passwords with honest demo profiles](#st-03) — **Completed — merged PR #47; local acceptance** | W2 | ST-02 via C1 | 2d | Convergence lane |
 
-| [ST-04 — Validate and price items from one canonical catalog](#st-04) — **Completed (local; CI/merge pending)** | W2 | ST-01 via C0; ST-02 shared backend files released | 3d | Yes |
+| [ST-04 — Validate and price items from one canonical catalog](#st-04) — **Completed (merged PR #48; local acceptance)** | W2 | ST-01 via C0; ST-02 shared backend files released | 3d | Yes |
 
-| [ST-05 — Persist baskets with revisions and no hidden failover](#st-05) — **Completed (local; CI/merge pending)** | W3 | ST-02 via C1; ST-04 via C3 | 3d | Yes |
+| [ST-05 — Persist baskets with revisions and no hidden failover](#st-05) — **Completed (merged PR #48; local acceptance)** | W3 | ST-02 via C1; ST-04 via C3 | 3d | Yes |
 
-| [ST-06 — Save complete receipts with deterministic money rules](#st-06) — **Completed (local; CI/merge pending)** | W4 | ST-04 via C3; ST-05 via C4 | 3d | Yes |
+| [ST-06 — Save complete receipts with deterministic money rules](#st-06) — **Completed (merged PR #48; local acceptance)** | W4 | ST-04 via C3; ST-05 via C4 | 3d | Yes |
 
-| [ST-07 — Make checkout atomic and safe to retry](#st-07) — **Not completed** | W5 | ST-06 via C5; C1/C4 providers complete | 3d | Yes |
+| [ST-07 — Make checkout atomic and safe to retry](#st-07) — **Completed (local; CI/merge pending)** | W5 | ST-06 via C5; C1/C4 providers complete | 3d | Yes |
 
-| [ST-08 — Connect discovery, customization and basket to the API](#st-08) — **Not completed** | W4 | ST-04 via C3; ST-05 via C4; ST-03 web types released | 3d | Convergence lane |
+| [ST-08 — Connect discovery, customization and basket to the API](#st-08) — **Completed (local; CI/merge pending)** | W4 | ST-04 via C3; ST-05 via C4; ST-03 web types released | 3d | Convergence lane |
 
-| [ST-09 — Make checkout, confirmation and history recover honestly](#st-09) — **Not completed** | W6 | ST-03 via C2; ST-07 via C6; ST-08 via C7 | 3d | Yes |
+| [ST-09 — Make checkout, confirmation and history recover honestly](#st-09) — **Completed (local; CI/merge pending)** | W6 | ST-03 via C2; ST-07 via C6; ST-08 via C7 | 3d | Yes |
 
-| [ST-10 — Finish address selection, safe navigation and resilient UI](#st-10) — **Not completed** | W7 | ST-03 via C2; ST-09 via C7; INT-01 manual gate | 2d | Convergence lane |
+| [ST-10 — Finish address selection, safe navigation and resilient UI](#st-10) — **Completed (local; CI/merge pending)** | W7 | ST-03 via C2; ST-09 via C7; INT-01 manual gate | 2d | Convergence lane |
 
 | [ST-11 — Make startup, readiness, retention and recovery truthful](#st-11) — **Not completed** | W6 | ST-07 backend complete via C1/C4/C5/C6 | 3d | Yes |
 
@@ -441,7 +441,7 @@ Consumers may prepare read-only designs after W0 fixtures; implementation starts
 
 | [ST-13 — Reconcile documentation and verify the public candidate](#st-13) — **Not completed** | W9 | INT-02 candidate gate; ST-12 CI gate | 2d | Yes |
 
-| [INT-01 — Real manual journey](#int-01) — **Not completed** | W7 | ST-09 and C1–C7 | 1d | Yes |
+| [INT-01 — Real manual journey](#int-01) — **Completed (separate local pass)** | W7 | ST-09 and C1–C7 | 1d | Yes |
 | [INT-02 — Release rehearsal](#int-02) — **Not completed** | W8 | ST-10, ST-12, C8 | 1d | Yes |
 | [RELEASE-GATE — Accepted public demo](#release-gate) — **Not completed** | W9 | ST-13 + both checkpoints | 0.5d | Yes |
 
@@ -715,7 +715,7 @@ Current criterion-indexed proof: [ST-02/ST-03 acceptance](docs/qa/st02-st03-acce
 
 ### ST-04 — Validate and price items from one canonical catalog
 
-**Status:** Completed — branch implementation/local acceptance; hosted CI and merge pending. **Execution owner:** Codex. See [criterion evidence](docs/qa/st04-st06-acceptance/acceptance.md). **Objective:** Every invalid fixture is rejected before persistence with stable field paths.
+**Status:** Completed — merged PR #48; local acceptance verified; hosted release gates separate. **Execution owner:** Codex. See [criterion evidence](docs/qa/st04-st06-acceptance/acceptance.md). **Objective:** Every invalid fixture is rejected before persistence with stable field paths.
 
 **Why this task exists:** The server currently trusts or inconsistently checks parts of the basket. A customer cannot write “this meal costs one cent” and have the shop accept it. The server menu must decide what exists and what it costs.
 
@@ -791,7 +791,7 @@ Current criterion-indexed proof: [ST-02/ST-03 acceptance](docs/qa/st02-st03-acce
 
 ### ST-05 — Persist baskets with revisions and no hidden failover
 
-**Status:** Completed — branch implementation/local acceptance; hosted CI and merge pending. **Execution owner:** Codex. See [criterion evidence](docs/qa/st04-st06-acceptance/acceptance.md). **Objective:** Two writes with one expected revision yield one success and one409; no silent overwrite.
+**Status:** Completed — merged PR #48; local acceptance verified; hosted release gates separate. **Execution owner:** Codex. See [criterion evidence](docs/qa/st04-st06-acceptance/acceptance.md). **Objective:** Two writes with one expected revision yield one success and one409; no silent overwrite.
 
 **Why this task exists:** If one tab edits a basket while another tab saves an old copy, the newer meal can disappear. Redis, Postgres and JSON copies also disagree after failures. Revisions act like page numbers: the server refuses to overwrite a newer page.
 
@@ -869,7 +869,7 @@ Current criterion-indexed proof: [ST-02/ST-03 acceptance](docs/qa/st02-st03-acce
 
 ### ST-06 — Save complete receipts with deterministic money rules
 
-**Status:** Completed — branch implementation/local acceptance; hosted CI and merge pending. **Execution owner:** Codex. See [criterion evidence](docs/qa/st04-st06-acceptance/acceptance.md). **Objective:** The fixture totals1192 cents and every checkout field roundtrips unchanged.
+**Status:** Completed — merged PR #48; local acceptance verified; hosted release gates separate. **Execution owner:** Codex. See [criterion evidence](docs/qa/st04-st06-acceptance/acceptance.md). **Objective:** The fixture totals1192 cents and every checkout field roundtrips unchanged.
 
 **Why this task exists:** The current receipt can be rebuilt from today's menu and lose the address, tip or discount. A receipt is a photograph of the order when submitted, not a fresh calculation tomorrow.
 
@@ -945,7 +945,7 @@ Current criterion-indexed proof: [ST-02/ST-03 acceptance](docs/qa/st02-st03-acce
 
 ### ST-07 — Make checkout atomic and safe to retry
 
-**Status:** Not completed. **Execution owner:** Unassigned. **Objective:** At most one order exists per owner/key even with concurrent requests.
+**Status:** Completed (implementation/local acceptance; hosted CI/merge pending). **Execution owner:** Codex. **Evidence:** [Current criterion report](docs/qa/st07-st10-acceptance/acceptance.md). **Objective:** At most one order exists per owner/key even with concurrent requests.
 
 **Why this task exists:** Clicking twice or losing the response must not create two orders. The basket must also not disappear without an order. A database transaction makes those changes one sealed operation.
 
@@ -977,15 +977,15 @@ Current criterion-indexed proof: [ST-02/ST-03 acceptance](docs/qa/st02-st03-acce
 
 **Implementation steps / TODOs:**
 
-- [ ] **ST-07.01** — Add owner+idempotency key unique record and canonical request digest. Resolve existing identical key before checking an already-cleared cart.
+- [x] **ST-07.01** — Add owner+idempotency key unique record and canonical request digest. Resolve existing identical key before checking an already-cleared cart.
 
-- [ ] **ST-07.02** — Lock guest/cart; verify revision and catalog fingerprint; validate checkout; generate C5 snapshot; insert order/key and clear/increment cart in one PG transaction.
+- [x] **ST-07.02** — Lock guest/cart; verify revision and catalog fingerprint; validate checkout; generate C5 snapshot; insert order/key and clear/increment cart in one PG transaction.
 
-- [ ] **ST-07.03** — Return original receipt on identical replay; changed body same key returns409. Different keys against one revision yield one order and one conflict.
+- [x] **ST-07.03** — Return original receipt on identical replay; changed body same key returns409. Different keys against one revision yield one order and one conflict.
 
-- [ ] **ST-07.04** — Translate precommit storage failure into safe rejection; connection loss after commit becomes uncertain at client, recoverable through same-key replay. Do not blindly start a new submission.
+- [x] **ST-07.04** — Translate precommit storage failure into safe rejection; connection loss after commit becomes uncertain at client, recoverable through same-key replay. Do not blindly start a new submission.
 
-- [ ] **ST-07.05** — Inject failures before/after insert and before cart clear; test simultaneous keys/replays and lost response; freeze C6.
+- [x] **ST-07.05** — Inject failures before/after insert and before cart clear; test simultaneous keys/replays and lost response; freeze C6.
 
 **Invariants affected:** INV-02, INV-04, INV-06; acceptance/tests below are enforcement proof.
 
@@ -1003,11 +1003,11 @@ Current criterion-indexed proof: [ST-02/ST-03 acceptance](docs/qa/st02-st03-acce
 
 **Acceptance criteria / completion proof:**
 
-1. **ST-07-AC1 — PASS/FAIL:** At most one order exists per owner/key even with concurrent requests. Attach the shared evidence form.
+1. **ST-07-AC1 — PASS (local acceptance):** At most one order exists per owner/key even with concurrent requests. Attach the shared evidence form.
 
-2. **ST-07-AC2 — PASS/FAIL:** Rollback before commit leaves both order count and basket unchanged. Attach the shared evidence form.
+2. **ST-07-AC2 — PASS (local acceptance):** Rollback before commit leaves both order count and basket unchanged. Attach the shared evidence form.
 
-3. **ST-07-AC3 — PASS/FAIL:** Lost-response retry returns same order ID and exact receipt, with basket cleared once. Attach the shared evidence form.
+3. **ST-07-AC3 — PASS (local acceptance):** Lost-response retry returns same order ID and exact receipt, with basket cleared once. Attach the shared evidence form.
 
 **Rollback / recovery:** Disable checkout writes if atomicity/uniqueness fails; preserve accepted records and key ledger. Restore only from transaction-consistent backup; reverting UI never permits a fresh key for an unresolved outcome.
 
@@ -1021,7 +1021,7 @@ Current criterion-indexed proof: [ST-02/ST-03 acceptance](docs/qa/st02-st03-acce
 
 ### ST-08 — Connect discovery, customization and basket to the API
 
-**Status:** Not completed. **Execution owner:** Unassigned. **Objective:** API-mode menu and basket prices match canonical backend responses.
+**Status:** Completed (implementation/local acceptance; hosted CI/merge pending). **Execution owner:** Codex. **Evidence:** [Current criterion report](docs/qa/st07-st10-acceptance/acceptance.md). **Objective:** API-mode menu and basket prices match canonical backend responses.
 
 **Why this task exists:** Good server rules do not help if the screens keep reading a separate toy menu. This ticket connects the visible shop to its real demo stockroom and explains conflicts instead of silently changing baskets.
 
@@ -1060,15 +1060,15 @@ Current criterion-indexed proof: [ST-02/ST-03 acceptance](docs/qa/st02-st03-acce
 
 **Implementation steps / TODOs:**
 
-- [ ] **ST-08.01** — Introduce shared typed API Result mapping and canonical model adapter. Use same-origin URLs, explicit api/local_demo selection, and no client-generated ownership IDs.
+- [x] **ST-08.01** — Introduce shared typed API Result mapping and canonical model adapter. Use same-origin URLs, explicit api/local_demo selection, and no client-generated ownership IDs.
 
-- [ ] **ST-08.02** — Replace API-mode discovery/menu/customization fixture reads with canonical responses; retain existing search/filter/sort UX and loading/empty/not-found/error states.
+- [x] **ST-08.02** — Replace API-mode discovery/menu/customization fixture reads with canonical responses; retain existing search/filter/sort UX and loading/empty/not-found/error states.
 
-- [ ] **ST-08.03** — Fetch revisioned basket; serialize mutations; suppress obsolete read results. Await save result before claiming success; retain user intent separately when failure occurs.
+- [x] **ST-08.03** — Fetch revisioned basket; serialize mutations; suppress obsolete read results. Await save result before claiming success; retain user intent separately when failure occurs.
 
-- [ ] **ST-08.04** — Handle409 by showing current basket and offering explicit reapply/review; never automatically overwrite. Cross-restaurant replacement requires deliberate confirmation and correct revision.
+- [x] **ST-08.04** — Handle409 by showing current basket and offering explicit reapply/review; never automatically overwrite. Cross-restaurant replacement requires deliberate confirmation and correct revision.
 
-- [ ] **ST-08.05** — Limit local_demo to browsing/customization/local basket under an isolated namespace and persistent fixture-preview label. Disable checkout entry; make no guest bootstrap or API requests in preview mode. Test fixture-only browsing/basket reload, namespace separation and zero order creation; API failures must leave API mode unchanged. Test real backend cart/catalog interactions and freeze C7.
+- [x] **ST-08.05** — Limit local_demo to browsing/customization/local basket under an isolated namespace and persistent fixture-preview label. Disable checkout entry; make no guest bootstrap or API requests in preview mode. Test fixture-only browsing/basket reload, namespace separation and zero order creation; API failures must leave API mode unchanged. Test real backend cart/catalog interactions and freeze C7.
 
 **Invariants affected:** INV-02, INV-05, INV-06; acceptance/tests below are enforcement proof.
 
@@ -1086,11 +1086,11 @@ Current criterion-indexed proof: [ST-02/ST-03 acceptance](docs/qa/st02-st03-acce
 
 **Acceptance criteria / completion proof:**
 
-1. **ST-08-AC1 — PASS/FAIL:** API-mode menu and basket prices match canonical backend responses. Attach the shared evidence form.
+1. **ST-08-AC1 — PASS (local acceptance):** API-mode menu and basket prices match canonical backend responses. Attach the shared evidence form.
 
-2. **ST-08-AC2 — PASS/FAIL:** Failed or stale cart save leaves last accepted basket intact and displays actionable error. Attach the shared evidence form.
+2. **ST-08-AC2 — PASS (local acceptance):** Failed or stale cart save leaves last accepted basket intact and displays actionable error. Attach the shared evidence form.
 
-3. **ST-08-AC3 — PASS/FAIL:** No API error activates fixture mode; explicitly selected local_demo supports only labelled fixture browsing/customization/basket with no backend requests or checkout entry. Attach the shared evidence form.
+3. **ST-08-AC3 — PASS (local acceptance):** No API error activates fixture mode; explicitly selected local_demo supports only labelled fixture browsing/customization/basket with no backend requests or checkout entry. Attach the shared evidence form.
 
 **Rollback / recovery:** Disable problematic mutation controls and show unavailable state; public API mode cannot be replaced with a local preview as release recovery. Revert web with compatible C3/C4 adapter; preserve separate local fixture caches.
 
@@ -1104,7 +1104,7 @@ Current criterion-indexed proof: [ST-02/ST-03 acceptance](docs/qa/st02-st03-acce
 
 ### ST-09 — Make checkout, confirmation and history recover honestly
 
-**Status:** Not completed. **Execution owner:** Unassigned. **Objective:** API500/offline/timeout cannot display an invented accepted order or clear a failed basket.
+**Status:** Completed (implementation/local acceptance; hosted CI/merge pending). **Execution owner:** Codex. **Evidence:** [Current criterion report](docs/qa/st07-st10-acceptance/acceptance.md). **Objective:** API500/offline/timeout cannot display an invented accepted order or clear a failed basket.
 
 **Why this task exists:** The current page can congratulate a visitor after the API failed. An honest checkout has three different outcomes: saved, rejected, or uncertain because the response was lost. Only the saved receipt earns a success screen.
 
@@ -1138,19 +1138,19 @@ Current criterion-indexed proof: [ST-02/ST-03 acceptance](docs/qa/st02-st03-acce
 
 **Implementation steps / TODOs:**
 
-- [ ] **ST-09.01** — Obtain server quote and display complete totals before submit. Generate one UUID key per immutable submission and keep key/body recovery in versioned sessionStorage before sending.
+- [x] **ST-09.01** — Obtain server quote and display complete totals before submit. Generate one UUID key per immutable submission and keep key/body recovery in versioned sessionStorage before sending.
 
-- [ ] **ST-09.02** — Use idle/submitting/uncertain/accepted/rejected states. Prevent duplicate clicks while pending; timeout after send shows uncertain with same-key retry, never new mock order.
+- [x] **ST-09.02** — Use idle/submitting/uncertain/accepted/rejected states. Prevent duplicate clicks while pending; timeout after send shows uncertain with same-key retry, never new mock order.
 
-- [ ] **ST-09.03** — On accepted response render exact snapshot and refetch durable cleared cart. On conflict display revised basket/quote; changed checkout gets new key only after unresolved prior attempt is reconciled.
+- [x] **ST-09.03** — On accepted response render exact snapshot and refetch durable cleared cart. On conflict display revised basket/quote; changed checkout gets new key only after unresolved prior attempt is reconciled.
 
-- [ ] **ST-09.04** — Confirmation requires exact requested order ID and current guest; unknown ID shows not found. Orders page bootstraps session then fetches scoped list, never all orders before gating.
+- [x] **ST-09.04** — Confirmation requires exact requested order ID and current guest; unknown ID shows not found. Orders page bootstraps session then fetches scoped list, never all orders before gating.
 
-- [ ] **ST-09.05** — Remove local Confirmed fallback and fixture-derived receipt totals in API mode; test refresh/back/new tab/failed network and freeze order adapter extension.
+- [x] **ST-09.05** — Remove local Confirmed fallback and fixture-derived receipt totals in API mode; test refresh/back/new tab/failed network and freeze order adapter extension.
 
-- [ ] **ST-09.06** — Before INT-01, load ST-03's validated synthetic addresses, apply selected/default address only before deliberate user input, and allow explicit alternate selection. Submit the selected values in C6 and verify exact receipt equality after reload. ST-10 owns subsequent accessibility/storage/navigation hardening, not initial address wiring.
+- [x] **ST-09.06** — Before INT-01, load ST-03's validated synthetic addresses, apply selected/default address only before deliberate user input, and allow explicit alternate selection. Submit the selected values in C6 and verify exact receipt equality after reload. ST-10 owns subsequent accessibility/storage/navigation hardening, not initial address wiring.
 
-- [ ] **ST-09.07** — In local_demo, direct checkout, confirmation and history navigation renders “unavailable in fixture preview”; never submits, creates a local order or displays a cached accepted receipt. Test direct URLs as well as disabled entry controls.
+- [x] **ST-09.07** — In local_demo, direct checkout, confirmation and history navigation renders “unavailable in fixture preview”; never submits, creates a local order or displays a cached accepted receipt. Test direct URLs as well as disabled entry controls.
 
 **Invariants affected:** INV-02, INV-03, INV-04, INV-11; acceptance/tests below are enforcement proof.
 
@@ -1168,15 +1168,15 @@ Current criterion-indexed proof: [ST-02/ST-03 acceptance](docs/qa/st02-st03-acce
 
 **Acceptance criteria / completion proof:**
 
-1. **ST-09-AC1 — PASS/FAIL:** API500/offline/timeout cannot display an invented accepted order or clear a failed basket. Attach the shared evidence form.
+1. **ST-09-AC1 — PASS (local acceptance):** API500/offline/timeout cannot display an invented accepted order or clear a failed basket. Attach the shared evidence form.
 
-2. **ST-09-AC2 — PASS/FAIL:** Lost-response retry shows one durable order with identical total/address/tip. Attach the shared evidence form.
+2. **ST-09-AC2 — PASS (local acceptance):** Lost-response retry shows one durable order with identical total/address/tip. Attach the shared evidence form.
 
-3. **ST-09-AC3 — PASS/FAIL:** Unknown requested ID never shows another order; history contains only current guest records. Attach the shared evidence form.
+3. **ST-09-AC3 — PASS (local acceptance):** Unknown requested ID never shows another order; history contains only current guest records. Attach the shared evidence form.
 
-4. **ST-09-AC4 — PASS/FAIL:** Selected/default synthetic address and explicit alternate selection work before INT-01; late profile loading never overwrites deliberate input and saved receipt fields match selection after reload. Attach the shared evidence form.
+4. **ST-09-AC4 — PASS (local acceptance):** Selected/default synthetic address and explicit alternate selection work before INT-01; late profile loading never overwrites deliberate input and saved receipt fields match selection after reload. Attach the shared evidence form.
 
-5. **ST-09-AC5 — PASS/FAIL:** Direct local_demo checkout/receipt/history routes show an unavailable state and cannot create or claim an accepted order. Attach the shared evidence form.
+5. **ST-09-AC5 — PASS (local acceptance):** Direct local_demo checkout/receipt/history routes show an unavailable state and cannot create or claim an accepted order. Attach the shared evidence form.
 
 **Rollback / recovery:** Disable submit with a clear unavailable state if recovery breaks. Preserve unresolved keys and server receipts. Roll back only to compatible typed-error client, never silent fallback.
 
@@ -1190,7 +1190,7 @@ Current criterion-indexed proof: [ST-02/ST-03 acceptance](docs/qa/st02-st03-acce
 
 ### ST-10 — Finish address selection, safe navigation and resilient UI
 
-**Status:** Not completed. **Execution owner:** Unassigned. **Objective:** Selected address appears exactly in saved receipt; default fill never overwrites deliberate input.
+**Status:** Completed (implementation/local acceptance; hosted CI/merge pending). **Execution owner:** Codex. **Evidence:** [Current criterion report](docs/qa/st07-st10-acceptance/acceptance.md). **Objective:** Selected address appears exactly in saved receipt; default fill never overwrites deliberate input.
 
 **Why this task exists:** Saved addresses should actually be used. A malformed browser value should not crash the shop, and a return-link parameter should not send the visitor to an arbitrary destination. These are small details that decide whether the existing journey feels dependable.
 
@@ -1224,15 +1224,15 @@ Current criterion-indexed proof: [ST-02/ST-03 acceptance](docs/qa/st02-st03-acce
 
 **Implementation steps / TODOs:**
 
-- [ ] **ST-10.01** — Harden the ST-09 address-selection flow: verify alternate selection, slow profile loads, empty/invalid defaults and recovery without overwriting deliberate edits. Preserve the address-to-receipt behavior already proven by INT-01.
+- [x] **ST-10.01** — Harden the ST-09 address-selection flow: verify alternate selection, slow profile loads, empty/invalid defaults and recovery without overwriting deliberate edits. Preserve the address-to-receipt behavior already proven by INT-01.
 
-- [ ] **ST-10.02** — Validate every persisted profile/address/cache read and handle getItem/setItem failures. Maintain known-good state; do not clear unrelated browser storage.
+- [x] **ST-10.02** — Validate every persisted profile/address/cache read and handle getItem/setItem failures. Maintain known-good state; do not clear unrelated browser storage.
 
-- [ ] **ST-10.03** — Constrain sign-in/profile return destination to known internal app routes; reject protocol-relative/external/encoded path bypasses and fall back to safe default.
+- [x] **ST-10.03** — Constrain sign-in/profile return destination to known internal app routes; reject protocol-relative/external/encoded path bypasses and fall back to safe default.
 
-- [ ] **ST-10.04** — Exercise keyboard focus, labelled validation/errors, disabled/pending buttons, empty states and 375px mobile checkout without horizontal overflow.
+- [x] **ST-10.04** — Exercise keyboard focus, labelled validation/errors, disabled/pending buttons, empty states and 375px mobile checkout without horizontal overflow.
 
-- [ ] **ST-10.05** — Verify selected address survives receipt reload and reset removes profile presentation state without falsely granting another guest data.
+- [x] **ST-10.05** — Verify selected address survives receipt reload and reset removes profile presentation state without falsely granting another guest data.
 
 **Invariants affected:** INV-09, INV-11; acceptance/tests below are enforcement proof.
 
@@ -1250,11 +1250,11 @@ Current criterion-indexed proof: [ST-02/ST-03 acceptance](docs/qa/st02-st03-acce
 
 **Acceptance criteria / completion proof:**
 
-1. **ST-10-AC1 — PASS/FAIL:** Selected address appears exactly in saved receipt; default fill never overwrites deliberate input. Attach the shared evidence form.
+1. **ST-10-AC1 — PASS (local acceptance):** Selected address appears exactly in saved receipt; default fill never overwrites deliberate input. Attach the shared evidence form.
 
-2. **ST-10-AC2 — PASS/FAIL:** Bad local JSON or disabled storage yields recoverable UI, not uncaught crash. Attach the shared evidence form.
+2. **ST-10-AC2 — PASS (local acceptance):** Bad local JSON or disabled storage yields recoverable UI, not uncaught crash. Attach the shared evidence form.
 
-3. **ST-10-AC3 — PASS/FAIL:** External/protocol-relative next values cannot navigate outside app; keyboard/mobile critical journey passes. Attach the shared evidence form.
+3. **ST-10-AC3 — PASS (local acceptance):** External/protocol-relative next values cannot navigate outside app; keyboard/mobile critical journey passes. Attach the shared evidence form.
 
 **Rollback / recovery:** Revert affected UI with validated defaults and safe navigation. If storage unavailable, offer ephemeral demo profile and explicit limitation; never restore passwords.
 
@@ -1517,15 +1517,17 @@ Checkpoints are real stop/go nodes, not a final “test everything” wish. They
 
 <a id="int-01"></a>
 
-### INT-01 — Real manual ordering journey — Not completed
+### INT-01 — Real manual ordering journey — Completed (disclosed separate local pass)
+
+**Evidence:** [INT-01 report](docs/qa/int-01.md). Native walkthrough plus explicitly identified automated negative checks on the current candidate; no independent human/public signoff claimed.
 
 **Owner:** Assigned QA/reviewer in the future implementation run; if unavailable, perform a disclosed separate testing pass. **Inputs:** ST-02 through ST-09 completed; frozen C1–C7; isolated seeded Postgres, real FastAPI and Next gateway; two fresh browser contexts. **Dependencies:** ST-09 integrated plus all its providers. **Outputs:** Criterion-indexed report, exact SHA/env, trace/screenshots and negative request evidence. **Files:** CREATE `docs/qa/int-01.md`; existing behavior test owners supply fixes. **Non-owned:** Product files and provider contract schemas.
 
-- [ ] **INT-01.01** — Browse/search/filter restaurant, customize required options, add item, change quantity, remove/readd, reload basket. Observe actual network responses and canonical totals.
-- [ ] **INT-01.02** — Select synthetic profile/address, quote with DEMO5 and tip, submit once, reload exact receipt/history. Stored address, modifier labels, tip and all totals equal approved snapshot.
-- [ ] **INT-01.03** — Guest B cannot access Guest A basket/order/list. Forged owner fields and foreign IDs fail without leakage.
-- [ ] **INT-01.04** — Two tabs conflict without overwrite; closed/unavailable/duplicate options and changed catalog quote are rejected; present corrected basket/quote for review.
-- [ ] **INT-01.05** — Duplicate click/retry and dropped response after commit produce one order. API500/503/offline never become invented success; failed transaction preserves basket.
+- [x] **INT-01.01** — Browse/search/filter restaurant, customize required options, add item, change quantity, remove/readd, reload basket. Observe actual network responses and canonical totals.
+- [x] **INT-01.02** — Select synthetic profile/address, quote with DEMO5 and tip, submit once, reload exact receipt/history. Stored address, modifier labels, tip and all totals equal approved snapshot.
+- [x] **INT-01.03** — Guest B cannot access Guest A basket/order/list. Forged owner fields and foreign IDs fail without leakage.
+- [x] **INT-01.04** — Two tabs conflict without overwrite; closed/unavailable/duplicate options and changed catalog quote are rejected; present corrected basket/quote for review.
+- [x] **INT-01.05** — Duplicate click/retry and dropped response after commit produce one order. API500/503/offline never become invented success; failed transaction preserves basket.
 
 **Commands:** WEB, proven BACKEND, E2E. Run against real PG/API, not only stubbed responses. **Compatibility:** Verify legacy records remain isolated and new browser never invokes old unscoped endpoints. **Security/privacy:** Synthetic data only, redact cookies/addresses from exported traces. **Observability:** Exact request/error IDs correlate with safe backend logs. **Exit criteria:** Each numbered case has passed evidence on one candidate; mandatory blocked cases keep gate Not completed. **Rollback/recovery:** Halt downstream ST-10 on failure; fix in owning ticket, obtain new SHA, repeat reproduction and affected regression. **Handoff:** Manual journey report unlocks ST-10 and feeds INT-02; implementation internals are not required. **Effort:** 1d excluding fixes.
 
@@ -1630,9 +1632,9 @@ The guide remains a **staged handoff plan**. **Execution readiness: ST-01 is com
 | DAG, start/merge/runtime semantics and shared-file release gates | Specified | Enforce wave ownership and documented handoff |
 | Every invariant and named defect has verification route | Specified in test matrix | Tests run on same candidate |
 | Backend runner and clean-install reproduction | Verified by ST-01 | Preserve the pinned commands and rerun them on each assessed candidate |
-| Cross-component integration and public release proof | Planned, not verified | INT-01, INT-02, ST-13 and RELEASE-GATE pass |
+| Cross-component integration and public release proof | INT-01 local integration verified; public release not verified | INT-02, ST-13 and RELEASE-GATE remain pending |
 | True blockers/product ambiguity disclosed | ST-01 runtime/hosted baseline resolved; later deployment access remains | Product scope is confirmed; satisfy each later ticket's explicit runtime/release prerequisites |
-| Completion/publishing claims truthful | ST-01 implementation evidence is recorded; no release claimed | Keep ST-02 through ST-13 and release gates incomplete until their own proof passes |
+| Completion/publishing claims truthful | ST-01–ST-10 local evidence recorded; no public release claimed | Hosted CI/merge are separate; ST-11–ST-13 and release gates remain incomplete |
 
 **Provider→consumer test:** Section6 records schema, positive/negative errors, fixtures, retry/security/lifecycle and conformance for every named interface. Section7 records each consumer gate. Consumers do not need private SQL or pricing code; they need the public contracts and executable fixtures ST-01 supplies. A provider may not freeze incomplete examples and ask the consumer to guess missing fields. If fixture/conformance fails, repair it in the provider before releasing the dependent wave.
 

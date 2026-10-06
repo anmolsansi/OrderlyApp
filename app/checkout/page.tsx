@@ -131,8 +131,8 @@ export default function CheckoutPage() {
       setAddresses([]);
 
       const recoveryStorage = getBrowserStorage('sessionStorage');
-      setRecoveryStorageAvailable(Boolean(recoveryStorage));
       const storedRecovery = loadCheckoutRecovery(recoveryStorage);
+      setRecoveryStorageAvailable(Boolean(recoveryStorage) && storedRecovery !== null);
       if (storedRecovery) {
         deliberateInput.current = true;
         setRecovery(storedRecovery);
@@ -570,7 +570,7 @@ export default function CheckoutPage() {
 
               {!loading && !recoveryStorageAvailable && (
                 <div className="validation-panel" role="alert">
-                  <p>Checkout recovery storage is unavailable. Enable browser storage and reload before submitting. No new order was submitted.</p>
+                  <p>Checkout recovery storage is unavailable or damaged. Restore browser recovery storage and reload before submitting. No new order was submitted.</p>
                 </div>
               )}
 

@@ -49,6 +49,7 @@ The default is `api` for compatibility with existing environments. Any other exp
     code: string,
     message: string,
     requestId?: string,
+    status?: number,
     fields?: string[],
     currentCart?: RevisionedCart,
   },
@@ -95,7 +96,7 @@ The accepted basket is not optimistically overwritten.
 3. Wait for the server result.
 4. Replace accepted state only with the successful canonical response.
 5. Clear the API draft.
-6. Update the temporary legacy checkout mirror.
+6. Update the legacy presentation mirror; checkout still reads the authoritative C4 cart.
 
 ### Validation/network/server failure
 
@@ -208,3 +209,7 @@ The repository CI remains API-mode because ST-12 owns CI/deployment configuratio
 If the mutation UI must be disabled, keep API-mode reads and show the basket as unavailable/read-only. Do not restore the old “API error -> fixture success” behavior.
 
 `local_demo` may remain as an explicitly selected development/test preview, but it must stay labelled, isolated, and unable to enter checkout/order flows.
+
+## Current conformance
+
+`tests/browser-contracts.test.ts` executes the shared C3 catalog, C4 basket and C5 quote/receipt through the real browser adapters and compares complete serialized C7 results. C7 now includes all presentation fields and the same required Small modifier, notes and catalog fingerprint as its providers. Error examples use browser `requestId`/HTTP `status`; network failures do not invent request IDs. Recovery corruption blocks new checkout rather than masquerading as an empty store.

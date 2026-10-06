@@ -162,3 +162,7 @@ ST-07 provides the server contract and gateway transport only. ST-09 still owns 
 - treat 201 and 200 as the same successful order outcome;
 - surface `cart_conflict`, `catalog_changed`, `idempotency_conflict`, validation, and storage errors explicitly;
 - never silently create a replacement key after a timeout when the original outcome is unknown.
+
+## Follow-up acceptance
+
+Current PostgreSQL tests inject an exception after each receipt, idempotency and cart SQL write. Every failure leaves both tables empty and the exact previously accepted basket unchanged. Replay after a menu edit and a newer basket returns the original receipt without clearing that new basket. Browser consumers keep 5xx and malformed accepted responses uncertain: a storage error may hide a committed transaction, so recover with the original key/body.
