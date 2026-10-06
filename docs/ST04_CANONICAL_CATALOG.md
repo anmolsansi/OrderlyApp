@@ -1,6 +1,6 @@
 # ST-04 canonical catalog authority
 
-ST-04 makes the backend catalog the authority for restaurant availability, menu-item availability, modifier validity, names, and item/option prices. Browser-submitted labels and prices are compatibility input only. They are never trusted as saved catalog truth.
+ST-04 makes the backend catalog the authority for restaurant availability, menu-item availability, modifier validity, names, and item/option prices. C4 write inputs reject browser-submitted labels and prices. Canonical output comes from the catalog.
 
 ## Contract
 
@@ -24,7 +24,7 @@ The catalog response exposes:
 - canonical modifier `price_delta_cents`
 - canonical `delivery_fee_cents`
 
-The write-facing cart shape still contains `name` and `base_price_cents` because ST-05 owns the next cart-contract revision. ST-04 deliberately ignores those client values for authority and reconstructs them from the server catalog before persistence.
+The current C4 write shape accepts IDs, quantities, selections and instructions. `name` and `base_price_cents` are output fields; submitting them returns 422. The legacy internal validator also replaces those values from the catalog.
 
 ## Architecture
 
@@ -172,3 +172,7 @@ ST-04 does not implement:
 - atomic idempotent checkout, owned by ST-07
 - frontend catalog/cart adapter cutover, owned by ST-08
 - final checkout/profile/receipt UX hardening, owned by ST-09/ST-10
+
+## Current acceptance
+
+See [ST-04–ST-06 acceptance](qa/st04-st06-acceptance/acceptance.md). All fifteen C3 negative fixtures contain executable requests and are checked over HTTP for exact fields and unchanged accepted PostgreSQL baskets. The complete C3 catalog feeds C4 canonicalization and the exact C5 receipt fixture.

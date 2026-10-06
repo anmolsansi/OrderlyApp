@@ -2,7 +2,7 @@
 
 Revision: 3 • Updated: 2026-10-05 • ST-02/ST-03 acceptance source: `a9537931c57cbf636466bf3f791e440e24ce74bd` on `fix/st02-st03-acceptance` • Release status: **Not completed**.
 
-This is the single execution guide for taking the existing application to a stable **public mock demo**. **ST-01 is implemented and verified. ST-02 and ST-03 implementation/local acceptance are completed on the identified follow-up branch; PR CI and merge are pending.** ST-04 through ST-13 and the integration/release gates remain **Not completed**. See [ST-02/ST-03 acceptance](docs/qa/st02-st03-acceptance/acceptance.md) for current criteria and evidence. This guide began as planning-only documentation; the dated ST-01 evidence below records the authorized implementation that followed. No later ticket is implied complete by ST-01.
+This is the single execution guide for taking the existing application to a stable **public mock demo**. **ST-01 is implemented and verified; ST-02/ST-03 are merged through PR #47. ST-04/ST-05/ST-06 implementation and local acceptance are Completed on `fix/st04-st06-acceptance`; hosted CI and merge remain pending.** ST-07 through ST-13 and integration/release gates remain **Not completed**. See [ST-04/ST-05/ST-06 evidence](docs/qa/st04-st06-acceptance/acceptance.md). See [ST-02/ST-03 acceptance](docs/qa/st02-st03-acceptance/acceptance.md) for current criteria and evidence. This guide began as planning-only documentation; the dated ST-01 evidence below records the authorized implementation that followed. No later ticket is implied complete by ST-01.
 
 Think of the app as a shop made from Lego. The screens already look like a shop, but some connections behind them can lose a basket, show another visitor's receipt, or pretend an order succeeded when the server failed. First we strengthen those connections. Then we add more Lego.
 
@@ -213,7 +213,7 @@ The contract designs below remain authoritative. **C0 is frozen by completed ST-
 11. **Ordering / concurrency:** Validation uses one coherent catalog read in transaction; no per-line whole-catalog scan.
 12. **Security / privacy:** No SQL interpolation; query limits q<=100 chars, sort enum; strict IDs and bounded list.
 13. **Migration / lifecycle:** Add availability/default fields in additive catalog migration; explicit seed preserves existing IDs.
-14. **Fixture / stub:** `{"schema_version":1,"restaurants":[{"id":"fixture-r1","name":"Fixture cafe","is_open":true,"delivery_fee_cents":199,"menu":[{"id":"fixture-i1","name":"Fixture meal","price_cents":1000,"available":true,"modifier_groups":[]}]}]}`. ST-01 materializes CREATE `tests/fixtures/contracts/c3.json`; provider extends with negative cases before freeze.
+14. **Fixture:** `tests/fixtures/contracts/c3.json` contains complete catalog fields, required size choices, authority example and fifteen executable negative requests. Current C3/C4/C5 conformance is recorded in [acceptance evidence](docs/qa/st04-st06-acceptance/acceptance.md).
 15. **Freeze point:** ST-04 after search, pricing authority and adversarial modifier conformance.
 16. **Post-freeze changes:** Shared version/change protocol above; owner updates all named consumers before refreeze.
 17. **Conformance proof:** ST-05/06 reject wrong IDs; ST-08 adapter maps fixture; INT-01 real canonical menu.
@@ -410,7 +410,7 @@ Consumers may prepare read-only designs after W0 fixtures; implementation starts
 
 ## 9. Task index and remaining work
 
-**ST-01 is Completed. ST-02 and ST-03 are Completed for branch implementation/local acceptance; PR CI and merge remain pending.** ST-04 through ST-13, INT-01, INT-02, and RELEASE-GATE remain **Not completed**. Effort is an estimate for one engineer familiar with the stack, excluding queue time and unavailable infrastructure. Split a ticket before starting if its concrete diff will exceed three engineer-days; preserve its contract seam, owned files and acceptance tests.
+**ST-01 is Completed; ST-02/ST-03 are merged (PR #47). ST-04/ST-05/ST-06 are Completed for branch implementation/local acceptance; hosted CI and merge remain pending.** ST-07 through ST-13, INT-01, INT-02, and RELEASE-GATE remain **Not completed**. See [current evidence](docs/qa/st04-st06-acceptance/acceptance.md). Effort is an estimate for one engineer familiar with the stack, excluding queue time and unavailable infrastructure. Split a ticket before starting if its concrete diff will exceed three engineer-days; preserve its contract seam, owned files and acceptance tests.
 
 | Ticket / outcome / status | Wave | Dependencies | Effort | Critical path |
 |---|---|---|---|---|
@@ -421,11 +421,11 @@ Consumers may prepare read-only designs after W0 fixtures; implementation starts
 
 | [ST-03 — Replace local passwords with honest demo profiles](#st-03) — **Completed — branch/local acceptance; PR CI/merge pending** | W2 | ST-02 via C1 | 2d | Convergence lane |
 
-| [ST-04 — Validate and price items from one canonical catalog](#st-04) — **Not completed** | W2 | ST-01 via C0; ST-02 shared backend files released | 3d | Yes |
+| [ST-04 — Validate and price items from one canonical catalog](#st-04) — **Completed (local; CI/merge pending)** | W2 | ST-01 via C0; ST-02 shared backend files released | 3d | Yes |
 
-| [ST-05 — Persist baskets with revisions and no hidden failover](#st-05) — **Not completed** | W3 | ST-02 via C1; ST-04 via C3 | 3d | Yes |
+| [ST-05 — Persist baskets with revisions and no hidden failover](#st-05) — **Completed (local; CI/merge pending)** | W3 | ST-02 via C1; ST-04 via C3 | 3d | Yes |
 
-| [ST-06 — Save complete receipts with deterministic money rules](#st-06) — **Not completed** | W4 | ST-04 via C3; ST-05 via C4 | 3d | Yes |
+| [ST-06 — Save complete receipts with deterministic money rules](#st-06) — **Completed (local; CI/merge pending)** | W4 | ST-04 via C3; ST-05 via C4 | 3d | Yes |
 
 | [ST-07 — Make checkout atomic and safe to retry](#st-07) — **Not completed** | W5 | ST-06 via C5; C1/C4 providers complete | 3d | Yes |
 
@@ -554,7 +554,7 @@ P0: ownership/password removal, truthful checkout, canonical money/validation, d
 
 ### ST-02 — Give each visitor a private server-issued guest session
 
-**Status:** Completed — implementation/local acceptance on the identified branch; PR CI/merge pending. **Execution owner:** Anmol Sansi / Codex follow-up. **Objective:** Guest A cannot read/list/change Guest B data by IDs, forged cookie or spoofed proxy headers.
+**Status:** Completed — merged through PR #47; historical branch acceptance is linked below. **Execution owner:** Anmol Sansi / Codex follow-up. **Objective:** Guest A cannot read/list/change Guest B data by IDs, forged cookie or spoofed proxy headers.
 
 **Why this task exists:** Today a browser-chosen session string is treated like ownership, and orders can be listed globally. That is like opening every visitor's locker with a label instead of a lock. A signed guest cookie provides actual isolation without adding real accounts.
 
@@ -637,7 +637,7 @@ Current criterion-indexed proof: [ST-02/ST-03 acceptance](docs/qa/st02-st03-acce
 
 ### ST-03 — Replace local passwords with honest demo profiles
 
-**Status:** Completed — implementation/local acceptance on the identified branch; PR CI/merge pending. **Execution owner:** Anmol Sansi / Codex follow-up. **Objective:** No UI collects a password and no versioned/legacy application key retains one after migration.
+**Status:** Completed — merged through PR #47; historical branch acceptance is linked below. **Execution owner:** Anmol Sansi / Codex follow-up. **Objective:** No UI collects a password and no versioned/legacy application key retains one after migration.
 
 **Why this task exists:** The old sign-up screen stores real-looking passwords without providing server authentication. A public mock demo should let a child pick a demo name without teaching them to trust a pretend login.
 
@@ -715,7 +715,7 @@ Current criterion-indexed proof: [ST-02/ST-03 acceptance](docs/qa/st02-st03-acce
 
 ### ST-04 — Validate and price items from one canonical catalog
 
-**Status:** Not completed. **Execution owner:** Unassigned. **Objective:** Every invalid fixture is rejected before persistence with stable field paths.
+**Status:** Completed — branch implementation/local acceptance; hosted CI and merge pending. **Execution owner:** Codex. See [criterion evidence](docs/qa/st04-st06-acceptance/acceptance.md). **Objective:** Every invalid fixture is rejected before persistence with stable field paths.
 
 **Why this task exists:** The server currently trusts or inconsistently checks parts of the basket. A customer cannot write “this meal costs one cent” and have the shop accept it. The server menu must decide what exists and what it costs.
 
@@ -747,15 +747,15 @@ Current criterion-indexed proof: [ST-02/ST-03 acceptance](docs/qa/st02-st03-acce
 
 **Implementation steps / TODOs:**
 
-- [ ] **ST-04.01** — Add open/available and explicit modifier min/max semantics, including single-choice required defaults; reconcile existing fixture IDs and optional fields.
+- [x] **ST-04.01** — Add open/available and explicit modifier min/max semantics, including single-choice required defaults; reconcile existing fixture IDs and optional fields.
 
-- [ ] **ST-04.02** — Build one canonical validation path for cart, quote and order. Bound lines, notes, quantity and modifiers; reject duplicate lines/groups/options, unknown groups/options, wrong restaurant and unavailable items.
+- [x] **ST-04.02** — Build one canonical validation path for cart, quote and order. Bound lines, notes, quantity and modifiers; reject duplicate lines/groups/options, unknown groups/options, wrong restaurant and unavailable items.
 
-- [ ] **ST-04.03** — Return canonical names/base prices/option deltas. Reject write payload price/name authority rather than retaining untrusted values.
+- [x] **ST-04.03** — Return canonical names/base prices/option deltas. Reject write payload price/name authority rather than retaining untrusted values.
 
-- [ ] **ST-04.04** — Implement existing search/filter/sort behavior against authoritative catalog. Read a catalog once per operation; avoid repeated whole-catalog fetches per line.
+- [x] **ST-04.04** — Implement existing search/filter/sort behavior against authoritative catalog. Read a catalog once per operation; avoid repeated whole-catalog fetches per line.
 
-- [ ] **ST-04.05** — Publish fixtures for closed restaurant, unavailable option, min/max, duplicate and unknown fields; freeze C3.
+- [x] **ST-04.05** — Publish fixtures for closed restaurant, unavailable option, min/max, duplicate and unknown fields; freeze C3.
 
 **Invariants affected:** INV-05, INV-08; acceptance/tests below are enforcement proof.
 
@@ -773,11 +773,11 @@ Current criterion-indexed proof: [ST-02/ST-03 acceptance](docs/qa/st02-st03-acce
 
 **Acceptance criteria / completion proof:**
 
-1. **ST-04-AC1 — PASS/FAIL:** Every invalid fixture is rejected before persistence with stable field paths. Attach the shared evidence form.
+1. **ST-04-AC1 — PASS (local):** Every invalid fixture is rejected before persistence with stable field paths. Attach the shared evidence form.
 
-2. **ST-04-AC2 — PASS/FAIL:** Submitted spoofed names/prices never become saved canonical cart fields. Attach the shared evidence form.
+2. **ST-04-AC2 — PASS (local):** Submitted spoofed names/prices never become saved canonical cart fields. Attach the shared evidence form.
 
-3. **ST-04-AC3 — PASS/FAIL:** Catalog filters preserve existing search/cuisine/open/sort behavior and availability is explicit. Attach the shared evidence form.
+3. **ST-04-AC3 — PASS (local):** Catalog filters preserve existing search/cuisine/open/sort behavior and availability is explicit. Attach the shared evidence form.
 
 **Rollback / recovery:** Keep additive catalog fields backward readable. Roll back validator only with closed API writes if it would restore price/selection vulnerabilities; preserve catalog backup.
 
@@ -791,7 +791,7 @@ Current criterion-indexed proof: [ST-02/ST-03 acceptance](docs/qa/st02-st03-acce
 
 ### ST-05 — Persist baskets with revisions and no hidden failover
 
-**Status:** Not completed. **Execution owner:** Unassigned. **Objective:** Two writes with one expected revision yield one success and one409; no silent overwrite.
+**Status:** Completed — branch implementation/local acceptance; hosted CI and merge pending. **Execution owner:** Codex. See [criterion evidence](docs/qa/st04-st06-acceptance/acceptance.md). **Objective:** Two writes with one expected revision yield one success and one409; no silent overwrite.
 
 **Why this task exists:** If one tab edits a basket while another tab saves an old copy, the newer meal can disappear. Redis, Postgres and JSON copies also disagree after failures. Revisions act like page numbers: the server refuses to overwrite a newer page.
 
@@ -825,15 +825,15 @@ Current criterion-indexed proof: [ST-02/ST-03 acceptance](docs/qa/st02-st03-acce
 
 **Implementation steps / TODOs:**
 
-- [ ] **ST-05.01** — Create owner-keyed Postgres cart with revision and canonical JSONB lines. Establish absent-cart revision0 atomically.
+- [x] **ST-05.01** — Create owner-keyed Postgres cart with revision and canonical JSONB lines. Establish absent-cart revision0 atomically.
 
-- [ ] **ST-05.02** — Implement GET/PUT/DELETE using verified owner and expected_revision; lock row or compare-and-swap and validate all items before committing. Increment on accepted mutation only.
+- [x] **ST-05.02** — Implement GET/PUT/DELETE using verified owner and expected_revision; lock row or compare-and-swap and validate all items before committing. Increment on accepted mutation only.
 
-- [ ] **ST-05.03** — Return409 with current_cart when stale; reject missing revisions and strict integer violations. Preserve existing accepted basket on any error.
+- [x] **ST-05.03** — Return409 with current_cart when stale; reject missing revisions and strict integer violations. Preserve existing accepted basket on any error.
 
-- [ ] **ST-05.04** — Remove Redis authority/JSON failover from API cart path. The local_demo browser fixture basket is independent, requires no backend and is never entered because PG failed; no alternate backend order store is implemented.
+- [x] **ST-05.04** — Remove Redis authority/JSON failover from API cart path. The local_demo browser fixture basket is independent, requires no backend and is never entered because PG failed; no alternate backend order store is implemented.
 
-- [ ] **ST-05.05** — Rehearse legacy cart isolation and database failure/recovery. Freeze C4 after two-tab/concurrent mutation proof.
+- [x] **ST-05.05** — Rehearse legacy cart isolation and database failure/recovery. Freeze C4 after two-tab/concurrent mutation proof.
 
 **Invariants affected:** INV-01, INV-05, INV-06, INV-07; acceptance/tests below are enforcement proof.
 
@@ -851,11 +851,11 @@ Current criterion-indexed proof: [ST-02/ST-03 acceptance](docs/qa/st02-st03-acce
 
 **Acceptance criteria / completion proof:**
 
-1. **ST-05-AC1 — PASS/FAIL:** Two writes with one expected revision yield one success and one409; no silent overwrite. Attach the shared evidence form.
+1. **ST-05-AC1 — PASS (local):** Two writes with one expected revision yield one success and one409; no silent overwrite. Attach the shared evidence form.
 
-2. **ST-05-AC2 — PASS/FAIL:** A saved cart survives backend restart; Redis absence does not alter API authority. Attach the shared evidence form.
+2. **ST-05-AC2 — PASS (local):** A saved cart survives backend restart; Redis absence does not alter API authority. Attach the shared evidence form.
 
-3. **ST-05-AC3 — PASS/FAIL:** PG failure returns503 and neither writes JSON nor returns invented success. Attach the shared evidence form.
+3. **ST-05-AC3 — PASS (local):** PG failure returns503 and neither writes JSON nor returns invented success. Attach the shared evidence form.
 
 **Rollback / recovery:** Quiesce writes before rollback; keep additive schema. Recover PG from verified backup if necessary; never import stale Redis automatically. Legacy carts remain offline rather than adopted.
 
@@ -869,7 +869,7 @@ Current criterion-indexed proof: [ST-02/ST-03 acceptance](docs/qa/st02-st03-acce
 
 ### ST-06 — Save complete receipts with deterministic money rules
 
-**Status:** Not completed. **Execution owner:** Unassigned. **Objective:** The fixture totals1192 cents and every checkout field roundtrips unchanged.
+**Status:** Completed — branch implementation/local acceptance; hosted CI and merge pending. **Execution owner:** Codex. See [criterion evidence](docs/qa/st04-st06-acceptance/acceptance.md). **Objective:** The fixture totals1192 cents and every checkout field roundtrips unchanged.
 
 **Why this task exists:** The current receipt can be rebuilt from today's menu and lose the address, tip or discount. A receipt is a photograph of the order when submitted, not a fresh calculation tomorrow.
 
@@ -901,15 +901,15 @@ Current criterion-indexed proof: [ST-02/ST-03 acceptance](docs/qa/st02-st03-acce
 
 **Implementation steps / TODOs:**
 
-- [ ] **ST-06.01** — Implement integer mock-v1 pricing and quote route with revision/catalog fingerprint; validate tip/promo and half-up rounding. Reject stale cart/catalog before approval.
+- [x] **ST-06.01** — Implement integer mock-v1 pricing and quote route with revision/catalog fingerprint; validate tip/promo and half-up rounding. Reject stale cart/catalog before approval.
 
-- [ ] **ST-06.02** — Define full immutable snapshot including canonical line labels/prices/modifiers, every checkout field, all totals, pricing version and created timestamp.
+- [x] **ST-06.02** — Define full immutable snapshot including canonical line labels/prices/modifiers, every checkout field, all totals, pricing version and created timestamp.
 
-- [ ] **ST-06.03** — Create additive snapshot storage/read mapping; remove current-catalog reconstruction for new receipts. Keep status Placed with explicit mock meaning.
+- [x] **ST-06.03** — Create additive snapshot storage/read mapping; remove current-catalog reconstruction for new receipts. Keep status Placed with explicit mock meaning.
 
-- [ ] **ST-06.04** — Scope receipt list/read to guest; bounded pagination newest first. Missing/foreign IDs return same404.
+- [x] **ST-06.04** — Scope receipt list/read to guest; bounded pagination newest first. Missing/foreign IDs return same404.
 
-- [ ] **ST-06.05** — Persist synthetic snapshot in test fixture, change menu afterward, and verify byte-equivalent monetary/address fields on reread; freeze C5.
+- [x] **ST-06.05** — Persist synthetic snapshot in test fixture, change menu afterward, and verify byte-equivalent monetary/address fields on reread; freeze C5.
 
 **Invariants affected:** INV-03, INV-08, INV-11; acceptance/tests below are enforcement proof.
 
@@ -927,11 +927,11 @@ Current criterion-indexed proof: [ST-02/ST-03 acceptance](docs/qa/st02-st03-acce
 
 **Acceptance criteria / completion proof:**
 
-1. **ST-06-AC1 — PASS/FAIL:** The fixture totals1192 cents and every checkout field roundtrips unchanged. Attach the shared evidence form.
+1. **ST-06-AC1 — PASS (local):** The fixture totals1192 cents and every checkout field roundtrips unchanged. Attach the shared evidence form.
 
-2. **ST-06-AC2 — PASS/FAIL:** Changing menu prices after storing a receipt cannot change that receipt. Attach the shared evidence form.
+2. **ST-06-AC2 — PASS (local):** Changing menu prices after storing a receipt cannot change that receipt. Attach the shared evidence form.
 
-3. **ST-06-AC3 — PASS/FAIL:** No old incomplete receipt is silently supplied with invented current address/tip/owner. Attach the shared evidence form.
+3. **ST-06-AC3 — PASS (local):** No old incomplete receipt is silently supplied with invented current address/tip/owner. Attach the shared evidence form.
 
 **Rollback / recovery:** Keep snapshot fields intact and legacy tables separate. Roll back writes only to compatible schema/version; never reprice or destructively backfill saved orders.
 

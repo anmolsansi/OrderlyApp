@@ -64,9 +64,15 @@
                   }
                 ]
               }
-            ]
+            ],
+            "description": "Synthetic fixture only",
+            "image_emoji": "M"
           }
-        ]
+        ],
+        "rating": 4.8,
+        "delivery_minutes": "10-20 min",
+        "image_emoji": "R",
+        "tags": []
       }
     ],
     "authority_case": {
@@ -80,7 +86,9 @@
         "modifiers": [
           {
             "group_id": "size",
-            "option_ids": ["large"]
+            "option_ids": [
+              "large"
+            ]
           }
         ]
       },
@@ -94,7 +102,9 @@
         "modifiers": [
           {
             "group_id": "size",
-            "option_ids": ["large"]
+            "option_ids": [
+              "large"
+            ]
           }
         ],
         "unit_price_cents": 1300
@@ -110,6 +120,10 @@
         "message": "Restaurant was not found",
         "request_id": "synthetic-request-1",
         "fields": []
+      },
+      "request": {
+        "method": "GET",
+        "path": "/v1/restaurants/missing"
       }
     },
     {
@@ -119,7 +133,33 @@
         "code": "invalid_cart",
         "message": "Cart contains invalid catalog choices",
         "request_id": "synthetic-request-2",
-        "fields": ["items.0.menu_item_id"]
+        "fields": [
+          "items.0.menu_item_id"
+        ]
+      },
+      "request": {
+        "method": "PUT",
+        "path": "/v1/cart",
+        "body": {
+          "expected_revision": 1,
+          "items": [
+            {
+              "id": "line-1",
+              "restaurant_id": "fixture-r1",
+              "menu_item_id": "missing",
+              "quantity": 1,
+              "modifiers": [
+                {
+                  "group_id": "size",
+                  "option_ids": [
+                    "small"
+                  ]
+                }
+              ],
+              "special_instructions": "Synthetic fixture only"
+            }
+          ]
+        }
       }
     },
     {
@@ -129,8 +169,35 @@
         "code": "invalid_cart",
         "message": "Cart contains invalid catalog choices",
         "request_id": "synthetic-request-3",
-        "fields": ["items.0.restaurant_id"]
-      }
+        "fields": [
+          "items.0.restaurant_id"
+        ]
+      },
+      "request": {
+        "method": "PUT",
+        "path": "/v1/cart",
+        "body": {
+          "expected_revision": 1,
+          "items": [
+            {
+              "id": "line-1",
+              "restaurant_id": "fixture-r1",
+              "menu_item_id": "fixture-i1",
+              "quantity": 1,
+              "modifiers": [
+                {
+                  "group_id": "size",
+                  "option_ids": [
+                    "small"
+                  ]
+                }
+              ],
+              "special_instructions": "Synthetic fixture only"
+            }
+          ]
+        }
+      },
+      "catalog_override": "closed"
     },
     {
       "name": "unavailable_item",
@@ -139,8 +206,35 @@
         "code": "invalid_cart",
         "message": "Cart contains invalid catalog choices",
         "request_id": "synthetic-request-4",
-        "fields": ["items.0.menu_item_id"]
-      }
+        "fields": [
+          "items.0.menu_item_id"
+        ]
+      },
+      "request": {
+        "method": "PUT",
+        "path": "/v1/cart",
+        "body": {
+          "expected_revision": 1,
+          "items": [
+            {
+              "id": "line-1",
+              "restaurant_id": "fixture-r1",
+              "menu_item_id": "fixture-i1",
+              "quantity": 1,
+              "modifiers": [
+                {
+                  "group_id": "size",
+                  "option_ids": [
+                    "small"
+                  ]
+                }
+              ],
+              "special_instructions": "Synthetic fixture only"
+            }
+          ]
+        }
+      },
+      "catalog_override": "unavailable"
     },
     {
       "name": "required_group_below_minimum",
@@ -149,7 +243,26 @@
         "code": "invalid_cart",
         "message": "Cart contains invalid catalog choices",
         "request_id": "synthetic-request-5",
-        "fields": ["items.0.modifiers"]
+        "fields": [
+          "items.0.modifiers"
+        ]
+      },
+      "request": {
+        "method": "PUT",
+        "path": "/v1/cart",
+        "body": {
+          "expected_revision": 1,
+          "items": [
+            {
+              "id": "line-1",
+              "restaurant_id": "fixture-r1",
+              "menu_item_id": "fixture-i1",
+              "quantity": 1,
+              "modifiers": [],
+              "special_instructions": "Synthetic fixture only"
+            }
+          ]
+        }
       }
     },
     {
@@ -159,8 +272,43 @@
         "code": "invalid_cart",
         "message": "Cart contains invalid catalog choices",
         "request_id": "synthetic-request-6",
-        "fields": ["items.0.modifiers.1.option_ids"]
-      }
+        "fields": [
+          "items.0.modifiers.1.option_ids"
+        ]
+      },
+      "request": {
+        "method": "PUT",
+        "path": "/v1/cart",
+        "body": {
+          "expected_revision": 1,
+          "items": [
+            {
+              "id": "line-1",
+              "restaurant_id": "fixture-r1",
+              "menu_item_id": "fixture-i1",
+              "quantity": 1,
+              "modifiers": [
+                {
+                  "group_id": "size",
+                  "option_ids": [
+                    "small"
+                  ]
+                },
+                {
+                  "group_id": "extras",
+                  "option_ids": [
+                    "sauce",
+                    "cheese",
+                    "third"
+                  ]
+                }
+              ],
+              "special_instructions": "Synthetic fixture only"
+            }
+          ]
+        }
+      },
+      "catalog_override": "three_available_extras"
     },
     {
       "name": "duplicate_line_id",
@@ -169,7 +317,48 @@
         "code": "invalid_cart",
         "message": "Cart contains invalid catalog choices",
         "request_id": "synthetic-request-7",
-        "fields": ["items.1.id"]
+        "fields": [
+          "items.1.id"
+        ]
+      },
+      "request": {
+        "method": "PUT",
+        "path": "/v1/cart",
+        "body": {
+          "expected_revision": 1,
+          "items": [
+            {
+              "id": "line-1",
+              "restaurant_id": "fixture-r1",
+              "menu_item_id": "fixture-i1",
+              "quantity": 1,
+              "modifiers": [
+                {
+                  "group_id": "size",
+                  "option_ids": [
+                    "small"
+                  ]
+                }
+              ],
+              "special_instructions": "Synthetic fixture only"
+            },
+            {
+              "id": "line-1",
+              "restaurant_id": "fixture-r1",
+              "menu_item_id": "fixture-i1",
+              "quantity": 1,
+              "modifiers": [
+                {
+                  "group_id": "size",
+                  "option_ids": [
+                    "small"
+                  ]
+                }
+              ],
+              "special_instructions": "Synthetic fixture only"
+            }
+          ]
+        }
       }
     },
     {
@@ -179,7 +368,39 @@
         "code": "invalid_cart",
         "message": "Cart contains invalid catalog choices",
         "request_id": "synthetic-request-8",
-        "fields": ["items.0.modifiers.1.group_id"]
+        "fields": [
+          "items.0.modifiers.1.group_id"
+        ]
+      },
+      "request": {
+        "method": "PUT",
+        "path": "/v1/cart",
+        "body": {
+          "expected_revision": 1,
+          "items": [
+            {
+              "id": "line-1",
+              "restaurant_id": "fixture-r1",
+              "menu_item_id": "fixture-i1",
+              "quantity": 1,
+              "modifiers": [
+                {
+                  "group_id": "size",
+                  "option_ids": [
+                    "small"
+                  ]
+                },
+                {
+                  "group_id": "size",
+                  "option_ids": [
+                    "large"
+                  ]
+                }
+              ],
+              "special_instructions": "Synthetic fixture only"
+            }
+          ]
+        }
       }
     },
     {
@@ -189,7 +410,37 @@
         "code": "invalid_cart",
         "message": "Cart contains invalid catalog choices",
         "request_id": "synthetic-request-9",
-        "fields": ["items.0.modifiers.0.group_id"]
+        "fields": [
+          "items.0.modifiers.0.group_id"
+        ]
+      },
+      "request": {
+        "method": "PUT",
+        "path": "/v1/cart",
+        "body": {
+          "expected_revision": 1,
+          "items": [
+            {
+              "id": "line-1",
+              "restaurant_id": "fixture-r1",
+              "menu_item_id": "fixture-i1",
+              "quantity": 1,
+              "modifiers": [
+                {
+                  "group_id": "missing",
+                  "option_ids": []
+                },
+                {
+                  "group_id": "size",
+                  "option_ids": [
+                    "small"
+                  ]
+                }
+              ],
+              "special_instructions": "Synthetic fixture only"
+            }
+          ]
+        }
       }
     },
     {
@@ -199,7 +450,40 @@
         "code": "invalid_cart",
         "message": "Cart contains invalid catalog choices",
         "request_id": "synthetic-request-10",
-        "fields": ["items.0.modifiers.0.option_ids.1"]
+        "fields": [
+          "items.0.modifiers.0.option_ids.1"
+        ]
+      },
+      "request": {
+        "method": "PUT",
+        "path": "/v1/cart",
+        "body": {
+          "expected_revision": 1,
+          "items": [
+            {
+              "id": "line-1",
+              "restaurant_id": "fixture-r1",
+              "menu_item_id": "fixture-i1",
+              "quantity": 1,
+              "modifiers": [
+                {
+                  "group_id": "extras",
+                  "option_ids": [
+                    "sauce",
+                    "sauce"
+                  ]
+                },
+                {
+                  "group_id": "size",
+                  "option_ids": [
+                    "small"
+                  ]
+                }
+              ],
+              "special_instructions": "Synthetic fixture only"
+            }
+          ]
+        }
       }
     },
     {
@@ -209,7 +493,33 @@
         "code": "invalid_cart",
         "message": "Cart contains invalid catalog choices",
         "request_id": "synthetic-request-11",
-        "fields": ["items.0.modifiers.0.option_ids.0"]
+        "fields": [
+          "items.0.modifiers.0.option_ids.0"
+        ]
+      },
+      "request": {
+        "method": "PUT",
+        "path": "/v1/cart",
+        "body": {
+          "expected_revision": 1,
+          "items": [
+            {
+              "id": "line-1",
+              "restaurant_id": "fixture-r1",
+              "menu_item_id": "fixture-i1",
+              "quantity": 1,
+              "modifiers": [
+                {
+                  "group_id": "size",
+                  "option_ids": [
+                    "missing"
+                  ]
+                }
+              ],
+              "special_instructions": "Synthetic fixture only"
+            }
+          ]
+        }
       }
     },
     {
@@ -219,7 +529,39 @@
         "code": "invalid_cart",
         "message": "Cart contains invalid catalog choices",
         "request_id": "synthetic-request-12",
-        "fields": ["items.0.modifiers.1.option_ids.0"]
+        "fields": [
+          "items.0.modifiers.1.option_ids.0"
+        ]
+      },
+      "request": {
+        "method": "PUT",
+        "path": "/v1/cart",
+        "body": {
+          "expected_revision": 1,
+          "items": [
+            {
+              "id": "line-1",
+              "restaurant_id": "fixture-r1",
+              "menu_item_id": "fixture-i1",
+              "quantity": 1,
+              "modifiers": [
+                {
+                  "group_id": "size",
+                  "option_ids": [
+                    "small"
+                  ]
+                },
+                {
+                  "group_id": "extras",
+                  "option_ids": [
+                    "sold-out"
+                  ]
+                }
+              ],
+              "special_instructions": "Synthetic fixture only"
+            }
+          ]
+        }
       }
     },
     {
@@ -229,8 +571,50 @@
         "code": "invalid_cart",
         "message": "Cart contains invalid catalog choices",
         "request_id": "synthetic-request-13",
-        "fields": ["items.1.restaurant_id"]
-      }
+        "fields": [
+          "items.1.restaurant_id"
+        ]
+      },
+      "request": {
+        "method": "PUT",
+        "path": "/v1/cart",
+        "body": {
+          "expected_revision": 1,
+          "items": [
+            {
+              "id": "line-1",
+              "restaurant_id": "fixture-r1",
+              "menu_item_id": "fixture-i1",
+              "quantity": 1,
+              "modifiers": [
+                {
+                  "group_id": "size",
+                  "option_ids": [
+                    "small"
+                  ]
+                }
+              ],
+              "special_instructions": "Synthetic fixture only"
+            },
+            {
+              "id": "line-2",
+              "restaurant_id": "fixture-r2",
+              "menu_item_id": "fixture-i2",
+              "quantity": 1,
+              "modifiers": [
+                {
+                  "group_id": "size",
+                  "option_ids": [
+                    "small"
+                  ]
+                }
+              ],
+              "special_instructions": "Synthetic fixture only"
+            }
+          ]
+        }
+      },
+      "catalog_override": "second_restaurant"
     },
     {
       "name": "quantity_out_of_range",
@@ -239,7 +623,33 @@
         "code": "invalid_cart",
         "message": "Cart contains invalid catalog choices",
         "request_id": "synthetic-request-14",
-        "fields": ["items.0.quantity"]
+        "fields": [
+          "items.0.quantity"
+        ]
+      },
+      "request": {
+        "method": "PUT",
+        "path": "/v1/cart",
+        "body": {
+          "expected_revision": 1,
+          "items": [
+            {
+              "id": "line-1",
+              "restaurant_id": "fixture-r1",
+              "menu_item_id": "fixture-i1",
+              "quantity": 0,
+              "modifiers": [
+                {
+                  "group_id": "size",
+                  "option_ids": [
+                    "small"
+                  ]
+                }
+              ],
+              "special_instructions": "Synthetic fixture only"
+            }
+          ]
+        }
       }
     },
     {
@@ -249,7 +659,33 @@
         "code": "invalid_cart",
         "message": "Cart contains invalid catalog choices",
         "request_id": "synthetic-request-15",
-        "fields": ["items.0.special_instructions"]
+        "fields": [
+          "items.0.special_instructions"
+        ]
+      },
+      "request": {
+        "method": "PUT",
+        "path": "/v1/cart",
+        "body": {
+          "expected_revision": 1,
+          "items": [
+            {
+              "id": "line-1",
+              "restaurant_id": "fixture-r1",
+              "menu_item_id": "fixture-i1",
+              "quantity": 1,
+              "modifiers": [
+                {
+                  "group_id": "size",
+                  "option_ids": [
+                    "small"
+                  ]
+                }
+              ],
+              "special_instructions": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+            }
+          ]
+        }
       }
     }
   ]

@@ -15,7 +15,15 @@
         "restaurant_id": "fixture-r1",
         "menu_item_id": "fixture-i1",
         "quantity": 1,
-        "modifiers": []
+        "modifiers": [
+          {
+            "group_id": "size",
+            "option_ids": [
+              "small"
+            ]
+          }
+        ],
+        "special_instructions": "Synthetic fixture only"
       }
     ]
   },
@@ -33,7 +41,15 @@
         "name": "Fixture meal",
         "base_price_cents": 1000,
         "quantity": 1,
-        "modifiers": []
+        "modifiers": [
+          {
+            "group_id": "size",
+            "option_ids": [
+              "small"
+            ]
+          }
+        ],
+        "special_instructions": "Synthetic fixture only"
       }
     ]
   },
@@ -70,7 +86,9 @@
         "code": "invalid_cart",
         "message": "Cart contains invalid catalog choices",
         "request_id": "synthetic-request-3",
-        "fields": ["items.0.menu_item_id"]
+        "fields": [
+          "items.0.menu_item_id"
+        ]
       }
     },
     {
@@ -80,7 +98,9 @@
         "code": "invalid_cart",
         "message": "Cart contains invalid catalog choices",
         "request_id": "synthetic-request-4",
-        "fields": ["expected_revision"]
+        "fields": [
+          "expected_revision"
+        ]
       }
     }
   ]

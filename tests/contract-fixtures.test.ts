@@ -45,7 +45,7 @@ describe('ST-01 contract fixtures', () => {
 
   it('preserves the cross-language C5 and C6 invariants', () => {
     const c5 = loadFixture(5) as ContractFixture & {
-      positive: { quote: { totals: { total_cents: number } } };
+      positive: { quote: { totals: { total_cents: number } }; receipt: unknown };
     };
     const c6 = loadFixture(6) as ContractFixture & {
       positive: {
@@ -56,5 +56,6 @@ describe('ST-01 contract fixtures', () => {
 
     expect(c5.positive.quote.totals.total_cents).toBe(1192);
     expect(c6.positive.replay_response.receipt).toEqual(c6.positive.first_response.receipt);
+    expect(c6.positive.first_response.receipt).toEqual(c5.positive.receipt);
   });
 });

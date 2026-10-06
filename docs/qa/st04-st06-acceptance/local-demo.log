@@ -1,0 +1,11 @@
+
+Running 2 tests using 1 worker
+
+(node:73743) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:73743) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 [chromium] › e2e/catalog-cart.spec.ts:276:5 › explicit local_demo makes zero API requests and keeps checkout unavailable (2.3s)
+  ✓  2 [chromium] › e2e/checkout-recovery.spec.ts:140:5 › direct local_demo checkout, receipt, and history routes stay unavailable (414ms)
+
+  2 passed (3.4s)

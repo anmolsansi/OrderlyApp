@@ -386,6 +386,13 @@ def test_postgres_catalog_search_reads_authoritative_availability(
         assert [item.id for item in results] == [open_id]
         assert results[0].menu[0].available is True
         assert results[0].is_open is True
+        assert [r.id for r in store.search_restaurants(query=suffix, cuisine='Synthetic', sort='rating')] == [closed_id, open_id]
+        assert [r.id for r in store.search_restaurants(query=suffix, cuisine='Synthetic', sort='fee')] == [closed_id, open_id]
+        assert store.search_restaurants(query=suffix, cuisine='Missing') == []
+        with get_connection() as conn:
+            with conn.transaction():
+                conn.execute('UPDATE menu_items SET available = FALSE WHERE id = %s', (open_item_id,))
+        assert store.search_restaurants(query=f'Searchable {suffix}')[0].menu[0].available is False
     finally:
         with get_connection() as conn:
             with conn.transaction():
