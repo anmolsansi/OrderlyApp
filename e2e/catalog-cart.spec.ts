@@ -295,3 +295,48 @@ test('explicit local_demo makes zero API requests and keeps checkout unavailable
   await expect(page.getByText(/pepperoni feast/i).first()).toBeVisible();
   expect(apiRequests).toEqual([]);
 });
+
+test('real shared guest tabs conflict, reapply deliberately, and persist removal', async ({ page, context }) => {
+  await page.goto('/restaurants/marios-pizza/items/pepperoni-feast');
+  await page.getByRole('button', { name: /add to cart/i }).click();
+  await expect(page.getByText(/basket revision 1/i)).toBeVisible();
+  const other = await context.newPage();
+  await other.goto('/cart');
+  await expect(other.getByText(/basket revision 1/i)).toBeVisible();
+  await page.getByRole('button', { name: '+', exact: true }).click();
+  await expect(page.getByText(/basket revision 2/i)).toBeVisible();
+  await other.getByRole('button', { name: '+', exact: true }).click();
+  await expect(other.getByText(/basket changed in another tab/i).first()).toBeVisible();
+  await expect(other.getByText(/basket revision 2/i)).toBeVisible();
+  await other.getByRole('button', { name: /reapply my change/i }).click();
+  await expect(other.getByText(/basket revision 3/i)).toBeVisible();
+  await other.getByRole('button', { name: 'Remove', exact: true }).click();
+  await expect(other.getByText(/your cart is empty/i)).toBeVisible();
+  await page.reload();
+  await expect(page.getByText(/your cart is empty/i)).toBeVisible();
+  const cart = await page.evaluate(async () => (await fetch('/api/orderly/cart')).json());
+  expect(cart.revision).toBe(4);
+  expect(cart.items).toEqual([]);
+});
+
+test('real cross-restaurant replacement preserves basket on cancel and changes it only on confirmation', async ({ page }) => {
+  await page.goto('/restaurants/marios-pizza/items/pepperoni-feast');
+  await page.getByRole('button', { name: /add to cart/i }).click();
+  await expect(page.getByText(/basket revision 1/i)).toBeVisible();
+  const before = await page.evaluate(async () => (await fetch('/api/orderly/cart')).json());
+  const catalog = await page.evaluate(async () => (await fetch('/api/orderly/restaurants')).json());
+  const replacement = catalog.find((restaurant: any) => restaurant.id !== 'marios-pizza' && restaurant.is_open && restaurant.menu.some((item: any) => item.available));
+  const item = replacement.menu.find((candidate: any) => candidate.available);
+  await page.goto(`/restaurants/${replacement.id}/items/${item.id}`);
+  await page.getByRole('button', { name: /add to cart/i }).click();
+  await page.getByRole('button', { name: /keep current basket/i }).click();
+  expect(await page.evaluate(async () => (await fetch('/api/orderly/cart')).json())).toEqual(before);
+  await page.getByRole('button', { name: /add to cart/i }).click();
+  await page.getByRole('button', { name: /replace basket/i }).click();
+  await expect(page).toHaveURL(/\/cart/);
+  await expect(page.getByText(/basket revision 2/i)).toBeVisible();
+  const after = await page.evaluate(async () => (await fetch('/api/orderly/cart')).json());
+  expect(after.items).toHaveLength(1);
+  expect(after.items[0].restaurant_id).toBe(replacement.id);
+  expect(after.items[0].menu_item_id).toBe(item.id);
+});
