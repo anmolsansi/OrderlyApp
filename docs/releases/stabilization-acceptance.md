@@ -55,7 +55,7 @@ GitHub #41/#43/#45 were already closed before this follow-up. Linear OPE-335 (ST
 
 ## Remaining release operation
 
-1. Identify the external PostgreSQL provider and an isolated hosted staging database/environment. Use synthetic data for controlled outage/restart, complete backup/restore and compatible rollback; do not stop or corrupt the public database for a rehearsal.
+1. Neon project OrderlyApp (`steep-wind-13795315`) and its production branch are identified. A schema-only `st13-staging` branch and free separate Render backend are created; database linkage/deployment are pending the user credential handoff. See [staging setup and bounded recovery checklist](../qa/st13-staging-2026-10-06.md). Run synthetic controlled outage/restart, complete backup/restore and compatible rollback only after staging is healthy; do not stop or corrupt the public database.
 2. Verify actual daily cleanup execution and monitoring. A checked-in cron/predeploy blueprint is not a running service; no paid upgrades are authorized by this record.
 3. Complete the outstanding hosted cases in INT-02, then close ST13.03 and the release gate only when the named hosted observations pass. Public receipt and guest isolation are already proven; retest them if deployed source changes.
 
@@ -64,3 +64,5 @@ Rollback was rehearsed locally using previous main backend against the additive 
 Merged implementation PR: [#50](https://github.com/anmolsansi/OrderlyApp/pull/50). Historical [public access](../qa/st11-st13-acceptance/public-access.json) and [guest-bootstrap failure](../qa/st11-st13-acceptance/public-journey.json) remain dated evidence. The [current confirmed-workspace journey](../qa/st11-st13-acceptance/confirmed-public-journey.json) records passing safe HTTP/status and full-receipt digest evidence at merged main; it contains no cookies, secrets or contact payloads.
 
 Evidence follow-up: [draft PR51](https://github.com/anmolsansi/OrderlyApp/pull/51). The earlier [limiter failure](../qa/st11-st13-acceptance/confirmed-public-limiter-failure.json) remains historical evidence.
+
+Hosted staging update: resources exist but no hosted recovery PASS is claimed. The Neon schema-only test branch expires October 7, 2026, at 5:17 a.m. EDT. Initial Render builds failed on absent DATABASE_URL; no public configuration was changed.

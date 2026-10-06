@@ -16,3 +16,7 @@ Runtime candidate: `64a6f412c03731e997c9a96e91e849bc4cf998e4`; prior compatible 
 Local environment: macOS, PostgreSQL 16.13 on isolated port 55439, disposable Redis on 56391, FastAPI 8041, gateway 3291. Preview ran sequentially on 3292 because Next dev permits one server per checkout. Synthetic data only; signing secrets/cookies/addresses/dumps excluded from exported evidence. [Detailed results and runnable backup rehearsal](st11-st13-acceptance/results.md).
 
 These local results do not establish current hosted staging topology, isolated staging database access or actual daily cleanup execution. The current public backend linkage and public receipt/isolation acceptance now pass separately in the release ledger. INT-02 remains Not completed until its hosted staging/release obligations pass. See [current release ledger](../releases/stabilization-acceptance.md).
+
+## Hosted staging setup — October 6, 2026
+
+The Neon OrderlyApp project is identified; a schema-only staging branch and separate free Render backend now exist. Database credential linkage/deployment remains pending, and initial builds fail safely on absent DATABASE_URL. No hosted recovery case passes merely from resource creation. See [setup, temporary expiry and next checks](st13-staging-2026-10-06.md).
