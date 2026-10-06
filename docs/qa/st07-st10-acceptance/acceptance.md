@@ -57,3 +57,5 @@ No dependency, production configuration or database migration was changed. Rever
 Existing GitHub issues #32/#34/#36/#38 were already closed; no duplicates or completion inferred from labels. Progress uses #32. No exact active ST07–10 Linear tickets were found; no Linear write was made. Graph tools reported this project unindexed; repository export/indexing had been rejected by automatic approval review, so private-code export was not retried. Local source/tests supplied evidence.
 
 Hosted CI is recorded independently in the PR. Prior main PR48's jobs were cancelled/skipped or failed release evidence; they are not current green proof. Do not merge or deploy solely from this local report.
+
+Publication: [PR49](https://github.com/anmolsansi/OrderlyApp/pull/49), OPEN against main. At publication, hosted dependency/web/backend/Chromium checks are queued or in progress; API/preview/release jobs have not yet completed. Completion here means implementation and current local acceptance, not hosted release readiness.

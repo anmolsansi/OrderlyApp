@@ -41,4 +41,6 @@ Base: latest main `e81ad40`; branch `fix/st07-st10-acceptance`. Existing issues 
 - [x] 37/40 Full backend PostgreSQL/Redis regressions and migrations
 - [x] 38/40 Full lint/unit/typecheck/build/API/local-demo browser regressions
 - [x] 39/40 Map every numbered criterion, reconcile development.md and ST guides
-- [ ] 40/40 Review diff, push all microcommits, open PR, report CI separately
+- [x] 40/40 Review diff, push all microcommits, open PR, report CI separately
+
+Publication: [PR49](https://github.com/anmolsansi/OrderlyApp/pull/49), targeting main. All planned fixes and evidence are pushed; hosted CI is queued/in progress, not a completed local acceptance check. No merge/deployment.
