@@ -166,9 +166,9 @@ Local endpoints:
 
 ## 8. Current Hosted Evidence — October 6, 2026
 
-PR #50 is merged at `c0931252fe652d8f14254db6687c228f4db8c5c5`; both public platforms deploy that SHA, and all seven merged-main CI jobs passed. In the user-confirmed Render workspace, `OrderlyApp` at `https://orderlyapp.onrender.com` now returns readiness 200 after API-mode and signing-secret configuration repairs. The public alias opens anonymously; guest creation, basket persistence and quote succeed (200). Mock order submission still returns 503 `rate_limit_unavailable`. A free private limiter is available but its connection URL has not yet been linked. Public receipt/isolation acceptance, isolated hosted recovery and actual cleanup scheduling remain pending. See [current acceptance ledger](releases/stabilization-acceptance.md).
+PR #50 is merged at `c0931252fe652d8f14254db6687c228f4db8c5c5`; both public platforms deploy that SHA, and all seven merged-main CI jobs passed. In the user-confirmed Render workspace, `OrderlyApp` at `https://orderlyapp.onrender.com` returns readiness 200 after API-mode, signing-secret and private limiter configuration repairs. A fresh visitor saves a mock order (201) and reloads the exact complete receipt (200); a second guest has empty history and receives 404 for that receipt. The public alias opens anonymously; the immutable Vercel URL returns 302. ST-13 remains Not completed pending isolated hosted recovery and actual cleanup scheduling. See [current acceptance ledger](releases/stabilization-acceptance.md).
 
-Vercel deployment `dpl_2FbVtUZmEMggR5ztcLxxac2srLJH` and Render deployment `dep-db2b4ju0tbcc738jpqn0` identify the merged SHA. The old `orderlyapp-int01-api` service belongs to a different Render account and is not the current backend. No paid plan or billed cron was activated. Configuration updates merged only the required keys; signing credentials are excluded from evidence.
+Vercel deployment `dpl_2FbVtUZmEMggR5ztcLxxac2srLJH` and Render deployment `dep-db2b9ucs728c73br6m10` identify the merged SHA. The old `orderlyapp-int01-api` service belongs to a different Render account and is not the current backend. No paid plan or billed cron was activated. Configuration updates merged only the required keys; signing credentials are excluded from evidence.
 
 ## 9. Public Acceptance Checklist
 

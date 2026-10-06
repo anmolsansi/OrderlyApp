@@ -55,3 +55,13 @@ Set ORDERLY_DATA_MODE=api and configured a secure signing secret through merge-o
 Fresh public Chromium journey passes profile, API session, menu customization, persisted basket and server quote; POST /api/orderly/orders fails with 503 rate_limit_unavailable. No saved receipt or guest-isolation PASS is claimed. Redacted statuses: [confirmed-public-journey.json](confirmed-public-journey.json). Created free Virginia Key Value red-db2b6jh7lnhs73earc9g (orderlyapp-checkout-limiter), available, persistence off, noeviction, external access disabled. It is not yet linked: the connector exposes metadata but not connection info; the dashboard requires user sign-in to obtain its authoritative Internal URL. No paid resource or cleanup scheduler was activated.
 
 Earlier dated public failures above are historical; this section supersedes the active mode/secret and wrong-account diagnosis. ST13.03 and INT02 hosted recovery remain Not completed.
+
+## Private limiter connected; public journey passes — October 6, 2026
+
+After user dashboard sign-in, read the created limiter's authoritative Internal URL and merged REDIS_URL into OrderlyApp. No external network access was enabled. Automatic Render deployment dep-db2b9ucs728c73br6m10 is LIVE at c0931252fe652d8f14254db6687c228f4db8c5c5; readiness remains 200 at that exact source. The current immutable Vercel URL returns anonymous 302; the public alias is the unauthenticated acceptance endpoint.
+
+Fresh public Chromium guest A completes profile, customization, API basket and quote, receives checkout 201, and reads the saved receipt 200 after page reload. Deep equality compares the entire accepted and reloaded JSON; only a digest is exported. Independent context B has its own session (200), history (200) with the empty-history UI, and foreign receipt 404 with Order not found UI. [Current redacted public report](confirmed-public-journey.json); [preserved earlier limiter failure](confirmed-public-limiter-failure.json).
+
+The first post-linkage isolation probe omitted Origin on its request-client session POST and correctly received 403 origin_forbidden. After matching the browser's same-origin header, the complete public probe passed. The application's origin check was not weakened. A quote 409 observed after checkout accompanies the now-cleared basket; saved receipt reload is 200 and exact.
+
+ST-13-AC2 is PASS for the named public deployment; M46 is complete. ST13.03 still includes isolated hosted failure/recovery and stays unchecked. INT02 and the release gate remain Not completed: external PostgreSQL provider/staging access, hosted recovery/backup/rollback and actual daily cleanup execution/monitoring are not proven. No source edits, paid infrastructure or tracker writes were made.

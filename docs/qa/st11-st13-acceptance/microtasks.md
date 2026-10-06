@@ -50,8 +50,8 @@ Each check below is complete only when current evidence is recorded. Group relat
 - [x] M43: Publish focused PR and attach it to this chat.
 - [x] M44: Verify all seven hosted CI gates on candidate SHA.
 - [x] M45: Record ST11 and ST12 acceptance separately from public gate.
-- [ ] M46: Run authorized public two-guest receipt acceptance after release prerequisites.
+- [x] M46: Run authorized public two-guest receipt acceptance after release prerequisites.
 
 Evidence: `docs/qa/st11-st13-acceptance/results.md` and `docs/releases/stabilization-acceptance.md`. Public or staging criteria stay pending when prerequisites are missing.
 
-Publication: [PR50](https://github.com/anmolsansi/OrderlyApp/pull/50) is merged; merged-main CI run 37431711534 passed. M39 is complete after the user confirmed Anmol's workspace (`tea-d7so32sm0tmc73dc3cp0`). M46 remains blocked: guest bootstrap, basket and quote now pass, but checkout returns 503 `rate_limit_unavailable`. The free limiter is available; its private URL must be connected before rerunning public receipt/isolation acceptance. Hosted staging recovery and cleanup evidence remain separate pending gates.
+Publication: [PR50](https://github.com/anmolsansi/OrderlyApp/pull/50) is merged; merged-main CI run 37431711534 passed. M39 is complete after the user confirmed Anmol's workspace (`tea-d7so32sm0tmc73dc3cp0`). M46 passes after connecting the available free limiter privately: guest A saves/reopens an exact complete receipt; independent guest B has empty history and receives 404 for A's receipt. These 46 implementation/public microtasks do not close the separate hosted staging recovery, retention scheduling or overall release gates. Evidence follow-up: [draft PR51](https://github.com/anmolsansi/OrderlyApp/pull/51).
