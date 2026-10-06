@@ -40,6 +40,8 @@ class _ReadyConnection:
 
     def execute(self, query: str, _params: object = None) -> _Rows:
         normalized = " ".join(query.split())
+        if normalized in ("SET TRANSACTION READ ONLY", "SET LOCAL statement_timeout = '2s'"):
+            return _Rows([])
         if normalized == "SELECT 1":
             return _Rows([{"?column?": 1}])
         if "to_regclass('public.schema_migrations')" in normalized:
@@ -539,3 +541,21 @@ def test_serving_manifests_keep_seed_out_of_api_startup() -> None:
     )[0]
     assert "startCommand: uvicorn app.main:app" in api_render_block
     assert "seed_postgres.py" not in api_render_block
+
+def test_readiness_is_bounded_by_real_ledger_lock(
+    postgres_database_url: str, monkeypatch,
+) -> None:
+    import time
+    import psycopg
+
+    _configure_ready_environment(monkeypatch)
+    monkeypatch.setenv("DATABASE_URL", postgres_database_url)
+    with psycopg.connect(postgres_database_url) as blocker:
+        blocker.execute("LOCK TABLE schema_migrations IN ACCESS EXCLUSIVE MODE")
+        started = time.monotonic()
+        response = TestClient(app).get("/health/ready")
+        assert response.status_code == 503
+        assert time.monotonic() - started < 5
+        assert TestClient(app).get("/health/live").status_code == 200
+        blocker.rollback()
+    assert TestClient(app).get("/health/ready").status_code == 200

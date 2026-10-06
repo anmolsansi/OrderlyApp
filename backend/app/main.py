@@ -516,6 +516,8 @@ def health_ready(request: Request) -> JSONResponse:
     else:
         try:
             with get_connection(connect_timeout_seconds=2) as conn:
+                conn.execute("SET TRANSACTION READ ONLY")
+                conn.execute("SET LOCAL statement_timeout = '2s'")
                 conn.execute("SELECT 1")
                 dependencies["postgres"] = "ok"
 
