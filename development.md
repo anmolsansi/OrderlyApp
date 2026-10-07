@@ -1,8 +1,8 @@
 # OrderlyApp development guide — stabilization
 
-Revision: 3 • Updated: 2026-10-05 • ST-02/ST-03 acceptance source: `a9537931c57cbf636466bf3f791e440e24ce74bd` on `fix/st02-st03-acceptance` • Release status: **Not completed**.
+Revision: 3 • Updated: 2026-10-07 • ST-02/ST-03 acceptance source: `a9537931c57cbf636466bf3f791e440e24ce74bd` on `fix/st02-st03-acceptance` • Release status: **Not completed**.
 
-This is the single execution guide for taking the application to a stable **public mock demo**. ST-01 through ST-10 are implemented; ST-02/03 merged in PR47, ST-04/05/06 in PR48, and ST-07/08/09/10 in PR49. **ST-11 implementation/local acceptance and ST-12 repository/hosted CI acceptance are Completed and merged in PR50. Both public platforms deploy merged main `c093125` with seven green CI gates. ST-13 public receipt acceptance, INT-02 hosted staging and RELEASE-GATE remain Not completed.** Backend readiness and the public manual journey now pass after configuration repair: a fresh guest saves/reopens an exact receipt, and a second guest cannot read it. Isolated hosted recovery and actual cleanup scheduling remain unverified. See [current criterion evidence](docs/qa/st11-st13-acceptance/results.md), [INT-01](docs/qa/int-01.md), [INT-02 local rehearsal](docs/qa/int-02.md) and [exact release identities/blockers](docs/releases/stabilization-acceptance.md). No public completion is inferred from local or CI results.
+This is the single execution guide for taking the application to a stable **public mock demo**. ST-01 through ST-10 are implemented; ST-02/03 merged in PR47, ST-04/05/06 in PR48, and ST-07/08/09/10 in PR49. **ST-11 implementation/local acceptance and ST-12 repository/hosted CI acceptance are Completed and merged in PR50. The October 6 public acceptance candidate `c093125` passed seven CI gates and public receipt/isolation checks; current hosted staging operations use merged main `9a72d02`. Overall ST-13, INT-02 hosted staging and RELEASE-GATE remain Not completed.** Backend readiness and the public manual journey now pass after configuration repair: a fresh guest saves/reopens an exact receipt, and a second guest cannot read it. Isolated hosted restart/outage, backup/restore, retention and compatible rollback/current-main recovery now pass; actual cleanup scheduling and remaining hosted INT-02 cases are open. See [current criterion evidence](docs/qa/st11-st13-acceptance/results.md), [INT-01](docs/qa/int-01.md), [INT-02 local rehearsal](docs/qa/int-02.md) and [exact release identities/blockers](docs/releases/stabilization-acceptance.md). No public completion is inferred from local or CI results.
 
 Think of the app as a shop made from Lego. The screens already look like a shop, but some connections behind them can lose a basket, show another visitor's receipt, or pretend an order succeeded when the server failed. First we strengthen those connections. Then we add more Lego.
 
@@ -410,7 +410,7 @@ Consumers may prepare read-only designs after W0 fixtures; implementation starts
 
 ## 9. Task index and remaining work
 
-**ST-01–ST-12 implementation/required acceptance is Completed; PR47, PR48, PR49 and PR50 are merged, and current main CI is green. INT-01 has a separate local pass. Public exact-receipt and guest-isolation checks now pass on merged main `c093125`. ST-13, INT-02 hosted staging and RELEASE-GATE remain Not completed pending hosted recovery and actual retention scheduling.** See [current release evidence](docs/releases/stabilization-acceptance.md). Effort is an estimate for one engineer familiar with the stack, excluding queue time and unavailable infrastructure. Split a ticket before starting if its concrete diff will exceed three engineer-days; preserve its contract seam, owned files and acceptance tests.
+**ST-01–ST-12 implementation/required acceptance is Completed; PR47, PR48, PR49 and PR50 are merged, and current main CI is green. INT-01 has a separate local pass. Public exact-receipt and guest-isolation checks now pass on merged main `c093125`. ST-13, INT-02 hosted staging and RELEASE-GATE remain Not completed pending remaining hosted INT-02 cases and actual retention scheduling.** See [current release evidence](docs/releases/stabilization-acceptance.md). Effort is an estimate for one engineer familiar with the stack, excluding queue time and unavailable infrastructure. Split a ticket before starting if its concrete diff will exceed three engineer-days; preserve its contract seam, owned files and acceptance tests.
 
 | Ticket / outcome / status | Wave | Dependencies | Effort | Critical path |
 |---|---|---|---|---|
@@ -1535,14 +1535,14 @@ Checkpoints are real stop/go nodes, not a final “test everything” wish. They
 
 ### INT-02 — Release, persistence and recovery rehearsal — Not completed
 
-**Current evidence:** [Local rehearsal report](docs/qa/int-02.md). [Hosted staging verification](docs/qa/st13-staging-2026-10-07.md): replacement Neon branch and separate Render backend are live; exact-source readiness passes, one-time seed removed, readiness health check configured. The schema-only `st13-recovery-clean` branch is connected and guarded linkage proven. Hosted checkout/isolation, process restart and real staging database block/recovery now pass with complete receipt/cart and edited-catalog preservation. Backup/restore, compatible rollback and actual daily cleanup scheduling remain separate gates. All six local scenarios pass; public receipt/isolation also pass separately. Hosted staging recovery, backup/rollback and actual cleanup scheduling remain unrun. The checklist below stays unchecked for that hosted release gate.
+**Current evidence:** [Local rehearsal report](docs/qa/int-02.md) and [hosted staging verification](docs/qa/st13-staging-2026-10-07.md). Clean schema-only branch linkage is guarded and proven. Hosted checkout/isolation, process restart, real staging database outage/recovery, edited-catalog preservation, native transaction-consistent backup/restore of all nine tables, locked-row retention and compatible application rollback/current-main recovery pass. INT-02.03 and INT-02.04 are checked against these named observations. Other checkboxes remain open for their complete hosted obligations, including actual daily cleanup execution/monitoring and remaining migration/browser/abuse cases; local/CI results are separate evidence.
 
 **Owner:** Future release reviewer. **Inputs:** ST-10 and ST-12 completed, INT-01 evidence, C8 runbook, upgraded candidate, isolated staging stack, pre-migration backup. **Outputs:** CREATE `docs/qa/int-02.md` plus identity-linked CI/backup/recovery reports. **Non-owned:** Product/config changes; assign defects to ST-11/ST-12 or relevant provider. **Runtime:** Actual required PG, gateway and staged environment; no production fault injection.
 
 - [ ] **INT-02.01** — Run all candidate unit/backend/contract/browser suites plus actual lint/typecheck/build; ensure jobs did not silently skip tests.
 - [ ] **INT-02.02** — Rehearse schema migration from copied legacy structure; start compatible app, inspect isolation, preserve stored catalog/receipts; record coordinated browser/API cutover behavior.
 - [x] **INT-02.03** — Edit catalog, save order, restart process/container, stop/start PG, observe readiness503/recovery200 and unchanged durable receipt. Redis absent must not affect correctness.
-- [ ] **INT-02.04** — Restore transaction-consistent backup into separate database, compare saved receipt/cart/catalog and rehearse app rollback compatible with additive schema.
+- [x] **INT-02.04** — Restore transaction-consistent backup into separate database, compare saved receipt/cart/catalog and rehearse app rollback compatible with additive schema.
 - [ ] **INT-02.05** — Expired/revoked guest cleanup under concurrent requests cannot remove active guest data or commit orphan order; bounded abuse yields429; no secrets appear in probes/logs.
 - [ ] **INT-02.06** — Repeat manual journey on 375px viewport and keyboard; malformed local storage, session expiry, safe return navigation and selected address recover visibly.
 
@@ -1621,7 +1621,7 @@ No additional user product decision blocks this document: audience, profiles and
 
 ## 16. Delegation readiness report
 
-The guide now records **executed stabilization work and the remaining release handoff**. ST-01–ST-12 are complete at their documented scope; both public platforms deploy the merged source and the public receipt/isolation checks pass. INT-02 hosted operations and ST-13's hosted recovery obligations remain gated by isolated staging access and cleanup scheduling evidence.
+The guide now records **executed stabilization work and the remaining release handoff**. ST-01–ST-12 are complete at their documented scope; both public platforms deploy the merged source and the public receipt/isolation checks pass. INT-02's named restart/outage and backup/rollback cases pass on isolated hosted staging; remaining hosted cases and actual cleanup scheduling evidence still gate ST-13.
 
 | Readiness check | Document state | Execution condition |
 |---|---|---|

@@ -121,9 +121,9 @@ The `seed` profile sets `ORDERLY_ENVIRONMENT=development` and `ORDERLY_ALLOW_FIX
 - health checks use `/health/ready`
 - a daily cron invokes `python scripts/cleanup_guests.py`
 
-Render documents pre-deploy commands for paid web services. The currently connected `orderlyapp-int01-api` integration service is on the free plan. **Do not upgrade the service, create a billed cron job, or sync a configuration that incurs charges without explicit approval.**
+Render documents pre-deploy commands for paid web services. Confirmed production `OrderlyApp` (`srv-d7sobtkm0tmc73dcb65g`) uses Docker on the free plan; separate `orderlyapp-st13-staging` (`srv-db2bq5jncjis73e5cah0`) uses native Python on the free plan. **Do not upgrade the service, create a billed cron job, or sync a configuration that incurs charges without explicit approval.**
 
-Until a supported release deployment path is approved, use Docker Compose or another environment where migrations can run as a separate one-shot job before serving. INT-02/ST-13 owns final public candidate proof.
+The isolated staging rehearsal proved migration-only build (`cd backend && pip install -e . && python scripts/migrate.py`) followed by app-only startup and `/health/ready`; it does not establish a paid pre-deploy hook or an actual daily production cron. One-time seed/recovery jobs were removed from the saved build. Docker Compose remains the local one-shot migration path. INT-02/ST-13 owns final public candidate proof.
 
 ## Explicit fixture seeding
 
@@ -305,3 +305,9 @@ Before declaring ST-11 complete, record one exact source SHA proving:
 ST-12 may expand CI/dependency gates. ST-13 decides release readiness. ST-11 does not claim those later gates on its own.
 
 Readiness uses a read-only transaction and a two-second PostgreSQL statement timeout as well as the two-second connection timeout. A locked migration ledger returns 503 instead of hanging the probe; liveness remains process-only.
+
+### Pending daily cleanup service — approval required
+
+Service inventory on October 7 contains no OrderlyApp cron. The existing blueprint is a proposal. Provision only `orderlyapp-guest-cleanup`, Python in Virginia, repo main, build `cd backend && pip install -e .`, command `cd backend && python scripts/cleanup_guests.py`, schedule `17 3 * * *` (03:17 UTC daily), `ORDERLY_ENVIRONMENT=production`, `ORDERLY_CLEANUP_MAX_BATCHES=1000`. Privately link the production database; never copy a credential into chat/evidence or use the staging database as production proof. Preserve any required private limiter configuration from the existing blueprint. Do not sync the whole blueprint or create duplicate web services.
+
+Render cron has a **$1/month minimum per service**, with runtime billing potentially increasing the monthly total; it is not a guaranteed $1 cap ([official cron documentation](https://render.com/docs/cronjobs)). Obtain explicit paid-resource approval before creation. Then verify one manual successful run, workspace failure-notification settings/recipient and a subsequent actual scheduled run. Record exit status and safe deleted count; zero expired rows is a valid successful execution. Configuration alone does not close the operational gate.
