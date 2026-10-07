@@ -20,3 +20,7 @@ These local results do not establish current hosted staging topology, isolated s
 ## Hosted staging setup — October 6, 2026
 
 The Neon OrderlyApp project is identified; a schema-only staging branch and separate free Render backend now exist. Database credential linkage/deployment remains pending, and initial builds fail safely on absent DATABASE_URL. No hosted recovery case passes merely from resource creation. See [setup, temporary expiry and next checks](st13-staging-2026-10-06.md).
+
+## Hosted staging verification — October 7, 2026
+
+The user connected a replacement Neon branch and deployed current main `9a72d02`; staging is live and readiness passes. One-time seed is removed and `/health/ready` configured. The replacement branch contains an order predating branch creation, plus six guest sessions, so synthetic-only isolation and exact backend linkage must be confirmed before fault/restore/cleanup tests. Hosted recovery remains Not completed. See [observed verification and next steps](st13-staging-2026-10-07.md).

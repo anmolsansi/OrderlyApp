@@ -1535,7 +1535,7 @@ Checkpoints are real stop/go nodes, not a final “test everything” wish. They
 
 ### INT-02 — Release, persistence and recovery rehearsal — Not completed
 
-**Current evidence:** [Local rehearsal report](docs/qa/int-02.md). [Hosted staging setup](docs/qa/st13-staging-2026-10-06.md): schema-only Neon branch and free Render backend created; database connection/deployment and recovery tests pending. All six local scenarios pass; public receipt/isolation also pass separately. Hosted staging recovery, backup/rollback and actual cleanup scheduling remain unrun. The checklist below stays unchecked for that hosted release gate.
+**Current evidence:** [Local rehearsal report](docs/qa/int-02.md). [Hosted staging verification](docs/qa/st13-staging-2026-10-07.md): replacement Neon branch and separate Render backend are live; exact-source readiness passes, one-time seed removed, readiness health check configured. Replacement branch contains inherited order/session data; provenance and backend branch linkage must be resolved before recovery tests. All six local scenarios pass; public receipt/isolation also pass separately. Hosted staging recovery, backup/rollback and actual cleanup scheduling remain unrun. The checklist below stays unchecked for that hosted release gate.
 
 **Owner:** Future release reviewer. **Inputs:** ST-10 and ST-12 completed, INT-01 evidence, C8 runbook, upgraded candidate, isolated staging stack, pre-migration backup. **Outputs:** CREATE `docs/qa/int-02.md` plus identity-linked CI/backup/recovery reports. **Non-owned:** Product/config changes; assign defects to ST-11/ST-12 or relevant provider. **Runtime:** Actual required PG, gateway and staged environment; no production fault injection.
 
@@ -1635,7 +1635,7 @@ The guide now records **executed stabilization work and the remaining release ha
 | Every invariant and named defect has verification route | Specified in test matrix | Tests run on same candidate |
 | Backend runner and clean-install reproduction | Verified by ST-01 | Preserve the pinned commands and rerun them on each assessed candidate |
 | Cross-component integration and public release proof | INT-01 local and named public receipt/isolation verified | INT-02 hosted recovery, ST-13 and RELEASE-GATE remain pending |
-| True blockers/product ambiguity disclosed | Public access resolved; Neon provider identified; staging linkage and cleanup scheduler remain | Connect created staging resources and collect hosted operational evidence |
+| True blockers/product ambiguity disclosed | Public access resolved; staging deploy/readiness passes; inherited staging data and cleanup scheduler remain | Confirm synthetic staging isolation and collect hosted operational evidence |
 | Completion/publishing claims truthful | ST-01–ST-12 evidence, merges, CI and exact public receipt/isolation recorded | ST-13 and overall release remain incomplete until hosted operations pass |
 
 **Provider→consumer test:** Section6 records schema, positive/negative errors, fixtures, retry/security/lifecycle and conformance for every named interface. Section7 records each consumer gate. Consumers do not need private SQL or pricing code; they need the public contracts and executable fixtures ST-01 supplies. A provider may not freeze incomplete examples and ask the consumer to guess missing fields. If fixture/conformance fails, repair it in the provider before releasing the dependent wave.
