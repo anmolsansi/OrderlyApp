@@ -29,5 +29,18 @@
   },
   "hosted_recovery": "NOT_COMPLETED",
   "replacement_schema_only": "UNVERIFIED",
-  "backend_branch_linkage": "UNVERIFIED"
+  "backend_branch_linkage": "UNVERIFIED",
+  "clean_branch": {
+    "name": "st13-recovery-clean",
+    "id": "br-dawn-bonus-aqvk2u1j",
+    "schema_only_selected": true,
+    "preseed_counts": {
+      "restaurants": 0,
+      "guest_sessions": 0,
+      "orders": 0
+    },
+    "expires_at": "2026-10-08T13:05:48Z",
+    "render_linkage": "PENDING_USER_PRIVATE_HANDOFF",
+    "seed": "NOT_RUN"
+  }
 }
