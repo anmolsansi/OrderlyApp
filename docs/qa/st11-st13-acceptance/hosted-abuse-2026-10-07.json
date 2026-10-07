@@ -1,0 +1,13 @@
+{
+  "date": "2026-10-07",
+  "result": "PASS",
+  "source_sha": "9a72d0288ea8b2fe9f14b0973a079ec661497835",
+  "scope": "isolated staging fresh guest, 11 bounded checkout attempts, one idempotency key",
+  "first_status": 201,
+  "next_nine_replay_status": 200,
+  "eleventh_status": 429,
+  "retry_after_positive": true,
+  "receipt_count": 1,
+  "identical_replay_receipts": true,
+  "shared_redis_stopped": false
+}

@@ -1,0 +1,64 @@
+name: Daily guest cleanup
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-guest-cleanup
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    if: github.repository == 'anmolsansi/OrderlyApp' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: backend
+        shell: bash
+    env:
+      ORDERLY_ENVIRONMENT: production
+      ORDERLY_CLEANUP_MAX_BATCHES: '1000'
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Use Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install backend runtime
+        run: python -m pip install .
+      - name: Clean expired and revoked guests
+        id: cleanup
+        env:
+          DATABASE_URL: ${{ secrets.ORDERLY_CLEANUP_DATABASE_URL }}
+          PGCONNECT_TIMEOUT: '10'
+          PGOPTIONS: '-c statement_timeout=30000 -c lock_timeout=5000'
+        run: |
+          if [[ -z "${DATABASE_URL}" ]]; then
+            echo '::error::Set the ORDERLY_CLEANUP_DATABASE_URL Actions secret to the production Neon database URL.'
+            exit 1
+          fi
+          if ! python scripts/cleanup_guests.py 2>/dev/null; then
+            echo '::error::Guest cleanup failed. Check production database access and rerun; private database diagnostics are suppressed.'
+            exit 1
+          fi
+      - name: Record cleanup outcome
+        if: always()
+        env:
+          CLEANUP_OUTCOME: ${{ steps.cleanup.outcome }}
+        run: |
+          {
+            echo '## Daily guest cleanup'
+            echo "- Outcome: ${CLEANUP_OUTCOME}"
+            echo "- Source SHA: ${GITHUB_SHA}"
+            echo "- Trigger: ${GITHUB_EVENT_NAME}"
+            echo 'See the cleanup step for the safe deleted count.'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,46 @@
+{
+  "observed_date": "2026-10-07",
+  "environment": "st13-staging",
+  "result": "PASS_DEPLOYMENT_READINESS_ONLY",
+  "render_service_id": "srv-db2bq5jncjis73e5cah0",
+  "render_workspace_id": "tea-d7so32sm0tmc73dc3cp0",
+  "deploy_id": "dep-db33rsnlk1mc739bfm00",
+  "source_sha": "9a72d0288ea8b2fe9f14b0973a079ec661497835",
+  "readiness": {
+    "http_status": 200,
+    "ready": true,
+    "mode": "api",
+    "dependencies": {
+      "configuration": "ok",
+      "postgres": "ok",
+      "schema": "ok",
+      "rate_limit_configuration": "ok"
+    }
+  },
+  "saved_build_command": "cd backend && pip install -e . && python scripts/migrate.py",
+  "saved_health_check_path": "/health/ready",
+  "replacement_neon_branch_id": "br-fancy-smoke-aqg4dluq",
+  "replacement_branch_expires_at": "2026-10-08T12:39:18Z",
+  "pretest_counts": {
+    "restaurants": 12,
+    "guest_sessions": 6,
+    "orders": 1,
+    "orders_older_than_replacement_branch": 1
+  },
+  "hosted_recovery": "NOT_COMPLETED",
+  "replacement_schema_only": "UNVERIFIED",
+  "backend_branch_linkage": "UNVERIFIED",
+  "clean_branch": {
+    "name": "st13-recovery-clean",
+    "id": "br-dawn-bonus-aqvk2u1j",
+    "schema_only_selected": true,
+    "preseed_counts": {
+      "restaurants": 0,
+      "guest_sessions": 0,
+      "orders": 0
+    },
+    "expires_at": "2026-10-08T13:05:48Z",
+    "render_linkage": "PENDING_USER_PRIVATE_HANDOFF",
+    "seed": "NOT_RUN"
+  }
+}

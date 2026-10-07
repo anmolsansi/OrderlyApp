@@ -1,0 +1,79 @@
+{
+  "date": "2026-10-07",
+  "source_sha": "9a72d0288ea8b2fe9f14b0973a079ec661497835",
+  "backend": "https://orderlyapp-st13-staging.onrender.com",
+  "branch": "br-dawn-bonus-aqvk2u1j",
+  "steps": [
+    {
+      "case": "synthetic_checkout_exact_receipt_cart_and_guest_isolation",
+      "result": "PASS",
+      "receipt_sha256": "341c7d5011c5172ffd46309a4238b7eec6e02be859e4d54d7bcc072b4f171a44",
+      "cart_sha256": "a29e785a67bde9befb2b0e7ea1bcc409f89295a3b77ee0eede472c860f7c6f5b",
+      "catalog_sha256": "69862fe9b00b1b1475a8368e46bb5855a85f683e339faa896be6fe01fb2fb0d4"
+    },
+    {
+      "case": "process_restart_preservation",
+      "result": "PASS",
+      "receipt_sha256": "341c7d5011c5172ffd46309a4238b7eec6e02be859e4d54d7bcc072b4f171a44",
+      "cart_sha256": "a29e785a67bde9befb2b0e7ea1bcc409f89295a3b77ee0eede472c860f7c6f5b",
+      "catalog_sha256": "69862fe9b00b1b1475a8368e46bb5855a85f683e339faa896be6fe01fb2fb0d4",
+      "source_sha": "9a72d0288ea8b2fe9f14b0973a079ec661497835"
+    },
+    {
+      "case": "controlled_staging_database_unavailable",
+      "result": "PASS",
+      "live": 200,
+      "ready": 503,
+      "write": 503
+    },
+    {
+      "case": "database_recovery_receipt_cart_catalog_preservation",
+      "result": "PASS",
+      "receipt_sha256": "341c7d5011c5172ffd46309a4238b7eec6e02be859e4d54d7bcc072b4f171a44",
+      "cart_sha256": "a29e785a67bde9befb2b0e7ea1bcc409f89295a3b77ee0eede472c860f7c6f5b",
+      "catalog_sha256": "69862fe9b00b1b1475a8368e46bb5855a85f683e339faa896be6fe01fb2fb0d4",
+      "source_sha": "9a72d0288ea8b2fe9f14b0973a079ec661497835"
+    },
+    {
+      "case": "edited_catalog_preservation_across_restart_and_database_outage",
+      "result": "PASS",
+      "catalog_sha256": "e018f4cfae55e5a2b24f464bc446ccd58c5c1381cc23867673a8d9044ebb915b",
+      "test_edit_restored": true
+    },
+    {
+      "case": "retention_preserves_active_receipt_cart_catalog",
+      "result": "PASS",
+      "receipt_sha256": "341c7d5011c5172ffd46309a4238b7eec6e02be859e4d54d7bcc072b4f171a44",
+      "cart_sha256": "a29e785a67bde9befb2b0e7ea1bcc409f89295a3b77ee0eede472c860f7c6f5b",
+      "catalog_sha256": "69862fe9b00b1b1475a8368e46bb5855a85f683e339faa896be6fe01fb2fb0d4",
+      "source_sha": "9a72d0288ea8b2fe9f14b0973a079ec661497835"
+    }
+  ],
+  "result": "PARTIAL_HOSTED_RECOVERY",
+  "render_deploys": {
+    "bootstrap": "dep-db34g2rncjis73eeciqg",
+    "process_restart": "dep-db34gv60tbcc738m8s00",
+    "edited_catalog_restart": "dep-db34i9flk1mc739dnvsg",
+    "retention": "dep-db34qch42hec738j3ugg",
+    "rollback": "dep-db34rtbtqb8s73e69bh0",
+    "main_recovery": "dep-db3500rncjis73efur7g"
+  },
+  "outage_mechanism": {
+    "scope": "neondb on br-dawn-bonus-aqvk2u1j only",
+    "blocked_connection_limit": 0,
+    "original_and_restored_connection_limit": -1,
+    "control_database": "st13_control",
+    "production_ready_after_test": true,
+    "shared_redis_stopped": false
+  },
+  "remaining": [
+    "actual_daily_cleanup_execution_and_monitoring",
+    "remaining_hosted_INT02_full_matrix_legacy_upgrade_browser_recovery_and_complete_checkout_concurrency_cases"
+  ],
+  "linked_evidence": {
+    "backup": "hosted-backup-2026-10-07.json",
+    "retention": "hosted-retention-2026-10-07.json",
+    "rollback": "hosted-rollback-2026-10-07.json",
+    "abuse": "hosted-abuse-2026-10-07.json"
+  }
+}

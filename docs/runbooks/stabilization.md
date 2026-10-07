@@ -119,11 +119,11 @@ The `seed` profile sets `ORDERLY_ENVIRONMENT=development` and `ORDERLY_ALLOW_FIX
 - `preDeployCommand` runs `python scripts/migrate.py`
 - serving `startCommand` runs only Uvicorn
 - health checks use `/health/ready`
-- a daily cron invokes `python scripts/cleanup_guests.py`
+- daily cleanup is handled separately by the GitHub Actions workflow below
 
-Render documents pre-deploy commands for paid web services. The currently connected `orderlyapp-int01-api` integration service is on the free plan. **Do not upgrade the service, create a billed cron job, or sync a configuration that incurs charges without explicit approval.**
+Render documents pre-deploy commands for paid web services. Confirmed production `OrderlyApp` (`srv-d7sobtkm0tmc73dcb65g`) uses Docker on the free plan; separate `orderlyapp-st13-staging` (`srv-db2bq5jncjis73e5cah0`) uses native Python on the free plan. **Do not upgrade the service, create a billed cron job, or sync a configuration that incurs charges without explicit approval.**
 
-Until a supported release deployment path is approved, use Docker Compose or another environment where migrations can run as a separate one-shot job before serving. INT-02/ST-13 owns final public candidate proof.
+The isolated staging rehearsal proved migration-only build (`cd backend && pip install -e . && python scripts/migrate.py`) followed by app-only startup and `/health/ready`; it does not establish a paid pre-deploy hook or an actual daily production cron. One-time seed/recovery jobs were removed from the saved build. Docker Compose remains the local one-shot migration path. INT-02/ST-13 owns final public candidate proof.
 
 ## Explicit fixture seeding
 
@@ -305,3 +305,23 @@ Before declaring ST-11 complete, record one exact source SHA proving:
 ST-12 may expand CI/dependency gates. ST-13 decides release readiness. ST-11 does not claim those later gates on its own.
 
 Readiness uses a read-only transaction and a two-second PostgreSQL statement timeout as well as the two-second connection timeout. A locked migration ledger returns 503 instead of hanging the probe; liveness remains process-only.
+
+### Daily cleanup with GitHub Actions
+
+The selected scheduler is [.github/workflows/guest-cleanup.yml](../../.github/workflows/guest-cleanup.yml), **Daily guest cleanup**, at **03:17 UTC daily** with a manual `workflow_dispatch` trigger. It reuses `backend/scripts/cleanup_guests.py`; it never runs migrations or seeds. It is restricted to `anmolsansi/OrderlyApp` on `main`, uses a read-only GitHub token, permits only one active cleanup run and has a ten-minute job limit. PostgreSQL connection/statement/lock timeouts bound individual operations. Missing database secret or cleanup failure fails the job; database diagnostics are suppressed from public logs. The safe deleted count, outcome, trigger and exact source SHA remain visible.
+
+OrderlyApp is public; standard GitHub-hosted runner usage is free ([GitHub billing](https://docs.github.com/en/billing/concepts/product-billing/github-actions)). No Render payment method is required for this path. The unsuccessful Render cron creation returned HTTP 402 and created no service ([dated provisioning evidence](../qa/st11-st13-acceptance/cron-provisioning-2026-10-07.json)). The Render cron proposal was removed from `infra/render.yaml` to avoid a second scheduler. Do not create/enable a duplicate cleanup service.
+
+**Activation steps:**
+
+1. Privately add repository Actions secret **`ORDERLY_CLEANUP_DATABASE_URL`** in [OrderlyApp Settings → Secrets and variables → Actions](https://github.com/anmolsansi/OrderlyApp/settings/secrets/actions). Use the production Neon direct (pooling off) database URL with TLS, not a temporary staging branch. Direct access lets the workflow apply PostgreSQL startup timeouts consistently. Never paste the URL into chat, a workflow input, a YAML file or a log. A dedicated cleanup database role can be substituted when provisioned; this workflow does not create roles or broaden database network access.
+2. Review CI and merge the workflow onto `main`. Scheduled runs use the default branch; manual dispatch from a feature branch is deliberately skipped by the main-only guard. A prepared/pushed PR is not an active schedule.
+3. In [Actions](https://github.com/anmolsansi/OrderlyApp/actions), select **Daily guest cleanup → Run workflow → main**. Verify success and `Guest cleanup complete; deleted=N`; zero is a valid success when nothing is expired. Record the run URL, SHA, timestamp and deleted count. Do not claim a manual PASS until the actual production database is linked and that run completes.
+4. Watch OrderlyApp and configure [GitHub notification settings](https://github.com/settings/notifications): System → Actions → Email or On GitHub, optionally **Only notify for failed workflows**, then Save ([official instructions](https://docs.github.com/en/subscriptions-and-notifications/how-tos/managing-github-actions-notifications)). Confirm the intended verified email/notification route. Failure notification preference and delivery are separate from a green job; no email/message is sent by this workflow.
+5. After the next scheduled invocation, record the actual `schedule` run separately. Check each day that a successful run exists in the preceding 36 hours. If a run failed, inspect the safe job error, check Neon access privately and manually rerun after repair; per-batch transactions and row locks make retries safe. If no run exists, inspect workflow enablement/default branch and use a manual run while resolving the schedule.
+
+GitHub schedules can be delayed or dropped under load, and public-repository schedules are disabled after 60 days without repository activity ([official schedule behavior](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)). GitHub failure notifications do not detect an absent run; the freshness check is part of operations, not an automatic external heartbeat. Do not close the daily scheduling gate without a named operator, notification settings evidence and an observed scheduled success.
+
+Render's internal Redis hostname is unreachable from a GitHub-hosted runner. `REDIS_URL` is deliberately unset; authoritative PostgreSQL guest/cart/receipt/idempotency cleanup still works. Legacy Redis cache-key purging is skipped, as the existing best-effort cache cleanup permits; expired sessions cannot regain authorization because their database rows are removed. Render Key Value external access is not opened for this workflow.
+
+**Current status:** Prepared and locally checked; no production database secret, manual run, scheduled run or notification delivery is inferred. ST-13 remains Not completed until remaining hosted and operational evidence passes.

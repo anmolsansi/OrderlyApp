@@ -1,0 +1,41 @@
+{
+  "date": "2026-10-07",
+  "result": "PASS",
+  "branch": "br-dawn-bonus-aqvk2u1j",
+  "rollback_sha": "1eaba8e396f1068f5da577aa29b78ed1cc6d2500",
+  "rollback_deploy": "dep-db34rtbtqb8s73e69bh0",
+  "rollback_ready": true,
+  "rollback_data_matches_restored_snapshot": true,
+  "compared_tables": [
+    "guest_carts",
+    "guest_orders",
+    "menu_items",
+    "order_idempotency",
+    "restaurants",
+    "schema_migrations"
+  ],
+  "comparison": "Complete rows sorted by JSON text in C collation, wrapped in SQL JSON arrays, UTF8 SHA256. Source and restored table counts/digests equal. Catalog Unicode serialization differs from Python ASCII escaping in backup report; compared identical SQL serialization on both databases.",
+  "api_probe_interruption": "Original guest process timed out on readiness and exited. No claim of its receipt API reload after rollback. Original durable data equality was verified directly; a new synthetic checkout/receipt/guest isolation passed on prior version.",
+  "recovery_deploy": "dep-db3500rncjis73efur7g",
+  "recovery_result": "PASS",
+  "recovery_sha": "9a72d0288ea8b2fe9f14b0973a079ec661497835",
+  "recovery_ready": true,
+  "recovery_finished_at": "2026-10-07T13:59:26Z",
+  "fresh_guest_api_checks": [
+    {
+      "case": "synthetic_checkout_exact_receipt_cart_and_guest_isolation",
+      "result": "PASS",
+      "receipt_sha256": "249fd0cd6425a478149d878d26e2372512c8a020c2f9fdd97f29f3891d17ef16",
+      "cart_sha256": "31dc78f41ee92ac72b7d9c308b69745ad4542f69595c146a852ca49128450d1a",
+      "catalog_sha256": "69862fe9b00b1b1475a8368e46bb5855a85f683e339faa896be6fe01fb2fb0d4"
+    },
+    {
+      "case": "current_main_recovery_preservation",
+      "result": "PASS",
+      "receipt_sha256": "249fd0cd6425a478149d878d26e2372512c8a020c2f9fdd97f29f3891d17ef16",
+      "cart_sha256": "31dc78f41ee92ac72b7d9c308b69745ad4542f69595c146a852ca49128450d1a",
+      "catalog_sha256": "69862fe9b00b1b1475a8368e46bb5855a85f683e339faa896be6fe01fb2fb0d4",
+      "source_sha": "9a72d0288ea8b2fe9f14b0973a079ec661497835"
+    }
+  ]
+}
