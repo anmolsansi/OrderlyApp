@@ -12,6 +12,7 @@ from typing import Any, Iterator
 from uuid import uuid4
 
 import pytest
+import yaml
 from fastapi import Request
 from fastapi.testclient import TestClient
 
@@ -21,6 +22,35 @@ from app.main import app
 from app.order_service import _lock_active_guest
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+
+
+@pytest.mark.parametrize("configured,script_fails", [(False, False), (True, False), (True, True)])
+def test_scheduled_cleanup_fails_closed_and_redacts_errors(tmp_path, configured, script_fails) -> None:
+    workflow = yaml.safe_load((REPOSITORY_ROOT / ".github/workflows/guest-cleanup.yml").read_text())
+    command = next(step["run"] for step in workflow["jobs"]["cleanup"]["steps"] if step.get("id") == "cleanup")
+    marker = tmp_path / "called"
+    python_stub = tmp_path / "python"
+    python_stub.write_text(
+        "#!/bin/sh\n"
+        f"printf '%s' \"$*\" > '{marker}'\n"
+        + ("echo 'private-diagnostic-canary' >&2\nexit 1\n" if script_fails else "echo 'Guest cleanup complete; deleted=0'\n")
+    )
+    python_stub.chmod(0o700)
+    result = subprocess.run(
+        ["bash", "-e", "-c", command],
+        cwd=REPOSITORY_ROOT / "backend",
+        env={"PATH": f"{tmp_path}:/usr/bin:/bin", "DATABASE_URL": "synthetic-test-only" if configured else ""},
+        capture_output=True,
+        text=True,
+        timeout=5,
+    )
+    assert result.returncode == (0 if configured and not script_fails else 1)
+    assert marker.exists() is configured
+    if configured:
+        assert marker.read_text() == "scripts/cleanup_guests.py"
+    assert "private-diagnostic-canary" not in result.stdout + result.stderr
+    if configured and not script_fails:
+        assert "Guest cleanup complete; deleted=0" in result.stdout
 
 
 class _Rows:

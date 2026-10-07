@@ -31,23 +31,7 @@ services:
       - key: ORDERLY_CHECKOUT_RATE_LIMIT_AGGREGATE
         value: "120"
 
-  - type: cron
-    name: orderlyapp-guest-cleanup
-    env: python
-    rootDir: backend
-    schedule: "17 3 * * *"
-    buildCommand: pip install -e .
-    startCommand: python scripts/cleanup_guests.py
-    envVars:
-      - key: DATABASE_URL
-        sync: false
-      - key: REDIS_URL
-        sync: false
-      - key: ORDERLY_ENVIRONMENT
-        value: production
-      - key: ORDERLY_CLEANUP_MAX_BATCHES
-        value: "1000"
-
+  # Daily retention is scheduled by .github/workflows/guest-cleanup.yml.
   - type: web
     name: orderlyapp-web
     env: node
