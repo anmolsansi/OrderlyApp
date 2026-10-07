@@ -1,0 +1,51 @@
+{
+  "result": "PASS",
+  "source_sha": "9a72d0288ea8b2fe9f14b0973a079ec661497835",
+  "branch": "br-dawn-bonus-aqvk2u1j",
+  "native_client": "pg_dump (PostgreSQL) 18.6 (Debian 18.6-1.pgdg12+2)",
+  "source_database": "neondb",
+  "restore_database": "st13_restore",
+  "tables": {
+    "carts": {
+      "rows": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "guest_carts": {
+      "rows": 1,
+      "sha256": "54780c85120178cb2d49d79867aa6f066b0e021f9501f73b871c1338851a402c"
+    },
+    "guest_orders": {
+      "rows": 1,
+      "sha256": "739782f732d4ae75f5a9a6b045f2ae9195a26aec4566c131ca56ae3090ed1f6c"
+    },
+    "guest_sessions": {
+      "rows": 2,
+      "sha256": "17df4e2505ac21dbfab1ac8f1a43bbf739633c5545dd71860c4d7602f6da4aa9"
+    },
+    "menu_items": {
+      "rows": 48,
+      "sha256": "07b3ac6f84de580be597b17b289ed9779c7c0f49ca67b2552858b1672298098d"
+    },
+    "order_idempotency": {
+      "rows": 1,
+      "sha256": "4caef16e1912ffbeefc1558fc8251b4d48208d04ec9589c7a855b84652f789e9"
+    },
+    "orders": {
+      "rows": 0,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "restaurants": {
+      "rows": 12,
+      "sha256": "df692333211fa885f0aab4d849ea47910ac5965caba76c48fda13d0ff1072d67"
+    },
+    "schema_migrations": {
+      "rows": 6,
+      "sha256": "2bce522e286d213c0f900a71b11ab66e57c76ee85a9ddd7576f76e7b83fcf7dd"
+    }
+  },
+  "restore_api_ready": true,
+  "deploy_id": "dep-db34ocvavr4c739ph980",
+  "observed_at": "2026-10-07T13:42:34Z",
+  "comparison": "All nine source/restored public table row counts and SHA256 digests equal",
+  "dump_retention": "Temporary rehearsal dump removed after restore; restored test database retained until branch expiry"
+}
