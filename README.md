@@ -4,6 +4,8 @@ OrderlyApp is a stabilized **manual food-ordering portfolio demo** built with Ne
 
 > **Current release status — October 6, 2026:** ST-11 and ST-12 are merged in PR #50; both public platforms deploy merged main `c093125` with green CI. Public mock checkout, exact saved-receipt reload and two-guest isolation pass after backend configuration repairs. ST-13, hosted recovery and the release gate remain **Not completed** pending isolated staging recovery and actual cleanup scheduling. See [development.md](development.md) and [current acceptance evidence](docs/releases/stabilization-acceptance.md). Voice, accounts, real payments and restaurant integrations remain deferred.
 
+
+
 ## What the stabilized candidate supports
 
 - Canonical restaurant/menu discovery from the FastAPI API in `api` mode.
