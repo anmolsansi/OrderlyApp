@@ -231,3 +231,56 @@ The PR must not merge with required CI failures.
 ## Historical assessment
 
 The initial repository assessment remains under [`docs/audit-2026-10-04`](audit-2026-10-04/). It is historical evidence, not a description of the post-ST-01 stabilization architecture. The local graph report remains at [`graphify-out/GRAPH_REPORT.md`](../graphify-out/GRAPH_REPORT.md).
+
+---
+
+# Repo context — OrderlyApp
+
+Audited 2026-10-11 at `81f799687c2bbb9ab45951393f1255823840d636`. This is source inspection, not runtime acceptance. Scope: restaurant-service ticket planning. New paths in development.md are proposals, not existing features.
+
+## Stack and commands
+- Next 16.3.8 / React 19.2.4, TypeScript, native CSS (`package.json`). No Clerk or theme library installed.
+- FastAPI >=0.115, Pydantic >=2.8, psycopg >=3.2, Redis >=5 (`backend/pyproject.toml`). Python >=3.9 declared; CI uses Python 3.12. No JWT verifier installed.
+- `npm run lint`, `npm run typecheck`, `npm run test`, `npm run build`, `npm run test:contracts`, `npm run test:e2e`, `npm run test:e2e:list` are real package scripts. `npm run test -- tests/api.test.ts` selects a Vitest file.
+- `python -m pytest backend/tests` is the backend runner. `python -m pytest backend/tests/test_checkout.py` is a valid focused invocation.
+- `python backend/scripts/migrate.py` is the migration command. Use only an isolated test database for ticket verification. Never silently use a developer's production DATABASE_URL.
+- `python -m pip install -e ./backend` and `python -m pip install -r backend/requirements-test.lock` are documented setup commands.
+- `docker compose up -d postgres redis`, then the migration command with an explicitly selected local DATABASE_URL, supplies local stores. Existing Compose pins PostgreSQL 16 and Redis 7.
+
+## Folder map and conventions
+- `app/`: Next App Router, page.tsx route entrypoints; native controls and React hooks. Read examples `app/checkout/page.tsx`, `app/orders/page.tsx`, `app/restaurants/[restaurantId]/page.tsx`.
+- `app/api/orderly/[...path]/route.ts`: same-origin gateway; fixed upstream, method/path allowlist, 64 KiB body cap, no-store responses, timeout and redirect rejection.
+- `lib/`: browser adapters/types, storage guard and fixture/demo helpers. Server JSON uses snake_case; browser types use camelCase through explicit adapters.
+- `backend/app/main.py`: FastAPI routes, safe error envelope, request IDs, rate-limit guards. New live router is additive, not a replacement for these mock routes.
+- `backend/app/models.py`: Pydantic models; mutation inputs use extra=forbid, strict bounded integers. Read CartItemInput, CartUpsertRequest and OrderSubmissionRequest.
+- `backend/app/catalog.py`, `pricing.py`, `order_service.py`: domain validation/calculation/transaction logic; `store.py` owns current SQL reads/writes.
+- `backend/migrations/001_initial.sql` through `006_order_idempotency.sql`: existing ordered migrations. Runner validates contiguous numbers, checksums and serializes application with a PostgreSQL advisory lock. Do not edit applied migrations.
+- `tests/`: Vitest; `tests/fixtures/contracts/c0.json` through c8.json are current fixture contracts. `e2e/`: Playwright. `backend/tests/`: pytest plus actual PostgreSQL fixtures.
+- `infra/render.yaml`, `infra/vercel.json`, Dockerfiles and `.github/workflows/ci.yml`: existing runtime/build boundaries. Blueprint currently has web/API, no campaign worker.
+
+## Auth and API
+`backend/app/identity.py` verifies a server-issued signed HttpOnly guest cookie; browser IDs are not authority. `lib/auth.ts` is a synthetic demo profile, not staff authentication. No staff membership implementation exists in the inspected source.
+Existing routes: POST /v1/session and /v1/session/reset; GET /v1/restaurants and /v1/restaurants/{id}; GET/PUT/DELETE /v1/cart; POST /v1/checkout/quote; POST /v1/orders; GET /v1/orders and /v1/orders/{id}.
+Example current cart request: PUT /v1/cart with {"expected_revision":0,"items":[]}; current response shape is {"schema_version":1,"revision":1,"items":[]} after an accepted mutation. This example is derived from models/service, not a live request made in this audit.
+`ApiContractError` in main.py owns status/code/message/fields. Middleware adds X-Request-ID. Follow that safe structured-error convention; never expose database/provider details.
+
+## Database and reuse
+`backend/app/database.py:get_connection` yields psycopg dict-row connections. SQL parameters, explicit transactions, snake_case columns; no ORM.
+Existing mock tables include restaurants/menu_items, guest_sessions, guest_carts, guest_orders and order_idempotency. Guest deletion cascades into mock carts/receipts/replay rows. Live records must not inherit those cascades.
+`order_service.py:107 submit_order` locks guest and cart, checks replay before checking the cleared cart, validates canonical catalog and atomically writes receipt/replay/cart clear. Preserve it.
+`pricing.py:261 quote_current_cart` uses mock-v1 totals. Reuse canonical item validation/integer money, not the delivery/service/tax assumptions.
+`identity.py:221 cleanup_expired_guests` deletes expired/revoked guest rows in bounded skip-locked batches. New live access can disappear with the guest; restaurant-owned history must survive.
+`lib/api.ts:saveCheckoutRecovery` must succeed before submit; optional theme storage may fail without that mandatory recovery rule becoming permissive.
+`lib/voice.ts:parseVoiceIntent` imports mock restaurants. Live proposals must use only the selected server catalog.
+
+## Testing and evidence
+Read tests/api.test.ts, tests/contract-fixtures.test.ts and e2e/checkout-recovery.spec.ts for assertion conventions. Backend conftest.py supplies postgres_database_url/postgres_connection and fails CI on skips. A local pytest pass with skipped database tests is not concurrency evidence.
+Playwright currently has one desktop Chromium project, one worker and screenshots only on failure. Real microphone/phone acceptance needs separate U4 evidence.
+CI runs dependency security, web quality, backend/recovery and Chromium runtime. Existing tests are not evidence that new live/auth/provider behavior exists.
+
+## Landmines and unknowns
+- Preserve mock-v1 routes, fixture data, receipt bytes and guest reset behavior.
+- Current development.md section 17 is an earlier mock-product roadmap. Section 18 must become the execution entrypoint for the newly approved restaurant direction, without marking old tickets completed.
+- U1 pricing/tax/receipt, U2 retention/deletion/export policy, U3 provider account/budget/configuration/support and U4 actual pilot/device/language inputs remain open. No invented production settings.
+- MSG91 callback authenticity is not established by the inspected public documentation; a callback claiming delivered is not trusted proof. U3 must settle authenticated reconciliation before SMS live activation.
+- Working tree contains unrelated QA/graph artifacts. Never stage those as ticket implementation.
