@@ -3531,7 +3531,7 @@ flowchart LR
 
 **Errors:** `{error:{code:string,message:string,fields:string[],request_id:string}}`. 401 staff_auth_required or guest_session_required;403 permission_denied;404 not_found for missing/foreign entity;409 version_conflict/cart_conflict/quote_changed/approval_stale/idempotency_conflict;422 invalid_input with exact field paths;429 rate_limited with Retry-After;503 storage_unavailable/identity_unavailable/pricing_unconfigured. Safe messages: sign in, no access, not found, changed since review, check highlighted fields, try later. No provider/raw SQL/token messages. On mutation502/503/504/network/invalid success, UI remains uncertain until original identity is reconciled; auth loss alone cannot prove no prior commit.
 
-**Command protocol:** Every POST with Idempotency-Key uses a UUID, scope(restaurant_id,actor_kind,actor_id,key), SHA256 of canonical validated body and saved result/status. Same body replays prior result before current-version/cart checks; different body409 with no writes. Membership is rechecked even on replay. Replays never grant another actor access. Reads may retry; writes never auto-create a fresh key after uncertainty. PUT config changes use expected_version; conflicts return current version with safe current object. Command locks and business writes share one transaction. No external network call inside a database transaction.
+**Command protocol:** Every POST with Idempotency-Key uses a UUID, scope(restaurant_id,actor_kind,actor_id,key), SHA256 of canonical {operation, target, body} and saved result/status. operation is a server-defined command name; target contains the normalized restaurant ID and every path resource ID (order/campaign/payment as applicable); body is the validated request. Never hash the body alone. A reused key with a different operation or target returns409 idempotency_conflict without returning another resource’s saved result. Same operation, target and body replay the prior result before current-version/cart checks; any difference returns409 with no writes. Membership is rechecked even on replay. Replays never grant another actor access. Reads may retry; writes never auto-create a fresh key after uncertainty. PUT config changes use expected_version; conflicts return current version with safe current object. Command locks and business writes share one transaction. No external network call inside a database transaction.
 
 **Authorization:** Guest actions use existing verified active HttpOnly cookie and allowed Origin. Staff actions use verified Clerk sub plus active local membership each time. owner may configure/menu/campaign/report/transition/pay/reverse; order_staff may read orders, transition and change availability only; cashier may read order/payment data and record full payment only. A path rid or QR is not authority. Every query/join uses restaurant key, including referenced objects. Public catalog contains no private fields. Demo authority is separate and cannot authorize live operations.
 
@@ -3712,6 +3712,12 @@ One contact row represents one channel/destination, not a unified customer ident
 ##### DB-F
 
 ```sql
+CREATE TABLE live_daily_send_budgets (
+ restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,
+ channel TEXT NOT NULL CHECK(channel IN ('sms','email')),budget_day DATE NOT NULL,
+ cap_minor BIGINT NOT NULL CHECK(cap_minor>0),reserved_minor BIGINT NOT NULL DEFAULT 0,
+ PRIMARY KEY(restaurant_id,channel,budget_day),CHECK(reserved_minor>=0 AND reserved_minor<=cap_minor)
+);
 CREATE TABLE live_campaigns (
  restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,id UUID NOT NULL,
  version BIGINT NOT NULL DEFAULT 1,channel TEXT NOT NULL CHECK(channel IN ('sms','email')),offer_id UUID NOT NULL,
@@ -3735,6 +3741,11 @@ CREATE TABLE live_deliveries (
  state TEXT NOT NULL CHECK(state IN ('queued','claimed','accepted','uncertain','delivered','failed','suppressed')),
  claim_token UUID NULL,lease_until TIMESTAMPTZ NULL,attempts INTEGER NOT NULL DEFAULT 0,due_at TIMESTAMPTZ NOT NULL,
  reserved_minor INTEGER NOT NULL DEFAULT 0,provider_id TEXT NULL,config_version BIGINT NOT NULL,
+ budget_channel TEXT NULL CHECK(budget_channel IN ('sms','email')),budget_day DATE NULL,
+ CHECK((budget_channel IS NULL)=(budget_day IS NULL)),
+ CHECK(reserved_minor=0 OR budget_day IS NOT NULL),
+ FOREIGN KEY(restaurant_id,budget_channel,budget_day)
+ REFERENCES live_daily_send_budgets(restaurant_id,channel,budget_day) ON DELETE RESTRICT,
  PRIMARY KEY(restaurant_id,id),UNIQUE(restaurant_id,approval_id,contact_id),
  FOREIGN KEY(restaurant_id,approval_id) REFERENCES live_campaign_approvals(restaurant_id,id) ON DELETE RESTRICT,
  FOREIGN KEY(restaurant_id,contact_id) REFERENCES live_contacts(restaurant_id,id) ON DELETE RESTRICT
@@ -4336,7 +4347,7 @@ Snapshot JSON is strictly validated, containing campaign version/channel/content
 - **Provider / source-of-truth owner:** RS-33 (worker); source: **CREATE** `backend/app/campaign_worker.py`.
 - **Consumers:** RS-34.
 - **Type:** schema/API/function/config boundary as specified below.
-- **Inputs / outputs / constraints:** CON-33: claim_next(conn,now)->DeliveryInput|null. Select a due candidate without locking, then acquire the restaurant budget row, campaign/approval, contact and delivery locks in that order; skip locked restaurant candidates and revalidate queued state. All approval, pause, suppression and dispatch eligibility transactions use the same order; recheck unpaused approval/config/consent/offer and reserve maximum recipient charge before marking claimed. Batch size1; lease30s, poll2s. Recovery of expired claimed means uncertain, never queued. No network inside SQL transaction.
+- **Inputs / outputs / constraints:** CON-33: claim_next(conn,now)->DeliveryInput|null. Select a due candidate without locking, then acquire live_restaurants row (FOR UPDATE SKIP LOCKED for worker claims), daily budget row, campaign/approval, contact and delivery locks in that order; skip busy restaurant candidates and revalidate queued state. The restaurant row serializes day-row creation and cross-day reconciliation. DB-F live_daily_send_budgets and delivery budget_channel/budget_day hold the reservation identity; rules in section18.17.1 apply. All approval, pause, suppression and dispatch eligibility transactions use the same order; recheck unpaused approval/config/consent/offer and reserve maximum recipient charge before marking claimed. Batch size1; lease30s, poll2s. Recovery of expired claimed means uncertain, never queued. No network inside SQL transaction.
 - **Preconditions:** RS-01; RS-31; RS-32; COMMON authorization and relevant DB constraints. No additional external decision for synthetic implementation.
 - **Postconditions:** Two workers cannot claim one recipient or exceed remaining budget.; Expired lease becomes uncertain and retains reservation.; Pause/withdrawal before claim prevents sending; unrelated restaurant can continue.
 - **Errors:** COMMON status/envelope applies to HTTP; internal/CLI operations return typed safe failure/nonzero with no partial success. Packet failures below are mandatory.
@@ -4786,7 +4797,7 @@ Snapshot JSON is strictly validated, containing campaign version/channel/content
 - **Provider / source-of-truth owner:** RS-58 (demo); source: **CREATE** `backend/app/live_demo.py`.
 - **Consumers:** RS-59, RS-60.
 - **Type:** schema/API/function/config boundary as specified below.
-- **Inputs / outputs / constraints:** CON-58: POST /v1/live/demo/session with {} and valid guest cookie returns201 {schema_version:1,restaurant_id:string,expires_at:UTC}; server records guest ownership in live_restaurants.demo_owner_id. Existing guest cookie is the capability, never a browser role or new bearer token. Scope expires with guest session. Dedicated /v1/live/demo/restaurants/{rid} prefix mirrors only GET orders, GET orders/{oid}, POST orders/{oid}/transitions, POST orders/{oid}/payments, POST orders/{oid}/reversals, GET campaigns, POST campaigns, PUT campaigns/{cid}, POST campaigns/{cid}/preview and POST campaigns/{cid}/approve with identical staff DTOs and replay rules. Demo approval creates simulated outcomes only. Other methods/paths404. Customer paths retain normal guest checks and also require synthetic owner match. Gateway allowlist and typed client add only these paths in this ticket; same-origin checks apply. New copy of synthetic fixture per session; domain scope is server-resolved demo, never client boolean. Demo role commands may mutate only that copy; network transports and live activation denied regardless request/forged IDs. Reset/delete affects only demo scope; no paid state claims outside simulation.
+- **Inputs / outputs / constraints:** CON-58: POST /v1/live/demo/session with {} and valid guest cookie returns201 {schema_version:1,restaurant_id:string,expires_at:UTC}; server records guest ownership in live_restaurants.demo_owner_id. Existing guest cookie is the capability, never a browser role or new bearer token. Scope expires with guest session. Dedicated /v1/live/demo/restaurants/{rid} prefix mirrors only GET orders, GET orders/{oid}, POST orders/{oid}/transitions, POST orders/{oid}/payments, POST orders/{oid}/payment-reversals, GET campaigns, POST campaigns, PUT campaigns/{cid}, POST campaigns/{cid}/preview and POST campaigns/{cid}/approve with identical staff DTOs and replay rules. Demo approval creates simulated outcomes only. Other methods/paths404. Customer paths retain normal guest checks and also require synthetic owner match. Gateway allowlist and typed client add only these paths in this ticket; same-origin checks apply. New copy of synthetic fixture per session; domain scope is server-resolved demo, never client boolean. Demo role commands may mutate only that copy; network transports and live activation denied regardless request/forged IDs. Reset/delete affects only demo scope; no paid state claims outside simulation.
 - **Preconditions:** RS-01; RS-23; RS-37; RS-19; RS-07; RS-41; COMMON authorization and relevant DB constraints. No additional external decision for synthetic implementation.
 - **Postconditions:** Two demos never see each other’s carts/orders/campaigns.; Forged live restaurant/actor/channel cannot send or access staff data.; DB/provider outage never falls back from live to demo success.
 - **Errors:** COMMON status/envelope applies to HTTP; internal/CLI operations return typed safe failure/nonzero with no partial success. Packet failures below are mandatory.
@@ -7946,6 +7957,8 @@ All modifications to `development.md` status and `docs/repo_context.md` during f
 
 ### 18.9 Task index
 
+Review follow-ups [RF-01–RF-05](#1817-review-amendments-and-follow-up-tickets) are additional planning/delivery work. They are Not completed and are not included in the original 67-packet count. Apply the contract corrections in section18.17.1 when extracting any affected packet.
+
 All are **Not completed**. A planned contract is not a merged provider. Readiness at execution is checked per packet: READY only when required inputs/fixture freeze and shared-file gates pass; otherwise WAITING_DEPENDENCY or BLOCKED_EXTERNAL. No implementation ticket is checked off by this planning work.
 
 | ID / status | Outcome | Workstream / merge wave | Direct dependencies | Output contract | Effort | Critical-path relevance |
@@ -8066,7 +8079,7 @@ CON-01: Publish the COMMON, DTO and schema records below verbatim as live-v1. Fi
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 This foundation owns the complete live-v1 artifact: copy the full COMMON rules, DTO definitions, DB-A–DB-F schemas and CON-01–CON-67 records from section18.6 into `docs/contracts/restaurant-service-v1.md`. Materialize positive and negative fixtures keyed by those contract IDs in the owned JSON bundle. Do not freeze all provider behavior merely because both fixture readers agree; each later provider still needs its own conformance proof.
@@ -8174,7 +8187,7 @@ CON-02: CREATE live_restaurants and live_tables using DB-A below. Existing resta
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -8303,7 +8316,7 @@ CON-03: CREATE DB-B live_carts, live_orders, live_receipts, live_guest_access, l
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -8465,7 +8478,7 @@ CON-04: DB-C memberships keyed (restaurant_id,clerk_user_id), role owner/order_s
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -8587,7 +8600,7 @@ CON-05: verify_staff_token(request)->StaffPrincipal{sub:string}. Only Bearer JWT
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -8707,7 +8720,7 @@ CON-06: require_role(conn,principal,rid,allowed)->Membership reads active member
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -8826,7 +8839,7 @@ CON-07: /api/orderly/live/* maps only the route/method pairs in LIVE ROUTES to f
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -8940,7 +8953,7 @@ CON-08: /staff/sign-in uses Clerk Next SDK; staff shell requests CON-06 membersh
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 No additional shared DTO beyond the exact fields in this packet. Schema/config ownership is stated below.
@@ -9059,7 +9072,7 @@ CON-09: owner GET/PUT /v1/live/staff/restaurants/{rid}/settings; PUT {expected_v
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -9191,7 +9204,7 @@ CON-10: GET /v1/live/staff/restaurants/{rid}/menu ->Menu; owner PUT .../menu/{it
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -9323,7 +9336,7 @@ CON-11: U1 evidence gate. Produce versioned PricingProfile and receipt identity 
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 No additional shared DTO beyond the exact fields in this packet. Schema/config ownership is stated below.
@@ -9450,7 +9463,7 @@ CON-12: owner GET/PUT /v1/live/staff/restaurants/{rid}/tables/{table_id}; PUT {e
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -9589,7 +9602,7 @@ CON-13: public GET /v1/live/restaurants/{rid}/menu ->{schema_version:1,restauran
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -9725,7 +9738,7 @@ CON-14: verified guest GET/PUT/DELETE /v1/live/restaurants/{rid}/cart. PUT {expe
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -9892,7 +9905,7 @@ CON-15: POST /v1/live/restaurants/{rid}/quote {expected_revision,fulfillment:"di
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -10031,7 +10044,7 @@ CON-16: DB-D promotions; owner GET/PUT /v1/live/staff/restaurants/{rid}/offers/{
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -10166,7 +10179,7 @@ CON-17: quote accepts at most one code. Discount=min(floor(subtotal_minor*percen
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -10322,7 +10335,7 @@ CON-18: POST /v1/live/restaurants/{rid}/orders + UUID Idempotency-Key; body {exp
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -10531,7 +10544,7 @@ CON-19: guest GET /v1/live/restaurants/{rid}/orders/{oid}-> {receipt:LiveOrderRe
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -10702,7 +10715,7 @@ CON-20: staff GET /v1/live/staff/restaurants/{rid}/orders?view=active|all|settle
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -10875,7 +10888,7 @@ CON-21: owner/order_staff POST .../orders/{oid}/transitions +Idempotency-Key {ex
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -11047,7 +11060,7 @@ CON-22: cashier/owner POST .../orders/{oid}/payments +Idempotency-Key {expected_
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -11219,7 +11232,7 @@ CON-23: owner POST .../orders/{oid}/payment-reversals +Idempotency-Key {expected
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -11390,7 +11403,7 @@ CON-24: DB-E contacts/consent_events/suppressions. Per-restaurant normalized ema
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -11528,7 +11541,7 @@ CON-25: verified guest POST /v1/live/restaurants/{rid}/consents {order_id,channe
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -11672,7 +11685,7 @@ CON-26: GET /v1/live/unsubscribe/{token} shows confirmation only; POST same rout
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -11807,7 +11820,7 @@ CON-27: DB-F campaigns, approvals, deliveries, delivery_events and provider_conf
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -11819,6 +11832,12 @@ type Approval = {id:UUID;campaign_id:UUID;version:number;recipient_count:number;
 
 DB-F:
 ```sql
+CREATE TABLE live_daily_send_budgets (
+ restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,
+ channel TEXT NOT NULL CHECK(channel IN ('sms','email')),budget_day DATE NOT NULL,
+ cap_minor BIGINT NOT NULL CHECK(cap_minor>0),reserved_minor BIGINT NOT NULL DEFAULT 0,
+ PRIMARY KEY(restaurant_id,channel,budget_day),CHECK(reserved_minor>=0 AND reserved_minor<=cap_minor)
+);
 CREATE TABLE live_campaigns (
  restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,id UUID NOT NULL,
  version BIGINT NOT NULL DEFAULT 1,channel TEXT NOT NULL CHECK(channel IN ('sms','email')),offer_id UUID NOT NULL,
@@ -11842,6 +11861,11 @@ CREATE TABLE live_deliveries (
  state TEXT NOT NULL CHECK(state IN ('queued','claimed','accepted','uncertain','delivered','failed','suppressed')),
  claim_token UUID NULL,lease_until TIMESTAMPTZ NULL,attempts INTEGER NOT NULL DEFAULT 0,due_at TIMESTAMPTZ NOT NULL,
  reserved_minor INTEGER NOT NULL DEFAULT 0,provider_id TEXT NULL,config_version BIGINT NOT NULL,
+ budget_channel TEXT NULL CHECK(budget_channel IN ('sms','email')),budget_day DATE NULL,
+ CHECK((budget_channel IS NULL)=(budget_day IS NULL)),
+ CHECK(reserved_minor=0 OR budget_day IS NOT NULL),
+ FOREIGN KEY(restaurant_id,budget_channel,budget_day)
+ REFERENCES live_daily_send_budgets(restaurant_id,channel,budget_day) ON DELETE RESTRICT,
  PRIMARY KEY(restaurant_id,id),UNIQUE(restaurant_id,approval_id,contact_id),
  FOREIGN KEY(restaurant_id,approval_id) REFERENCES live_campaign_approvals(restaurant_id,id) ON DELETE RESTRICT,
  FOREIGN KEY(restaurant_id,contact_id) REFERENCES live_contacts(restaurant_id,id) ON DELETE RESTRICT
@@ -11968,7 +11992,7 @@ CON-28: owner GET/POST .../campaigns and GET/PUT .../campaigns/{cid}. POST {chan
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -11982,6 +12006,12 @@ type Approval = {id:UUID;campaign_id:UUID;version:number;recipient_count:number;
 
 Consumed storage contract DB-F (read/use only; no schema changes owned here):
 ```sql
+CREATE TABLE live_daily_send_budgets (
+ restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,
+ channel TEXT NOT NULL CHECK(channel IN ('sms','email')),budget_day DATE NOT NULL,
+ cap_minor BIGINT NOT NULL CHECK(cap_minor>0),reserved_minor BIGINT NOT NULL DEFAULT 0,
+ PRIMARY KEY(restaurant_id,channel,budget_day),CHECK(reserved_minor>=0 AND reserved_minor<=cap_minor)
+);
 CREATE TABLE live_campaigns (
  restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,id UUID NOT NULL,
  version BIGINT NOT NULL DEFAULT 1,channel TEXT NOT NULL CHECK(channel IN ('sms','email')),offer_id UUID NOT NULL,
@@ -12005,6 +12035,11 @@ CREATE TABLE live_deliveries (
  state TEXT NOT NULL CHECK(state IN ('queued','claimed','accepted','uncertain','delivered','failed','suppressed')),
  claim_token UUID NULL,lease_until TIMESTAMPTZ NULL,attempts INTEGER NOT NULL DEFAULT 0,due_at TIMESTAMPTZ NOT NULL,
  reserved_minor INTEGER NOT NULL DEFAULT 0,provider_id TEXT NULL,config_version BIGINT NOT NULL,
+ budget_channel TEXT NULL CHECK(budget_channel IN ('sms','email')),budget_day DATE NULL,
+ CHECK((budget_channel IS NULL)=(budget_day IS NULL)),
+ CHECK(reserved_minor=0 OR budget_day IS NOT NULL),
+ FOREIGN KEY(restaurant_id,budget_channel,budget_day)
+ REFERENCES live_daily_send_budgets(restaurant_id,channel,budget_day) ON DELETE RESTRICT,
  PRIMARY KEY(restaurant_id,id),UNIQUE(restaurant_id,approval_id,contact_id),
  FOREIGN KEY(restaurant_id,approval_id) REFERENCES live_campaign_approvals(restaurant_id,id) ON DELETE RESTRICT,
  FOREIGN KEY(restaurant_id,contact_id) REFERENCES live_contacts(restaurant_id,id) ON DELETE RESTRICT
@@ -12127,7 +12162,7 @@ CON-29: POST .../campaigns/{cid}/preview {expected_version}->Preview{preview_id,
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -12182,6 +12217,12 @@ One contact row represents one channel/destination, not a unified customer ident
 
 Consumed storage contract DB-F (read/use only; no schema changes owned here):
 ```sql
+CREATE TABLE live_daily_send_budgets (
+ restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,
+ channel TEXT NOT NULL CHECK(channel IN ('sms','email')),budget_day DATE NOT NULL,
+ cap_minor BIGINT NOT NULL CHECK(cap_minor>0),reserved_minor BIGINT NOT NULL DEFAULT 0,
+ PRIMARY KEY(restaurant_id,channel,budget_day),CHECK(reserved_minor>=0 AND reserved_minor<=cap_minor)
+);
 CREATE TABLE live_campaigns (
  restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,id UUID NOT NULL,
  version BIGINT NOT NULL DEFAULT 1,channel TEXT NOT NULL CHECK(channel IN ('sms','email')),offer_id UUID NOT NULL,
@@ -12205,6 +12246,11 @@ CREATE TABLE live_deliveries (
  state TEXT NOT NULL CHECK(state IN ('queued','claimed','accepted','uncertain','delivered','failed','suppressed')),
  claim_token UUID NULL,lease_until TIMESTAMPTZ NULL,attempts INTEGER NOT NULL DEFAULT 0,due_at TIMESTAMPTZ NOT NULL,
  reserved_minor INTEGER NOT NULL DEFAULT 0,provider_id TEXT NULL,config_version BIGINT NOT NULL,
+ budget_channel TEXT NULL CHECK(budget_channel IN ('sms','email')),budget_day DATE NULL,
+ CHECK((budget_channel IS NULL)=(budget_day IS NULL)),
+ CHECK(reserved_minor=0 OR budget_day IS NOT NULL),
+ FOREIGN KEY(restaurant_id,budget_channel,budget_day)
+ REFERENCES live_daily_send_budgets(restaurant_id,channel,budget_day) ON DELETE RESTRICT,
  PRIMARY KEY(restaurant_id,id),UNIQUE(restaurant_id,approval_id,contact_id),
  FOREIGN KEY(restaurant_id,approval_id) REFERENCES live_campaign_approvals(restaurant_id,id) ON DELETE RESTRICT,
  FOREIGN KEY(restaurant_id,contact_id) REFERENCES live_contacts(restaurant_id,id) ON DELETE RESTRICT
@@ -12328,7 +12374,7 @@ CON-30: owner GET .../messaging-setup ->{sms:SetupState,email:SetupState}; Setup
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -12341,6 +12387,12 @@ type SetupState = {configured:boolean;verified:boolean;reason_codes:string[];cos
 
 Consumed storage contract DB-F (read/use only; no schema changes owned here):
 ```sql
+CREATE TABLE live_daily_send_budgets (
+ restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,
+ channel TEXT NOT NULL CHECK(channel IN ('sms','email')),budget_day DATE NOT NULL,
+ cap_minor BIGINT NOT NULL CHECK(cap_minor>0),reserved_minor BIGINT NOT NULL DEFAULT 0,
+ PRIMARY KEY(restaurant_id,channel,budget_day),CHECK(reserved_minor>=0 AND reserved_minor<=cap_minor)
+);
 CREATE TABLE live_campaigns (
  restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,id UUID NOT NULL,
  version BIGINT NOT NULL DEFAULT 1,channel TEXT NOT NULL CHECK(channel IN ('sms','email')),offer_id UUID NOT NULL,
@@ -12364,6 +12416,11 @@ CREATE TABLE live_deliveries (
  state TEXT NOT NULL CHECK(state IN ('queued','claimed','accepted','uncertain','delivered','failed','suppressed')),
  claim_token UUID NULL,lease_until TIMESTAMPTZ NULL,attempts INTEGER NOT NULL DEFAULT 0,due_at TIMESTAMPTZ NOT NULL,
  reserved_minor INTEGER NOT NULL DEFAULT 0,provider_id TEXT NULL,config_version BIGINT NOT NULL,
+ budget_channel TEXT NULL CHECK(budget_channel IN ('sms','email')),budget_day DATE NULL,
+ CHECK((budget_channel IS NULL)=(budget_day IS NULL)),
+ CHECK(reserved_minor=0 OR budget_day IS NOT NULL),
+ FOREIGN KEY(restaurant_id,budget_channel,budget_day)
+ REFERENCES live_daily_send_budgets(restaurant_id,channel,budget_day) ON DELETE RESTRICT,
  PRIMARY KEY(restaurant_id,id),UNIQUE(restaurant_id,approval_id,contact_id),
  FOREIGN KEY(restaurant_id,approval_id) REFERENCES live_campaign_approvals(restaurant_id,id) ON DELETE RESTRICT,
  FOREIGN KEY(restaurant_id,contact_id) REFERENCES live_contacts(restaurant_id,id) ON DELETE RESTRICT
@@ -12486,7 +12543,7 @@ CON-31: send_sms(config,DeliveryInput)->DeliveryResult (COMMON). HTTPS fixed MSG
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -12498,6 +12555,12 @@ type DeliveryResult = {state:"accepted"|"delivered"|"failed"|"uncertain"|"safely
 
 Consumed storage contract DB-F (read/use only; no schema changes owned here):
 ```sql
+CREATE TABLE live_daily_send_budgets (
+ restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,
+ channel TEXT NOT NULL CHECK(channel IN ('sms','email')),budget_day DATE NOT NULL,
+ cap_minor BIGINT NOT NULL CHECK(cap_minor>0),reserved_minor BIGINT NOT NULL DEFAULT 0,
+ PRIMARY KEY(restaurant_id,channel,budget_day),CHECK(reserved_minor>=0 AND reserved_minor<=cap_minor)
+);
 CREATE TABLE live_campaigns (
  restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,id UUID NOT NULL,
  version BIGINT NOT NULL DEFAULT 1,channel TEXT NOT NULL CHECK(channel IN ('sms','email')),offer_id UUID NOT NULL,
@@ -12521,6 +12584,11 @@ CREATE TABLE live_deliveries (
  state TEXT NOT NULL CHECK(state IN ('queued','claimed','accepted','uncertain','delivered','failed','suppressed')),
  claim_token UUID NULL,lease_until TIMESTAMPTZ NULL,attempts INTEGER NOT NULL DEFAULT 0,due_at TIMESTAMPTZ NOT NULL,
  reserved_minor INTEGER NOT NULL DEFAULT 0,provider_id TEXT NULL,config_version BIGINT NOT NULL,
+ budget_channel TEXT NULL CHECK(budget_channel IN ('sms','email')),budget_day DATE NULL,
+ CHECK((budget_channel IS NULL)=(budget_day IS NULL)),
+ CHECK(reserved_minor=0 OR budget_day IS NOT NULL),
+ FOREIGN KEY(restaurant_id,budget_channel,budget_day)
+ REFERENCES live_daily_send_budgets(restaurant_id,channel,budget_day) ON DELETE RESTRICT,
  PRIMARY KEY(restaurant_id,id),UNIQUE(restaurant_id,approval_id,contact_id),
  FOREIGN KEY(restaurant_id,approval_id) REFERENCES live_campaign_approvals(restaurant_id,id) ON DELETE RESTRICT,
  FOREIGN KEY(restaurant_id,contact_id) REFERENCES live_contacts(restaurant_id,id) ON DELETE RESTRICT
@@ -12642,7 +12710,7 @@ CON-32: send_email(config,DeliveryInput)->DeliveryResult. POST https://api.sendg
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -12654,6 +12722,12 @@ type DeliveryResult = {state:"accepted"|"delivered"|"failed"|"uncertain"|"safely
 
 Consumed storage contract DB-F (read/use only; no schema changes owned here):
 ```sql
+CREATE TABLE live_daily_send_budgets (
+ restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,
+ channel TEXT NOT NULL CHECK(channel IN ('sms','email')),budget_day DATE NOT NULL,
+ cap_minor BIGINT NOT NULL CHECK(cap_minor>0),reserved_minor BIGINT NOT NULL DEFAULT 0,
+ PRIMARY KEY(restaurant_id,channel,budget_day),CHECK(reserved_minor>=0 AND reserved_minor<=cap_minor)
+);
 CREATE TABLE live_campaigns (
  restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,id UUID NOT NULL,
  version BIGINT NOT NULL DEFAULT 1,channel TEXT NOT NULL CHECK(channel IN ('sms','email')),offer_id UUID NOT NULL,
@@ -12677,6 +12751,11 @@ CREATE TABLE live_deliveries (
  state TEXT NOT NULL CHECK(state IN ('queued','claimed','accepted','uncertain','delivered','failed','suppressed')),
  claim_token UUID NULL,lease_until TIMESTAMPTZ NULL,attempts INTEGER NOT NULL DEFAULT 0,due_at TIMESTAMPTZ NOT NULL,
  reserved_minor INTEGER NOT NULL DEFAULT 0,provider_id TEXT NULL,config_version BIGINT NOT NULL,
+ budget_channel TEXT NULL CHECK(budget_channel IN ('sms','email')),budget_day DATE NULL,
+ CHECK((budget_channel IS NULL)=(budget_day IS NULL)),
+ CHECK(reserved_minor=0 OR budget_day IS NOT NULL),
+ FOREIGN KEY(restaurant_id,budget_channel,budget_day)
+ REFERENCES live_daily_send_budgets(restaurant_id,channel,budget_day) ON DELETE RESTRICT,
  PRIMARY KEY(restaurant_id,id),UNIQUE(restaurant_id,approval_id,contact_id),
  FOREIGN KEY(restaurant_id,approval_id) REFERENCES live_campaign_approvals(restaurant_id,id) ON DELETE RESTRICT,
  FOREIGN KEY(restaurant_id,contact_id) REFERENCES live_contacts(restaurant_id,id) ON DELETE RESTRICT
@@ -12763,7 +12842,7 @@ Current source or external behavior may invalidate a proposed shape; report the 
 Claim recipient work with durable leases and cost reservations. Internal changes become visible only through the documented API/operational outcome; no additional screen is implied.
 
 **Why this task exists / scope**
-This first restaurant release needs the following bounded outcome: CON-33: claim_next(conn,now)->DeliveryInput|null. Select a due candidate without locking, then acquire the restaurant budget row, campaign/approval, contact and delivery locks in that order; skip locked restaurant candidates and revalidate queued state. All approval, pause, suppression and dispatch eligibility transactions use the same order; recheck unpaused approval/config/consent/offer and reserve maximum recipient charge before marking claimed. Batch size1; lease30s, poll2s. Recovery of expired claimed means uncertain, never queued. No network inside SQL transaction.
+This first restaurant release needs the following bounded outcome: CON-33: claim_next(conn,now)->DeliveryInput|null. Select a due candidate without locking, then acquire live_restaurants row (FOR UPDATE SKIP LOCKED for worker claims), daily budget row, campaign/approval, contact and delivery locks in that order; skip busy restaurant candidates and revalidate queued state. The restaurant row serializes day-row creation and cross-day reconciliation. DB-F live_daily_send_budgets and delivery budget_channel/budget_day hold the reservation identity; rules in section18.17.1 apply. All approval, pause, suppression and dispatch eligibility transactions use the same order; recheck unpaused approval/config/consent/offer and reserve maximum recipient charge before marking claimed. Batch size1; lease30s, poll2s. Recovery of expired claimed means uncertain, never queued. No network inside SQL transaction.
 
 **Workstream / execution wave / effort**
 worker, merge W16; 1d engineer effort (implementation ~50%, behavior/negative checks ~40%, docs/diff ~10%). External waiting time excluded. Checklist share1/67≈1.49%, not an effort estimate. One focused behavior with tests; split if implementation exceeds this bound.
@@ -12795,11 +12874,11 @@ Existing mock receipt/pricing/session contracts, applied migrations001–006, un
 - CON-32: send_email(config,DeliveryInput)->DeliveryResult. POST https://api.sendgrid.com/v3/mail/send with Bearer server credential, one personalization/to recipient, verified from, frozen subject and text/plain content, custom_args.delivery_id; include unsubscribe URL. HTTP202 means accepted, never delivered. Timeout10s, no automatic HTTP retries; response ambiguity uncertain.
 
 **Contract produced / API or component boundary**
-CON-33: claim_next(conn,now)->DeliveryInput|null. Select a due candidate without locking, then acquire the restaurant budget row, campaign/approval, contact and delivery locks in that order; skip locked restaurant candidates and revalidate queued state. All approval, pause, suppression and dispatch eligibility transactions use the same order; recheck unpaused approval/config/consent/offer and reserve maximum recipient charge before marking claimed. Batch size1; lease30s, poll2s. Recovery of expired claimed means uncertain, never queued. No network inside SQL transaction.
+CON-33: claim_next(conn,now)->DeliveryInput|null. Select a due candidate without locking, then acquire live_restaurants row (FOR UPDATE SKIP LOCKED for worker claims), daily budget row, campaign/approval, contact and delivery locks in that order; skip busy restaurant candidates and revalidate queued state. The restaurant row serializes day-row creation and cross-day reconciliation. DB-F live_daily_send_budgets and delivery budget_channel/budget_day hold the reservation identity; rules in section18.17.1 apply. All approval, pause, suppression and dispatch eligibility transactions use the same order; recheck unpaused approval/config/consent/offer and reserve maximum recipient charge before marking claimed. Batch size1; lease30s, poll2s. Recovery of expired claimed means uncertain, never queued. No network inside SQL transaction.
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -12834,6 +12913,12 @@ One contact row represents one channel/destination, not a unified customer ident
 
 Consumed storage contract DB-F (read/use only; no schema changes owned here):
 ```sql
+CREATE TABLE live_daily_send_budgets (
+ restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,
+ channel TEXT NOT NULL CHECK(channel IN ('sms','email')),budget_day DATE NOT NULL,
+ cap_minor BIGINT NOT NULL CHECK(cap_minor>0),reserved_minor BIGINT NOT NULL DEFAULT 0,
+ PRIMARY KEY(restaurant_id,channel,budget_day),CHECK(reserved_minor>=0 AND reserved_minor<=cap_minor)
+);
 CREATE TABLE live_campaigns (
  restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,id UUID NOT NULL,
  version BIGINT NOT NULL DEFAULT 1,channel TEXT NOT NULL CHECK(channel IN ('sms','email')),offer_id UUID NOT NULL,
@@ -12857,6 +12942,11 @@ CREATE TABLE live_deliveries (
  state TEXT NOT NULL CHECK(state IN ('queued','claimed','accepted','uncertain','delivered','failed','suppressed')),
  claim_token UUID NULL,lease_until TIMESTAMPTZ NULL,attempts INTEGER NOT NULL DEFAULT 0,due_at TIMESTAMPTZ NOT NULL,
  reserved_minor INTEGER NOT NULL DEFAULT 0,provider_id TEXT NULL,config_version BIGINT NOT NULL,
+ budget_channel TEXT NULL CHECK(budget_channel IN ('sms','email')),budget_day DATE NULL,
+ CHECK((budget_channel IS NULL)=(budget_day IS NULL)),
+ CHECK(reserved_minor=0 OR budget_day IS NOT NULL),
+ FOREIGN KEY(restaurant_id,budget_channel,budget_day)
+ REFERENCES live_daily_send_budgets(restaurant_id,channel,budget_day) ON DELETE RESTRICT,
  PRIMARY KEY(restaurant_id,id),UNIQUE(restaurant_id,approval_id,contact_id),
  FOREIGN KEY(restaurant_id,approval_id) REFERENCES live_campaign_approvals(restaurant_id,id) ON DELETE RESTRICT,
  FOREIGN KEY(restaurant_id,contact_id) REFERENCES live_contacts(restaurant_id,id) ON DELETE RESTRICT
@@ -12972,14 +13062,14 @@ Existing mock receipt/pricing/session contracts, applied migrations001–006, un
 
 **Contracts consumed (copied handoff, not provider internals)**
 - CON-01: Publish the COMMON, DTO and schema records below verbatim as live-v1. Fixture bundle has positive and negative cases keyed by contract ID, synthetic=true, schema_version=1; includes restaurant r-demo, guest g-one, item i-one, revision 0/1 and a deterministic receipt. Reject fixture mutations that remove fields or change money units. Fixtures are not runtime fallback data.
-- CON-33: claim_next(conn,now)->DeliveryInput|null. Select a due candidate without locking, then acquire the restaurant budget row, campaign/approval, contact and delivery locks in that order; skip locked restaurant candidates and revalidate queued state. All approval, pause, suppression and dispatch eligibility transactions use the same order; recheck unpaused approval/config/consent/offer and reserve maximum recipient charge before marking claimed. Batch size1; lease30s, poll2s. Recovery of expired claimed means uncertain, never queued. No network inside SQL transaction.
+- CON-33: claim_next(conn,now)->DeliveryInput|null. Select a due candidate without locking, then acquire live_restaurants row (FOR UPDATE SKIP LOCKED for worker claims), daily budget row, campaign/approval, contact and delivery locks in that order; skip busy restaurant candidates and revalidate queued state. The restaurant row serializes day-row creation and cross-day reconciliation. DB-F live_daily_send_budgets and delivery budget_channel/budget_day hold the reservation identity; rules in section18.17.1 apply. All approval, pause, suppression and dispatch eligibility transactions use the same order; recheck unpaused approval/config/consent/offer and reserve maximum recipient charge before marking claimed. Batch size1; lease30s, poll2s. Recovery of expired claimed means uncertain, never queued. No network inside SQL transaction.
 
 **Contract produced / API or component boundary**
 CON-34: dispatch(delivery_id,claim_token) calls exactly one channel adapter for valid lease. Persist accepted/provider ID or uncertain after network. Only explicit safely_not_sent may retry, max3 attempts with30s/120s/600s backoff; any unknown result stops retries. Retain cost reservation for accepted/uncertain; release only proven no-send. Crash after request before persistence becomes uncertain.
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -12989,6 +13079,12 @@ type DeliveryInput = {id:UUID;restaurant_id:string;approval_id:UUID;claim_token:
 
 Consumed storage contract DB-F (read/use only; no schema changes owned here):
 ```sql
+CREATE TABLE live_daily_send_budgets (
+ restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,
+ channel TEXT NOT NULL CHECK(channel IN ('sms','email')),budget_day DATE NOT NULL,
+ cap_minor BIGINT NOT NULL CHECK(cap_minor>0),reserved_minor BIGINT NOT NULL DEFAULT 0,
+ PRIMARY KEY(restaurant_id,channel,budget_day),CHECK(reserved_minor>=0 AND reserved_minor<=cap_minor)
+);
 CREATE TABLE live_campaigns (
  restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,id UUID NOT NULL,
  version BIGINT NOT NULL DEFAULT 1,channel TEXT NOT NULL CHECK(channel IN ('sms','email')),offer_id UUID NOT NULL,
@@ -13012,6 +13108,11 @@ CREATE TABLE live_deliveries (
  state TEXT NOT NULL CHECK(state IN ('queued','claimed','accepted','uncertain','delivered','failed','suppressed')),
  claim_token UUID NULL,lease_until TIMESTAMPTZ NULL,attempts INTEGER NOT NULL DEFAULT 0,due_at TIMESTAMPTZ NOT NULL,
  reserved_minor INTEGER NOT NULL DEFAULT 0,provider_id TEXT NULL,config_version BIGINT NOT NULL,
+ budget_channel TEXT NULL CHECK(budget_channel IN ('sms','email')),budget_day DATE NULL,
+ CHECK((budget_channel IS NULL)=(budget_day IS NULL)),
+ CHECK(reserved_minor=0 OR budget_day IS NOT NULL),
+ FOREIGN KEY(restaurant_id,budget_channel,budget_day)
+ REFERENCES live_daily_send_budgets(restaurant_id,channel,budget_day) ON DELETE RESTRICT,
  PRIMARY KEY(restaurant_id,id),UNIQUE(restaurant_id,approval_id,contact_id),
  FOREIGN KEY(restaurant_id,approval_id) REFERENCES live_campaign_approvals(restaurant_id,id) ON DELETE RESTRICT,
  FOREIGN KEY(restaurant_id,contact_id) REFERENCES live_contacts(restaurant_id,id) ON DELETE RESTRICT
@@ -13135,7 +13236,7 @@ CON-35: POST /v1/live/webhooks/sendgrid/{account_alias}; verify signed raw body/
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 No additional shared DTO beyond the exact fields in this packet. Schema/config ownership is stated below.
@@ -13166,6 +13267,12 @@ One contact row represents one channel/destination, not a unified customer ident
 
 Consumed storage contract DB-F (read/use only; no schema changes owned here):
 ```sql
+CREATE TABLE live_daily_send_budgets (
+ restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,
+ channel TEXT NOT NULL CHECK(channel IN ('sms','email')),budget_day DATE NOT NULL,
+ cap_minor BIGINT NOT NULL CHECK(cap_minor>0),reserved_minor BIGINT NOT NULL DEFAULT 0,
+ PRIMARY KEY(restaurant_id,channel,budget_day),CHECK(reserved_minor>=0 AND reserved_minor<=cap_minor)
+);
 CREATE TABLE live_campaigns (
  restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,id UUID NOT NULL,
  version BIGINT NOT NULL DEFAULT 1,channel TEXT NOT NULL CHECK(channel IN ('sms','email')),offer_id UUID NOT NULL,
@@ -13189,6 +13296,11 @@ CREATE TABLE live_deliveries (
  state TEXT NOT NULL CHECK(state IN ('queued','claimed','accepted','uncertain','delivered','failed','suppressed')),
  claim_token UUID NULL,lease_until TIMESTAMPTZ NULL,attempts INTEGER NOT NULL DEFAULT 0,due_at TIMESTAMPTZ NOT NULL,
  reserved_minor INTEGER NOT NULL DEFAULT 0,provider_id TEXT NULL,config_version BIGINT NOT NULL,
+ budget_channel TEXT NULL CHECK(budget_channel IN ('sms','email')),budget_day DATE NULL,
+ CHECK((budget_channel IS NULL)=(budget_day IS NULL)),
+ CHECK(reserved_minor=0 OR budget_day IS NOT NULL),
+ FOREIGN KEY(restaurant_id,budget_channel,budget_day)
+ REFERENCES live_daily_send_budgets(restaurant_id,channel,budget_day) ON DELETE RESTRICT,
  PRIMARY KEY(restaurant_id,id),UNIQUE(restaurant_id,approval_id,contact_id),
  FOREIGN KEY(restaurant_id,approval_id) REFERENCES live_campaign_approvals(restaurant_id,id) ON DELETE RESTRICT,
  FOREIGN KEY(restaurant_id,contact_id) REFERENCES live_contacts(restaurant_id,id) ON DELETE RESTRICT
@@ -13311,7 +13423,7 @@ CON-36: reconcile_sms(config,provider_id,delivery_id)->DeliveryResult. No unauth
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -13344,6 +13456,12 @@ One contact row represents one channel/destination, not a unified customer ident
 
 Consumed storage contract DB-F (read/use only; no schema changes owned here):
 ```sql
+CREATE TABLE live_daily_send_budgets (
+ restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,
+ channel TEXT NOT NULL CHECK(channel IN ('sms','email')),budget_day DATE NOT NULL,
+ cap_minor BIGINT NOT NULL CHECK(cap_minor>0),reserved_minor BIGINT NOT NULL DEFAULT 0,
+ PRIMARY KEY(restaurant_id,channel,budget_day),CHECK(reserved_minor>=0 AND reserved_minor<=cap_minor)
+);
 CREATE TABLE live_campaigns (
  restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,id UUID NOT NULL,
  version BIGINT NOT NULL DEFAULT 1,channel TEXT NOT NULL CHECK(channel IN ('sms','email')),offer_id UUID NOT NULL,
@@ -13367,6 +13485,11 @@ CREATE TABLE live_deliveries (
  state TEXT NOT NULL CHECK(state IN ('queued','claimed','accepted','uncertain','delivered','failed','suppressed')),
  claim_token UUID NULL,lease_until TIMESTAMPTZ NULL,attempts INTEGER NOT NULL DEFAULT 0,due_at TIMESTAMPTZ NOT NULL,
  reserved_minor INTEGER NOT NULL DEFAULT 0,provider_id TEXT NULL,config_version BIGINT NOT NULL,
+ budget_channel TEXT NULL CHECK(budget_channel IN ('sms','email')),budget_day DATE NULL,
+ CHECK((budget_channel IS NULL)=(budget_day IS NULL)),
+ CHECK(reserved_minor=0 OR budget_day IS NOT NULL),
+ FOREIGN KEY(restaurant_id,budget_channel,budget_day)
+ REFERENCES live_daily_send_budgets(restaurant_id,channel,budget_day) ON DELETE RESTRICT,
  PRIMARY KEY(restaurant_id,id),UNIQUE(restaurant_id,approval_id,contact_id),
  FOREIGN KEY(restaurant_id,approval_id) REFERENCES live_campaign_approvals(restaurant_id,id) ON DELETE RESTRICT,
  FOREIGN KEY(restaurant_id,contact_id) REFERENCES live_contacts(restaurant_id,id) ON DELETE RESTRICT
@@ -13492,7 +13615,7 @@ CON-37: owner POST .../campaigns/{cid}/pause or /resume +Idempotency-Key {expect
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -13514,6 +13637,12 @@ type DeliveryResult = {state:"accepted"|"delivered"|"failed"|"uncertain"|"safely
 
 Consumed storage contract DB-F (read/use only; no schema changes owned here):
 ```sql
+CREATE TABLE live_daily_send_budgets (
+ restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,
+ channel TEXT NOT NULL CHECK(channel IN ('sms','email')),budget_day DATE NOT NULL,
+ cap_minor BIGINT NOT NULL CHECK(cap_minor>0),reserved_minor BIGINT NOT NULL DEFAULT 0,
+ PRIMARY KEY(restaurant_id,channel,budget_day),CHECK(reserved_minor>=0 AND reserved_minor<=cap_minor)
+);
 CREATE TABLE live_campaigns (
  restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,id UUID NOT NULL,
  version BIGINT NOT NULL DEFAULT 1,channel TEXT NOT NULL CHECK(channel IN ('sms','email')),offer_id UUID NOT NULL,
@@ -13537,6 +13666,11 @@ CREATE TABLE live_deliveries (
  state TEXT NOT NULL CHECK(state IN ('queued','claimed','accepted','uncertain','delivered','failed','suppressed')),
  claim_token UUID NULL,lease_until TIMESTAMPTZ NULL,attempts INTEGER NOT NULL DEFAULT 0,due_at TIMESTAMPTZ NOT NULL,
  reserved_minor INTEGER NOT NULL DEFAULT 0,provider_id TEXT NULL,config_version BIGINT NOT NULL,
+ budget_channel TEXT NULL CHECK(budget_channel IN ('sms','email')),budget_day DATE NULL,
+ CHECK((budget_channel IS NULL)=(budget_day IS NULL)),
+ CHECK(reserved_minor=0 OR budget_day IS NOT NULL),
+ FOREIGN KEY(restaurant_id,budget_channel,budget_day)
+ REFERENCES live_daily_send_budgets(restaurant_id,channel,budget_day) ON DELETE RESTRICT,
  PRIMARY KEY(restaurant_id,id),UNIQUE(restaurant_id,approval_id,contact_id),
  FOREIGN KEY(restaurant_id,approval_id) REFERENCES live_campaign_approvals(restaurant_id,id) ON DELETE RESTRICT,
  FOREIGN KEY(restaurant_id,contact_id) REFERENCES live_contacts(restaurant_id,id) ON DELETE RESTRICT
@@ -13660,7 +13794,7 @@ CON-38: owner GET .../summary?from=YYYY-MM-DD&to=YYYY-MM-DD ->Summary. Range<=31
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -13732,6 +13866,12 @@ Immutable receipt/events: BEFORE UPDATE OR DELETE trigger raises an error for li
 
 Consumed storage contract DB-F (read/use only; no schema changes owned here):
 ```sql
+CREATE TABLE live_daily_send_budgets (
+ restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,
+ channel TEXT NOT NULL CHECK(channel IN ('sms','email')),budget_day DATE NOT NULL,
+ cap_minor BIGINT NOT NULL CHECK(cap_minor>0),reserved_minor BIGINT NOT NULL DEFAULT 0,
+ PRIMARY KEY(restaurant_id,channel,budget_day),CHECK(reserved_minor>=0 AND reserved_minor<=cap_minor)
+);
 CREATE TABLE live_campaigns (
  restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,id UUID NOT NULL,
  version BIGINT NOT NULL DEFAULT 1,channel TEXT NOT NULL CHECK(channel IN ('sms','email')),offer_id UUID NOT NULL,
@@ -13755,6 +13895,11 @@ CREATE TABLE live_deliveries (
  state TEXT NOT NULL CHECK(state IN ('queued','claimed','accepted','uncertain','delivered','failed','suppressed')),
  claim_token UUID NULL,lease_until TIMESTAMPTZ NULL,attempts INTEGER NOT NULL DEFAULT 0,due_at TIMESTAMPTZ NOT NULL,
  reserved_minor INTEGER NOT NULL DEFAULT 0,provider_id TEXT NULL,config_version BIGINT NOT NULL,
+ budget_channel TEXT NULL CHECK(budget_channel IN ('sms','email')),budget_day DATE NULL,
+ CHECK((budget_channel IS NULL)=(budget_day IS NULL)),
+ CHECK(reserved_minor=0 OR budget_day IS NOT NULL),
+ FOREIGN KEY(restaurant_id,budget_channel,budget_day)
+ REFERENCES live_daily_send_budgets(restaurant_id,channel,budget_day) ON DELETE RESTRICT,
  PRIMARY KEY(restaurant_id,id),UNIQUE(restaurant_id,approval_id,contact_id),
  FOREIGN KEY(restaurant_id,approval_id) REFERENCES live_campaign_approvals(restaurant_id,id) ON DELETE RESTRICT,
  FOREIGN KEY(restaurant_id,contact_id) REFERENCES live_contacts(restaurant_id,id) ON DELETE RESTRICT
@@ -13878,7 +14023,7 @@ CON-39: html data-theme=light default; optional localStorage key orderlyapp.them
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 No additional shared DTO beyond the exact fields in this packet. Schema/config ownership is stated below.
@@ -13990,7 +14135,7 @@ CON-40: LiveShell{restaurant,role,children}; owner links Overview/Orders/Menu/Ma
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -14107,7 +14252,7 @@ CON-41: browser live adapter explicitly maps snake_case live-v1 DTOs to camelCas
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 No additional shared DTO beyond the exact fields in this packet. Schema/config ownership is stated below.
@@ -14219,7 +14364,7 @@ CON-42: /r/{rid}?table={id} displays menu first plus Speak your order control; d
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -14341,7 +14486,7 @@ CON-43: one basket controller owns CON-14 state. >=64rem and menu>=22rem/summary
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -14460,7 +14605,7 @@ CON-44: checkout obtains CON-15/17 quote, renders receipt preview and explicit P
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -14630,7 +14775,7 @@ CON-45: recovery view says We’re checking whether your order was received, sho
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 No additional shared DTO beyond the exact fields in this packet. Schema/config ownership is stated below.
@@ -14791,7 +14936,7 @@ CON-46: status page reads CON-19 and separates Submitted/Accepted/etc from Unpai
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -14940,7 +15085,7 @@ CON-47: queue polls every5s while visible and authenticated; pause on hidden tab
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -15073,7 +15218,7 @@ CON-48: phone queue->full-width detail with Back restoring queue position where 
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -15248,7 +15393,7 @@ CON-49: inline full receipt amount/currency plus required method, single Record 
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -15425,7 +15570,7 @@ CON-50: owner Settings presents separate forms for branding/hours, tables and ve
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -15558,7 +15703,7 @@ CON-51: owner Menu edits item name/description/price/modifier rules; order_staff
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -15679,7 +15824,7 @@ CON-52: owner Marketing empty state No campaigns yet, primary Create campaign dr
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -15800,7 +15945,7 @@ CON-53: approval view displays frozen channel/text/offer-version/count/estimated
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -15815,6 +15960,12 @@ type Approval = {id:UUID;campaign_id:UUID;version:number;recipient_count:number;
 
 Consumed storage contract DB-F (read/use only; no schema changes owned here):
 ```sql
+CREATE TABLE live_daily_send_budgets (
+ restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,
+ channel TEXT NOT NULL CHECK(channel IN ('sms','email')),budget_day DATE NOT NULL,
+ cap_minor BIGINT NOT NULL CHECK(cap_minor>0),reserved_minor BIGINT NOT NULL DEFAULT 0,
+ PRIMARY KEY(restaurant_id,channel,budget_day),CHECK(reserved_minor>=0 AND reserved_minor<=cap_minor)
+);
 CREATE TABLE live_campaigns (
  restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,id UUID NOT NULL,
  version BIGINT NOT NULL DEFAULT 1,channel TEXT NOT NULL CHECK(channel IN ('sms','email')),offer_id UUID NOT NULL,
@@ -15838,6 +15989,11 @@ CREATE TABLE live_deliveries (
  state TEXT NOT NULL CHECK(state IN ('queued','claimed','accepted','uncertain','delivered','failed','suppressed')),
  claim_token UUID NULL,lease_until TIMESTAMPTZ NULL,attempts INTEGER NOT NULL DEFAULT 0,due_at TIMESTAMPTZ NOT NULL,
  reserved_minor INTEGER NOT NULL DEFAULT 0,provider_id TEXT NULL,config_version BIGINT NOT NULL,
+ budget_channel TEXT NULL CHECK(budget_channel IN ('sms','email')),budget_day DATE NULL,
+ CHECK((budget_channel IS NULL)=(budget_day IS NULL)),
+ CHECK(reserved_minor=0 OR budget_day IS NOT NULL),
+ FOREIGN KEY(restaurant_id,budget_channel,budget_day)
+ REFERENCES live_daily_send_budgets(restaurant_id,channel,budget_day) ON DELETE RESTRICT,
  PRIMARY KEY(restaurant_id,id),UNIQUE(restaurant_id,approval_id,contact_id),
  FOREIGN KEY(restaurant_id,approval_id) REFERENCES live_campaign_approvals(restaurant_id,id) ON DELETE RESTRICT,
  FOREIGN KEY(restaurant_id,contact_id) REFERENCES live_contacts(restaurant_id,id) ON DELETE RESTRICT
@@ -15965,7 +16121,7 @@ CON-54: campaign results separates accepted, delivered, uncertain, failed and su
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -15976,6 +16132,12 @@ type Summary = {from:string;to:string;currency:"INR";submitted:number;completed:
 
 Consumed storage contract DB-F (read/use only; no schema changes owned here):
 ```sql
+CREATE TABLE live_daily_send_budgets (
+ restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,
+ channel TEXT NOT NULL CHECK(channel IN ('sms','email')),budget_day DATE NOT NULL,
+ cap_minor BIGINT NOT NULL CHECK(cap_minor>0),reserved_minor BIGINT NOT NULL DEFAULT 0,
+ PRIMARY KEY(restaurant_id,channel,budget_day),CHECK(reserved_minor>=0 AND reserved_minor<=cap_minor)
+);
 CREATE TABLE live_campaigns (
  restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,id UUID NOT NULL,
  version BIGINT NOT NULL DEFAULT 1,channel TEXT NOT NULL CHECK(channel IN ('sms','email')),offer_id UUID NOT NULL,
@@ -15999,6 +16161,11 @@ CREATE TABLE live_deliveries (
  state TEXT NOT NULL CHECK(state IN ('queued','claimed','accepted','uncertain','delivered','failed','suppressed')),
  claim_token UUID NULL,lease_until TIMESTAMPTZ NULL,attempts INTEGER NOT NULL DEFAULT 0,due_at TIMESTAMPTZ NOT NULL,
  reserved_minor INTEGER NOT NULL DEFAULT 0,provider_id TEXT NULL,config_version BIGINT NOT NULL,
+ budget_channel TEXT NULL CHECK(budget_channel IN ('sms','email')),budget_day DATE NULL,
+ CHECK((budget_channel IS NULL)=(budget_day IS NULL)),
+ CHECK(reserved_minor=0 OR budget_day IS NOT NULL),
+ FOREIGN KEY(restaurant_id,budget_channel,budget_day)
+ REFERENCES live_daily_send_budgets(restaurant_id,channel,budget_day) ON DELETE RESTRICT,
  PRIMARY KEY(restaurant_id,id),UNIQUE(restaurant_id,approval_id,contact_id),
  FOREIGN KEY(restaurant_id,approval_id) REFERENCES live_campaign_approvals(restaurant_id,id) ON DELETE RESTRICT,
  FOREIGN KEY(restaurant_id,contact_id) REFERENCES live_contacts(restaurant_id,id) ON DELETE RESTRICT
@@ -16123,7 +16290,7 @@ CON-55: explicit Start/Stop listening with browser SpeechRecognition or webkit e
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 No additional shared DTO beyond the exact fields in this packet. Schema/config ownership is stated below.
@@ -16234,7 +16401,7 @@ CON-56: propose(transcript,restaurantId,catalogVersion,items)->{kind:add|clarify
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -16349,7 +16516,7 @@ CON-57: VoiceProposal shows editable item/quantity/modifiers and explicit Add to
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 No additional shared DTO beyond the exact fields in this packet. Schema/config ownership is stated below.
@@ -16425,7 +16592,7 @@ Current source or external behavior may invalidate a proposed shape; report the 
 Isolate synthetic role demos and deny all external side effects. Internal changes become visible only through the documented API/operational outcome; no additional screen is implied.
 
 **Why this task exists / scope**
-This first restaurant release needs the following bounded outcome: CON-58: POST /v1/live/demo/session with {} and valid guest cookie returns201 {schema_version:1,restaurant_id:string,expires_at:UTC}; server records guest ownership in live_restaurants.demo_owner_id. Existing guest cookie is the capability, never a browser role or new bearer token. Scope expires with guest session. Dedicated /v1/live/demo/restaurants/{rid} prefix mirrors only GET orders, GET orders/{oid}, POST orders/{oid}/transitions, POST orders/{oid}/payments, POST orders/{oid}/reversals, GET campaigns, POST campaigns, PUT campaigns/{cid}, POST campaigns/{cid}/preview and POST campaigns/{cid}/approve with identical staff DTOs and replay rules. Demo approval creates simulated outcomes only. Other methods/paths404. Customer paths retain normal guest checks and also require synthetic owner match. Gateway allowlist and typed client add only these paths in this ticket; same-origin checks apply. New copy of synthetic fixture per session; domain scope is server-resolved demo, never client boolean. Demo role commands may mutate only that copy; network transports and live activation denied regardless request/forged IDs. Reset/delete affects only demo scope; no paid state claims outside simulation.
+This first restaurant release needs the following bounded outcome: CON-58: POST /v1/live/demo/session with {} and valid guest cookie returns201 {schema_version:1,restaurant_id:string,expires_at:UTC}; server records guest ownership in live_restaurants.demo_owner_id. Existing guest cookie is the capability, never a browser role or new bearer token. Scope expires with guest session. Dedicated /v1/live/demo/restaurants/{rid} prefix mirrors only GET orders, GET orders/{oid}, POST orders/{oid}/transitions, POST orders/{oid}/payments, POST orders/{oid}/payment-reversals, GET campaigns, POST campaigns, PUT campaigns/{cid}, POST campaigns/{cid}/preview and POST campaigns/{cid}/approve with identical staff DTOs and replay rules. Demo approval creates simulated outcomes only. Other methods/paths404. Customer paths retain normal guest checks and also require synthetic owner match. Gateway allowlist and typed client add only these paths in this ticket; same-origin checks apply. New copy of synthetic fixture per session; domain scope is server-resolved demo, never client boolean. Demo role commands may mutate only that copy; network transports and live activation denied regardless request/forged IDs. Reset/delete affects only demo scope; no paid state claims outside simulation.
 
 **Workstream / execution wave / effort**
 demo, merge W20; 1d engineer effort (implementation ~50%, behavior/negative checks ~40%, docs/diff ~10%). External waiting time excluded. Checklist share1/67≈1.49%, not an effort estimate. Atomic exception: shared basket or demo boundary spans six tightly coupled files; tests cover the complete boundary. Split only at a frozen contract.
@@ -16464,11 +16631,11 @@ Existing mock receipt/pricing/session contracts, applied migrations001–006, un
 - CON-41: browser live adapter explicitly maps snake_case live-v1 DTOs to camelCase types; Result<T>={ok:true,data:T}|{ok:false,error:{code,message,fields,kind:definitive|uncertain}}. Mutation network/5xx/malformed success ->uncertain. 4xx business response definitive only when server guarantees no commit; identity loss does not prove prior request failed. Fetch same-origin gateway, never provider URLs.
 
 **Contract produced / API or component boundary**
-CON-58: POST /v1/live/demo/session with {} and valid guest cookie returns201 {schema_version:1,restaurant_id:string,expires_at:UTC}; server records guest ownership in live_restaurants.demo_owner_id. Existing guest cookie is the capability, never a browser role or new bearer token. Scope expires with guest session. Dedicated /v1/live/demo/restaurants/{rid} prefix mirrors only GET orders, GET orders/{oid}, POST orders/{oid}/transitions, POST orders/{oid}/payments, POST orders/{oid}/reversals, GET campaigns, POST campaigns, PUT campaigns/{cid}, POST campaigns/{cid}/preview and POST campaigns/{cid}/approve with identical staff DTOs and replay rules. Demo approval creates simulated outcomes only. Other methods/paths404. Customer paths retain normal guest checks and also require synthetic owner match. Gateway allowlist and typed client add only these paths in this ticket; same-origin checks apply. New copy of synthetic fixture per session; domain scope is server-resolved demo, never client boolean. Demo role commands may mutate only that copy; network transports and live activation denied regardless request/forged IDs. Reset/delete affects only demo scope; no paid state claims outside simulation.
+CON-58: POST /v1/live/demo/session with {} and valid guest cookie returns201 {schema_version:1,restaurant_id:string,expires_at:UTC}; server records guest ownership in live_restaurants.demo_owner_id. Existing guest cookie is the capability, never a browser role or new bearer token. Scope expires with guest session. Dedicated /v1/live/demo/restaurants/{rid} prefix mirrors only GET orders, GET orders/{oid}, POST orders/{oid}/transitions, POST orders/{oid}/payments, POST orders/{oid}/payment-reversals, GET campaigns, POST campaigns, PUT campaigns/{cid}, POST campaigns/{cid}/preview and POST campaigns/{cid}/approve with identical staff DTOs and replay rules. Demo approval creates simulated outcomes only. Other methods/paths404. Customer paths retain normal guest checks and also require synthetic owner match. Gateway allowlist and typed client add only these paths in this ticket; same-origin checks apply. New copy of synthetic fixture per session; domain scope is server-resolved demo, never client boolean. Demo role commands may mutate only that copy; network transports and live activation denied regardless request/forged IDs. Reset/delete affects only demo scope; no paid state claims outside simulation.
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -16610,14 +16777,14 @@ Existing mock receipt/pricing/session contracts, applied migrations001–006, un
 - CON-49: inline full receipt amount/currency plus required method, single Record payment received button. Saving label until confirmed. Owner reversal requires reason and original payment selection; settlement task visible for paid cancelled orders. Same persistent action identity as CON-48; no confirmation modal, partial amount or online payment.
 - CON-54: campaign results separates accepted, delivered, uncertain, failed and suppressed; pause/resume/reconcile use CON-37, never retry-uncertain button. Overview uses CON-38 exact operational/payment metrics and labeled date range. Show last refresh and unavailable state; no inferred sales attribution.
 - CON-57: VoiceProposal shows editable item/quantity/modifiers and explicit Add to basket; Cancel discards only proposal. Apply consumes current cart revision through CON-14; current catalog/restaurant mismatch invalidates proposal. It cannot invoke checkout or campaign endpoints.
-- CON-58: POST /v1/live/demo/session with {} and valid guest cookie returns201 {schema_version:1,restaurant_id:string,expires_at:UTC}; server records guest ownership in live_restaurants.demo_owner_id. Existing guest cookie is the capability, never a browser role or new bearer token. Scope expires with guest session. Dedicated /v1/live/demo/restaurants/{rid} prefix mirrors only GET orders, GET orders/{oid}, POST orders/{oid}/transitions, POST orders/{oid}/payments, POST orders/{oid}/reversals, GET campaigns, POST campaigns, PUT campaigns/{cid}, POST campaigns/{cid}/preview and POST campaigns/{cid}/approve with identical staff DTOs and replay rules. Demo approval creates simulated outcomes only. Other methods/paths404. Customer paths retain normal guest checks and also require synthetic owner match. Gateway allowlist and typed client add only these paths in this ticket; same-origin checks apply. New copy of synthetic fixture per session; domain scope is server-resolved demo, never client boolean. Demo role commands may mutate only that copy; network transports and live activation denied regardless request/forged IDs. Reset/delete affects only demo scope; no paid state claims outside simulation.
+- CON-58: POST /v1/live/demo/session with {} and valid guest cookie returns201 {schema_version:1,restaurant_id:string,expires_at:UTC}; server records guest ownership in live_restaurants.demo_owner_id. Existing guest cookie is the capability, never a browser role or new bearer token. Scope expires with guest session. Dedicated /v1/live/demo/restaurants/{rid} prefix mirrors only GET orders, GET orders/{oid}, POST orders/{oid}/transitions, POST orders/{oid}/payments, POST orders/{oid}/payment-reversals, GET campaigns, POST campaigns, PUT campaigns/{cid}, POST campaigns/{cid}/preview and POST campaigns/{cid}/approve with identical staff DTOs and replay rules. Demo approval creates simulated outcomes only. Other methods/paths404. Customer paths retain normal guest checks and also require synthetic owner match. Gateway allowlist and typed client add only these paths in this ticket; same-origin checks apply. New copy of synthetic fixture per session; domain scope is server-resolved demo, never client boolean. Demo role commands may mutate only that copy; network transports and live activation denied regardless request/forged IDs. Reset/delete affects only demo scope; no paid state claims outside simulation.
 
 **Contract produced / API or component boundary**
 CON-59: /demo creates isolated CON-58 session and links Customer/Staff/Owner for same synthetic restaurant. Persistent Demo — no real orders, payments or messages label. Reset demo explicitly creates fresh scope; existing live browser/session cannot be converted into demo authority. Reuse real task components, do not build a second UI implementation.
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -16725,7 +16892,7 @@ Existing mock receipt/pricing/session contracts, applied migrations001–006, un
 **Contracts consumed (copied handoff, not provider internals)**
 - CON-01: Publish the COMMON, DTO and schema records below verbatim as live-v1. Fixture bundle has positive and negative cases keyed by contract ID, synthetic=true, schema_version=1; includes restaurant r-demo, guest g-one, item i-one, revision 0/1 and a deterministic receipt. Reject fixture mutations that remove fields or change money units. Fixtures are not runtime fallback data.
 - CON-34: dispatch(delivery_id,claim_token) calls exactly one channel adapter for valid lease. Persist accepted/provider ID or uncertain after network. Only explicit safely_not_sent may retry, max3 attempts with30s/120s/600s backoff; any unknown result stops retries. Retain cost reservation for accepted/uncertain; release only proven no-send. Crash after request before persistence becomes uncertain.
-- CON-58: POST /v1/live/demo/session with {} and valid guest cookie returns201 {schema_version:1,restaurant_id:string,expires_at:UTC}; server records guest ownership in live_restaurants.demo_owner_id. Existing guest cookie is the capability, never a browser role or new bearer token. Scope expires with guest session. Dedicated /v1/live/demo/restaurants/{rid} prefix mirrors only GET orders, GET orders/{oid}, POST orders/{oid}/transitions, POST orders/{oid}/payments, POST orders/{oid}/reversals, GET campaigns, POST campaigns, PUT campaigns/{cid}, POST campaigns/{cid}/preview and POST campaigns/{cid}/approve with identical staff DTOs and replay rules. Demo approval creates simulated outcomes only. Other methods/paths404. Customer paths retain normal guest checks and also require synthetic owner match. Gateway allowlist and typed client add only these paths in this ticket; same-origin checks apply. New copy of synthetic fixture per session; domain scope is server-resolved demo, never client boolean. Demo role commands may mutate only that copy; network transports and live activation denied regardless request/forged IDs. Reset/delete affects only demo scope; no paid state claims outside simulation.
+- CON-58: POST /v1/live/demo/session with {} and valid guest cookie returns201 {schema_version:1,restaurant_id:string,expires_at:UTC}; server records guest ownership in live_restaurants.demo_owner_id. Existing guest cookie is the capability, never a browser role or new bearer token. Scope expires with guest session. Dedicated /v1/live/demo/restaurants/{rid} prefix mirrors only GET orders, GET orders/{oid}, POST orders/{oid}/transitions, POST orders/{oid}/payments, POST orders/{oid}/payment-reversals, GET campaigns, POST campaigns, PUT campaigns/{cid}, POST campaigns/{cid}/preview and POST campaigns/{cid}/approve with identical staff DTOs and replay rules. Demo approval creates simulated outcomes only. Other methods/paths404. Customer paths retain normal guest checks and also require synthetic owner match. Gateway allowlist and typed client add only these paths in this ticket; same-origin checks apply. New copy of synthetic fixture per session; domain scope is server-resolved demo, never client boolean. Demo role commands may mutate only that copy; network transports and live activation denied regardless request/forged IDs. Reset/delete affects only demo scope; no paid state claims outside simulation.
 - CON-35: POST /v1/live/webhooks/sendgrid/{account_alias}; verify signed raw body/timestamp with pinned account public key before JSON parse. Limit body256KiB and events100; dedupe sg_event_id within account. Map correlated accepted/delivered/bounce/dropped/spamreport/unsubscribe events; bounce/complaint/unsubscribe suppress channel. Delivery history append-only; duplicate/out-of-order event cannot resurrect suppressed eligibility.
 
 **Contract produced / API or component boundary**
@@ -16733,7 +16900,7 @@ CON-60: GET /health/live-service ->{ready,source_sha,schema_ready,worker_ready,i
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -16742,6 +16909,12 @@ type UTC = string;
 
 Consumed storage contract DB-F (read/use only; no schema changes owned here):
 ```sql
+CREATE TABLE live_daily_send_budgets (
+ restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,
+ channel TEXT NOT NULL CHECK(channel IN ('sms','email')),budget_day DATE NOT NULL,
+ cap_minor BIGINT NOT NULL CHECK(cap_minor>0),reserved_minor BIGINT NOT NULL DEFAULT 0,
+ PRIMARY KEY(restaurant_id,channel,budget_day),CHECK(reserved_minor>=0 AND reserved_minor<=cap_minor)
+);
 CREATE TABLE live_campaigns (
  restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,id UUID NOT NULL,
  version BIGINT NOT NULL DEFAULT 1,channel TEXT NOT NULL CHECK(channel IN ('sms','email')),offer_id UUID NOT NULL,
@@ -16765,6 +16938,11 @@ CREATE TABLE live_deliveries (
  state TEXT NOT NULL CHECK(state IN ('queued','claimed','accepted','uncertain','delivered','failed','suppressed')),
  claim_token UUID NULL,lease_until TIMESTAMPTZ NULL,attempts INTEGER NOT NULL DEFAULT 0,due_at TIMESTAMPTZ NOT NULL,
  reserved_minor INTEGER NOT NULL DEFAULT 0,provider_id TEXT NULL,config_version BIGINT NOT NULL,
+ budget_channel TEXT NULL CHECK(budget_channel IN ('sms','email')),budget_day DATE NULL,
+ CHECK((budget_channel IS NULL)=(budget_day IS NULL)),
+ CHECK(reserved_minor=0 OR budget_day IS NOT NULL),
+ FOREIGN KEY(restaurant_id,budget_channel,budget_day)
+ REFERENCES live_daily_send_budgets(restaurant_id,channel,budget_day) ON DELETE RESTRICT,
  PRIMARY KEY(restaurant_id,id),UNIQUE(restaurant_id,approval_id,contact_id),
  FOREIGN KEY(restaurant_id,approval_id) REFERENCES live_campaign_approvals(restaurant_id,id) ON DELETE RESTRICT,
  FOREIGN KEY(restaurant_id,contact_id) REFERENCES live_contacts(restaurant_id,id) ON DELETE RESTRICT
@@ -16889,13 +17067,19 @@ CON-61: worker process uses same backend image/modules/database, command python 
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 No additional shared DTO beyond the exact fields in this packet. Schema/config ownership is stated below.
 
 Consumed storage contract DB-F (read/use only; no schema changes owned here):
 ```sql
+CREATE TABLE live_daily_send_budgets (
+ restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,
+ channel TEXT NOT NULL CHECK(channel IN ('sms','email')),budget_day DATE NOT NULL,
+ cap_minor BIGINT NOT NULL CHECK(cap_minor>0),reserved_minor BIGINT NOT NULL DEFAULT 0,
+ PRIMARY KEY(restaurant_id,channel,budget_day),CHECK(reserved_minor>=0 AND reserved_minor<=cap_minor)
+);
 CREATE TABLE live_campaigns (
  restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,id UUID NOT NULL,
  version BIGINT NOT NULL DEFAULT 1,channel TEXT NOT NULL CHECK(channel IN ('sms','email')),offer_id UUID NOT NULL,
@@ -16919,6 +17103,11 @@ CREATE TABLE live_deliveries (
  state TEXT NOT NULL CHECK(state IN ('queued','claimed','accepted','uncertain','delivered','failed','suppressed')),
  claim_token UUID NULL,lease_until TIMESTAMPTZ NULL,attempts INTEGER NOT NULL DEFAULT 0,due_at TIMESTAMPTZ NOT NULL,
  reserved_minor INTEGER NOT NULL DEFAULT 0,provider_id TEXT NULL,config_version BIGINT NOT NULL,
+ budget_channel TEXT NULL CHECK(budget_channel IN ('sms','email')),budget_day DATE NULL,
+ CHECK((budget_channel IS NULL)=(budget_day IS NULL)),
+ CHECK(reserved_minor=0 OR budget_day IS NOT NULL),
+ FOREIGN KEY(restaurant_id,budget_channel,budget_day)
+ REFERENCES live_daily_send_budgets(restaurant_id,channel,budget_day) ON DELETE RESTRICT,
  PRIMARY KEY(restaurant_id,id),UNIQUE(restaurant_id,approval_id,contact_id),
  FOREIGN KEY(restaurant_id,approval_id) REFERENCES live_campaign_approvals(restaurant_id,id) ON DELETE RESTRICT,
  FOREIGN KEY(restaurant_id,contact_id) REFERENCES live_contacts(restaurant_id,id) ON DELETE RESTRICT
@@ -17042,7 +17231,7 @@ CON-62: existing CI adds live contract fixture conformance, PostgreSQL race/roll
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 No additional shared DTO beyond the exact fields in this packet. Schema/config ownership is stated below.
@@ -17153,7 +17342,7 @@ CON-63: U2 decision artifact states per-table retention, lawful deletion/export 
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -17238,6 +17427,12 @@ One contact row represents one channel/destination, not a unified customer ident
 
 Consumed storage contract DB-F (read/use only; no schema changes owned here):
 ```sql
+CREATE TABLE live_daily_send_budgets (
+ restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,
+ channel TEXT NOT NULL CHECK(channel IN ('sms','email')),budget_day DATE NOT NULL,
+ cap_minor BIGINT NOT NULL CHECK(cap_minor>0),reserved_minor BIGINT NOT NULL DEFAULT 0,
+ PRIMARY KEY(restaurant_id,channel,budget_day),CHECK(reserved_minor>=0 AND reserved_minor<=cap_minor)
+);
 CREATE TABLE live_campaigns (
  restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,id UUID NOT NULL,
  version BIGINT NOT NULL DEFAULT 1,channel TEXT NOT NULL CHECK(channel IN ('sms','email')),offer_id UUID NOT NULL,
@@ -17261,6 +17456,11 @@ CREATE TABLE live_deliveries (
  state TEXT NOT NULL CHECK(state IN ('queued','claimed','accepted','uncertain','delivered','failed','suppressed')),
  claim_token UUID NULL,lease_until TIMESTAMPTZ NULL,attempts INTEGER NOT NULL DEFAULT 0,due_at TIMESTAMPTZ NOT NULL,
  reserved_minor INTEGER NOT NULL DEFAULT 0,provider_id TEXT NULL,config_version BIGINT NOT NULL,
+ budget_channel TEXT NULL CHECK(budget_channel IN ('sms','email')),budget_day DATE NULL,
+ CHECK((budget_channel IS NULL)=(budget_day IS NULL)),
+ CHECK(reserved_minor=0 OR budget_day IS NOT NULL),
+ FOREIGN KEY(restaurant_id,budget_channel,budget_day)
+ REFERENCES live_daily_send_budgets(restaurant_id,channel,budget_day) ON DELETE RESTRICT,
  PRIMARY KEY(restaurant_id,id),UNIQUE(restaurant_id,approval_id,contact_id),
  FOREIGN KEY(restaurant_id,approval_id) REFERENCES live_campaign_approvals(restaurant_id,id) ON DELETE RESTRICT,
  FOREIGN KEY(restaurant_id,contact_id) REFERENCES live_contacts(restaurant_id,id) ON DELETE RESTRICT
@@ -17384,7 +17584,7 @@ CON-64: evidence packet records exact source/schema, isolated DB target, backup 
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 No additional shared DTO beyond the exact fields in this packet. Schema/config ownership is stated below.
@@ -17441,6 +17641,12 @@ Immutable receipt/events: BEFORE UPDATE OR DELETE trigger raises an error for li
 
 Consumed storage contract DB-F (read/use only; no schema changes owned here):
 ```sql
+CREATE TABLE live_daily_send_budgets (
+ restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,
+ channel TEXT NOT NULL CHECK(channel IN ('sms','email')),budget_day DATE NOT NULL,
+ cap_minor BIGINT NOT NULL CHECK(cap_minor>0),reserved_minor BIGINT NOT NULL DEFAULT 0,
+ PRIMARY KEY(restaurant_id,channel,budget_day),CHECK(reserved_minor>=0 AND reserved_minor<=cap_minor)
+);
 CREATE TABLE live_campaigns (
  restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,id UUID NOT NULL,
  version BIGINT NOT NULL DEFAULT 1,channel TEXT NOT NULL CHECK(channel IN ('sms','email')),offer_id UUID NOT NULL,
@@ -17464,6 +17670,11 @@ CREATE TABLE live_deliveries (
  state TEXT NOT NULL CHECK(state IN ('queued','claimed','accepted','uncertain','delivered','failed','suppressed')),
  claim_token UUID NULL,lease_until TIMESTAMPTZ NULL,attempts INTEGER NOT NULL DEFAULT 0,due_at TIMESTAMPTZ NOT NULL,
  reserved_minor INTEGER NOT NULL DEFAULT 0,provider_id TEXT NULL,config_version BIGINT NOT NULL,
+ budget_channel TEXT NULL CHECK(budget_channel IN ('sms','email')),budget_day DATE NULL,
+ CHECK((budget_channel IS NULL)=(budget_day IS NULL)),
+ CHECK(reserved_minor=0 OR budget_day IS NOT NULL),
+ FOREIGN KEY(restaurant_id,budget_channel,budget_day)
+ REFERENCES live_daily_send_budgets(restaurant_id,channel,budget_day) ON DELETE RESTRICT,
  PRIMARY KEY(restaurant_id,id),UNIQUE(restaurant_id,approval_id,contact_id),
  FOREIGN KEY(restaurant_id,approval_id) REFERENCES live_campaign_approvals(restaurant_id,id) ON DELETE RESTRICT,
  FOREIGN KEY(restaurant_id,contact_id) REFERENCES live_contacts(restaurant_id,id) ON DELETE RESTRICT
@@ -17588,7 +17799,7 @@ CON-65: U1–U4 evidence matrix names restaurant/owner, signed-off pricing/recei
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 No additional shared DTO beyond the exact fields in this packet. Schema/config ownership is stated below.
@@ -17706,7 +17917,7 @@ CON-66: owner offer list/form uses CON-16 fields, displays public/transferable/n
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -17844,7 +18055,7 @@ CON-67: operator CLI --input <private JSON> accepts new restaurant_id,name,cuisi
 
 **Local boundary rules:** rid is restaurant TEXT ID; oid/command keys are UUID. Backend `/v1/live` is mapped by same-origin gateway `/api/orderly/live`; staff shorthand `...` means `/v1/live/staff/restaurants/{rid}`. JSON snake_case, strict integer INR paise (0..2147483647), UTC ISO timestamps, extra mutation fields rejected,64KiB body cap. Every private query uses restaurant plus verified actor. Owner configures/approves/transitions/pays/reverses; order_staff transitions/availability only; cashier full payment only. No browser role or QR grants access.
 
-Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; replay exact saved response before checking current cart/version. Same key/different canonical body409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
+Errors are `{error:{code,message,fields:string[],request_id}}`:401 missing identity,403 denied role,404 missing/foreign entity,409 stale version or changed replay body,422 invalid fields,429 bounded abuse,503 dependency unavailable. POST command keys are durable per restaurant/actor; fingerprint canonical {operation,target,body}, including server-defined command and all path IDs. Replay the exact saved response only for that fingerprint before checking current cart/version. Same key with different operation, target or canonical body returns409. Network/5xx/malformed mutation success means uncertain, not safe to repeat with a new key. PUT uses expected_version/revision. SQL multi-writes atomic, no network inside transaction. Guest reset may remove access but never restaurant-owned receipts. Preserve mock routes/storage and disabled live/send defaults. Endpoints without their own auth statement inherit these rules.
 
 **Data model / exact payload definitions consumed by this packet**
 ```typescript
@@ -18096,6 +18307,8 @@ Release rollback never drops retained business history. No canary infrastructure
 
 ### 18.16 Delegation readiness report
 
+**Review amendment:** Section18.17 adds three contract corrections and five Not completed follow-ups. The structural PASS rows below describe the original 67-packet plan; they do not certify the new milestone graph, commercial evidence or follow-up implementation. RF-01 must publish a validated revised DAG before any changed scheduling; original release gates remain in force.
+
 **Instruction-detail review — October11,2026:** All92 implementation packets across stabilization, the earlier feature roadmap and restaurant service now include task-specific arrange/action/accepted/failure/proof walkthroughs. The remaining eight integration/release gates have ordered reviewer instructions. Section0 explains reproducible setup, packet assembly, exact-state assertions, diagnostics and handoff. These additions preserve historical statuses and dependency/ownership graphs. They are documentation checks, not executed application, provider, policy or pilot acceptance; the conditional readiness results below still apply.
 
 **Documentation decomposition: complete draft. Application implementation:0/67. Live activation: NOT READY.** Foundation/synthetic work can be scheduled after draft/fixture approval. Do not claim all downstream packets READY merely because their descriptions exist.
@@ -18117,3 +18330,108 @@ Release rollback never drops retained business history. No canary infrastructure
 **Builder handoff assembly:** at execution, extract one packet including its copied DTO/contracts and exact inspected file contents, attach current docs/repo_context.md and named scope/security/test rules. Re-read source after every upstream merge. Do not attach the entire guide to a small builder session. If required context exceeds a focused session, split the packet at its existing contract boundary and update this graph. Implementation evidence report: ticket ID, changed files, test commands/results, manual QA, contract changes, unresolved inputs and next consumers unlocked.
 
 **Spec draft review:** This file is the concrete reviewable result requested. Confirm its proposed technical details before external quality scoring or tracker publication. No new issues, implementation agents, migrations, commits, provider accounts or sends were created by this decomposition. Existing plan PR53 is not automatically amended by saving local tickets.
+
+
+### 18.17 Review amendments and follow-up tickets
+
+Added after review of GitHub main `d09adb3f326b9425404ca2d1e9e5947c2403b6e0`. This amendment preserves the approved four-capability scope: ordering, management, marketing and reviewed voice. Online payments remain later. Contract text and repeated draft schema above have been corrected; application code, database migrations, paid-pilot evidence and deployment have not been completed by this edit.
+
+#### 18.17.1 Contract corrections required before fixture freeze
+
+**C-A — Bind command identity to operation and target.** Owner: RS-01/03 and each command provider RS-18/21/22/23/29/37/58; consumers: RS-41/44/45/48/49/53/59 and INT01–03. Retain the existing restaurant/actor/key uniqueness scope. Store the fingerprint of a canonical envelope containing the server-defined operation, normalized target IDs and validated body in `live_commands.payload_sha256`; no second command ledger is needed. Define one cross-runtime canonicalization fixture in RS-01: sorted object keys recursively, stable array order, compact UTF-8 JSON, strict integers and explicit nullable fields after validation. Reject extra fields before hashing. Authorization and restaurant/target scope are checked before replay. Do not hash raw URLs, query ordering or raw request bytes.
+
+Acceptance: (1) identical operation/target/body/key returns the saved result after commit and after the cart/version changes; (2) same actor/key/body against order B after order A returns409 and neither pays B nor returns A as B’s result; (3) reuse across command kinds returns409; (4) a changed body returns409; (5) revoked membership or foreign target never gains access through replay. Put these assertions in the provider’s already-owned test file and the shared fixture readers. Existing mock-v1 behavior is unchanged. Since these are draft live tables, no deployed ledger rewrite is authorized; if live command rows exist when work starts, require a compatible version/migration decision before changing fingerprints.
+
+**C-B — Make daily send reservations durable.** Owners: RS-27 (draft migration012/DB-F), RS-30 (configuration), RS-33/34 (reservation/dispatch) and RS-35/36/37 (feedback/reconciliation). The DB-F copies now define `live_daily_send_budgets`, keyed by restaurant, channel and local budget date, and the delivery’s reference to that row. Channel caps are separate; approval and daily caps must both admit the same maximum charge. Dates are computed server-side in Asia/Kolkata at claim. No browser date, budget or cost is authoritative.
+
+- Start each reservation transaction with the restaurant row lock, followed by daily budget, campaign/approval, contact and delivery. All mutations touching these resources follow the same order; a path may omit an unused lock but may not reverse the order. No network call occurs while locks are held.
+- Create the current day/channel row under that restaurant lock using the verified configured cap. Reserve the conservative maximum in both daily and approval counters and persist the delivery’s budget reference in the same transaction that marks it claimed. A duplicate claim/result must not increment or release twice.
+- Midnight creates a new row; it never clears yesterday’s counters or moves old reservations. Accepted, delivered, uncertain and potentially billable failed attempts retain their original reservation. Do not subtract a cost merely because delivery failed or reported actual cost is lower.
+- Release only with authenticated or transport evidence proving no send and no charge. Lock the original referenced day, even after midnight, and decrement the approval counter atomically. A proven no-send retry obtains a fresh reservation for its new claim date; retain the prior attempt outcome in the existing append-only delivery events. Unknown acceptance is never retryable.
+- Configuration rotation invalidates unclaimed approvals. Freeze each existing day’s cap: a lower newly configured cap also bounds further reservations; increasing configuration does not enlarge the existing day row. Accepted/uncertain reservations remain counted. New days use the then-verified cap. This prevents a cap change from violating retained accounting or reopening spend silently.
+- Immediately before dispatch, recheck whether the claim’s budget day is still current. A claimed attempt not yet dispatched across midnight must be marked proven no-send and re-reserved under the new day before networking; an attempt already in flight retains its original reservation and may settle later. This budget counts dispatch attempts by start day, not a promise about the provider’s invoice date.
+
+Acceptance: actual PostgreSQL tests race two workers/two campaigns for the final daily allowance; cross-channel and cross-restaurant counters stay isolated; fail after reservation and after provider acceptance; roll over midnight with an uncertain prior-day attempt; replay proven no-send reconciliation twice; lower the cap below existing reservations. No case may exceed the permitted new reservation bound, release twice or retry uncertainty. Extend the existing RS-27/30/33–37 test ownership and INT03; fake-provider proof is separate from U3 live charge-bound evidence. Retain rows on rollback; no destructive cleanup before U2 policy.
+
+**C-C — One reversal route suffix.** CON-23 and CON-58 both use `orders/{oid}/payment-reversals` beneath their respective staff/demo prefixes. Owners: RS-23/58; consumers: RS-07/41/49/59. Shared DTOs and command rules remain identical; demo authorization remains separate. Acceptance: live and demo clients invoke the documented suffix, the gateway permits only their exact method/path pairs, undocumented `/reversals` returns404, and a demo identity cannot reach the live reversal handler. Use the existing owned gateway/client/backend tests; no compatibility alias is needed for a route that has not shipped.
+
+#### 18.17.2 Follow-up index and scheduling
+
+These five bounded follow-ups are **Not completed**. Documentation edits are integrated serially by one owner. They supplement the 67 implementation packets; their estimates exclude waiting for restaurant input.
+
+| ID | Outcome | Start/merge dependencies | Blocks | Effort |
+|---|---|---|---|---|
+| RF-01 | Earlier synthetic sales-demo milestone and revised dependency plan | Current contracts; fixture/provider inventory before scheduling | New early-demo milestone scheduling; RF-02 demo rehearsal | 0.5–1 day planning |
+| RF-02 | Concrete paid-pilot offer and sales evidence checklist | Offer draft can start now; demonstrated claims require RF-01 milestone evidence | Commercial acceptance portion of RS-65 | 0.5 day preparation plus customer response |
+| RF-03 | New-order attention and waiting-order visibility | RS-20/40/47/48 merged; before INT02 acceptance | INT02 and real staff pilot | 0.5–1 day implementation |
+| RF-04 | Manual outage workflow and uncertain-order reconciliation | RS-19/20/45/48 contracts and implementation available for rehearsal | RS-64/65 outage acceptance | 0.5 day documentation/rehearsal |
+| RF-05 | Smaller master guide and independently usable ticket files | After RF-01 plan correction; exclusive documentation ownership | Further large-scale packet delegation | 0.5–1 day documentation |
+
+The table defines additive gates, not new runtime APIs. Original dependencies remain effective until RF-01 updates the canonical DAG, waves, consumers and milestone records together. No follow-up can waive U1–U4, tenant isolation or live release proof. RF-03 follows RS-48 because both can touch queue layout; it must not run concurrently with that owner. RF-04 follows RF-02 if both edit onboarding/support wording. RF-05 runs last among concurrent documentation edits and republishes every status/link without changing completion evidence.
+
+<a id="rf-01"></a>
+#### RF-01 — Define an earlier complete synthetic sales demo — Not completed
+
+**Outcome:** a named `DEMO-SALES` milestone with the same four capabilities, demonstrable before restaurant provider accounts are ready. This milestone is a sales demonstration, never live acceptance. Keep ordering-to-staff-to-recorded-payment connected; show owner management, simulated marketing preview/results and reviewed voice with typed fallback.
+
+**Owned files:** EDIT `development.md`; CREATE `docs/demo/restaurant-sales-walkthrough.md`. Inspect RS-01/29–37/40–59, INT01–04, and the current approved design. No application changes in this planning ticket.
+
+**Steps:**
+1. Inventory the minimum merged providers and fixtures each reused demo component consumes, including summary/setup/offer reads and role navigation. Resolve any absent demo endpoint explicitly; do not create a wildcard proxy or give a guest Clerk membership.
+2. Separate provider-independent marketing preview/simulation from live MSG91/SendGrid activation and authenticated live feedback evidence. Specify narrowly bounded child implementation packets where the existing RS-58/59 ownership cannot deliver that split. Preserve the real provider tasks and full-service release gate.
+3. Publish the exact `DEMO-SALES` inputs, owners, owned implementation/test files and merge edges. Remove only dependencies proven to be live-provider-only; retain actual shared-file/schema and security dependencies. Recompute waves/critical path and update every affected consumer; no implied bypass of current INT gates.
+4. Write a five-minute walkthrough using one synthetic restaurant: guest submits, staff accepts/prepares/completes, cashier records payment, owner changes availability and previews a campaign, voice produces an editable proposal. Include an uncertain-request recovery example and a visible simulation label. Reset produces an isolated clean scenario.
+
+**PASS/FAIL:** revised DAG is acyclic with no same-wave file ownership collision; all four demo capabilities have concrete evidence criteria; missing live provider credentials cannot block a fake-transport demo but cannot enable sending; two guest sessions remain isolated; demo transport spy observes zero real sends/money movement; every screen link has an explicit authorized route. Actual browser proof is owned by the resulting implementation packets, not claimed by this planning ticket.
+
+**Handoff/recovery:** RF-02 gets the reviewed script and milestone prerequisites; RS-58/59 and CI owners receive bounded changes. If isolation or transport separation cannot be proved, keep the earlier milestone blocked. Revert only the proposed scheduling change, retaining the original full-release plan and records.
+
+<a id="rf-02"></a>
+#### RF-02 — Prepare the paid-pilot offer and evidence checklist — Not completed
+
+**Outcome:** a restaurant owner can understand what they are buying, what they must supply and how success will be evaluated. This closes the gap between technical acceptance and the goal of winning paid work.
+
+**Owned files:** CREATE `docs/pilot/restaurant-offer.md` and `docs/pilot/restaurant-onboarding.md`; integrator updates the RS-65 evidence checklist in `development.md`. Inputs: RF-01 walkthrough, U1–U4 questions, existing support/activation runbooks. No outreach, contract execution, billing integration or fabricated testimonial is authorized by this ticket.
+
+**Steps:** draft one configurable offer recording setup charge, recurring service charge, included support hours, exclusions, restaurant-owned SMS/email charges, hosting responsibility, payment timing, pilot duration and exit/data-handoff responsibilities. Unknown amounts remain `OWNER DECISION REQUIRED`; do not invent prices or present them as agreed. Add menu/table/staff onboarding checklist, account ownership, training session, named support contact and change-request process. Record whose approval is needed for each input.
+
+**Acceptance:** distinguish demo interest, requested proposal, accepted pilot and actually paid project; attach dated private evidence references without committing contacts or agreements. Before the pilot starts, agree measurable targets and observation windows with the restaurant: staff order acknowledgement time, ordering completion, errors needing intervention and staff usability. Record baseline and observed values; do not infer sales uplift from orders or campaign delivery. Include a decision checkpoint to continue, revise or stop the pilot, with named owner and reasons. Every advertised capability maps to accepted evidence or is labeled planned/simulated.
+
+**Verification/handoff:** a reviewer can answer who pays which costs, what is delivered, who supports it and what happens on exit without guessing. RS-65 consumes this commercial checklist alongside technical evidence. Unanswered commercial fields block agreement claims, not synthetic coding. Rollback is document revision; no customer communication or payment happens automatically.
+
+<a id="rf-03"></a>
+#### RF-03 — Make new and waiting orders noticeable to staff — Not completed
+
+**Outcome:** a busy staff member can identify newly submitted and overdue unaccepted orders without relying on silently changing rows. Reuse the existing polling queue; do not add push infrastructure.
+
+**Owned files:** EDIT `app/components/StaffQueue.tsx`, `app/staff/[restaurantId]/orders/page.tsx` and `e2e/live-staff-queue.spec.ts` after RS-47/48. Inputs: CON-20 order ID/status/created_at, CON-47 freshness and CON-40 accessible feedback. No schema/API change. If actual CON-20 lacks those fields, correct that provider contract before implementation.
+
+**Steps:** display a persistent Submitted count and visible waiting duration for every unaccepted order. Use a labeled “Waiting over 5 minutes” cue as the initial engineering threshold, explicitly not a promised service time; U4 validates suitability before pilot. Announce newly observed Submitted IDs once per active page session through a polite live region; initial load announces a summary rather than one announcement per historical row. Preserve row selection and do not move keyboard focus. Successful refresh deduplicates alerts by order ID; expired session/restaurant change resets local tracking. Browser suspension cannot be treated as background monitoring.
+
+**PASS/FAIL:** repeated polls of the same ID do not repeat announcements; one new Submitted order produces one announcement and visible cue; a waiting order crossing the threshold remains distinguishable in both themes without color alone; Accepted removes it from the waiting group; stale/offline queue retains its snapshot but shows the existing warning and disables commands. Resuming a hidden tab refreshes before actions become available. Test delayed A/B restaurant responses and fake-clock threshold crossing. Staff acknowledgement remains the server-confirmed Accept transition, not viewing or dismissing a cue.
+
+**Verification:** run `npm run test:e2e -- e2e/live-staff-queue.spec.ts` after implementation, plus keyboard/screen-reader review and a named U4 staff rehearsal with the screen positioned as it would be during service. No sound, notifications permission or delivery guarantee is implied. Handoff goes to INT02 and RS-65; on rollback retain the safe queue and train staff on manual checks rather than claiming alerts are active.
+
+<a id="rf-04"></a>
+#### RF-04 — Rehearse manual service during outages without duplicate orders — Not completed
+
+**Owned file:** CREATE `docs/runbooks/restaurant-service-outage.md`. Inputs: current receipt/access APIs, checkout recovery, staff detail and existing rollback runbook. No offline write queue, automatic replay importer or new order-entry feature is introduced.
+
+**Workflow:** when ordering becomes unavailable, staff directs new customers to the existing counter/waiter process. Record manual orders in the restaurant’s established system with a local reference and time; keep them separate from uncertain digital attempts. For a customer who already pressed submit, preserve the original key/body and available receipt/order ID. Staff searches authorized order records and uses the existing reconciliation path; a timeout, missing screen or one failed search is not proof that no order committed. Do not create a second digital attempt while the first is unresolved. If service must proceed manually, the shift lead records the linkage/uncertainty and checks it when service returns before treating any late digital result as another kitchen order. Never mark payment received solely because a customer or UI says submission succeeded.
+
+**Acceptance/rehearsal:** simulate loss before submission, after server commit/before response, staff-browser disconnect and service recovery. For each, record who takes over, what the customer sees, where the reference is recorded and how staff avoids a second fulfilment/payment. Reconcile all unresolved references at shift handover; unresolved items have a named owner. Do not automatically import paper/manual orders or resend payment/campaign commands on recovery. Use synthetic records for committed evidence, with no personal data.
+
+**Handoff:** RS-64/65 add the four scenario results and trained shift contact to their acceptance evidence. Missing working reconciliation blocks live service readiness; it must not be papered over by this runbook. Rollback returns to established manual service while retaining digital evidence for reconciliation. Any necessary UI change discovered in rehearsal becomes a separately scoped implementation ticket.
+
+<a id="rf-05"></a>
+#### RF-05 — Split the master guide without losing executable ticket context — Not completed
+
+**Outcome:** `development.md` becomes the concise current roadmap, status index, decisions, dependency summary and release gates. Detailed tickets remain available individually; historical evidence remains accessible.
+
+**Owned documentation:** EDIT `development.md`; CREATE `docs/tickets/restaurant-service/RS-01.md` through `RS-67.md` and `RF-01.md` through `RF-05.md`; CREATE `docs/contracts/restaurant-service-plan.md` for the authoritative draft contracts; CREATE `docs/plans/orderly-history.md` for preserved historical sections. This is a mechanical documentation exception to the usual small file-count limit. Do not overwrite RS-01’s future executable contract document or imply fixtures are frozen.
+
+**Steps:** inventory every ticket ID, status, owned path, contract, acceptance criterion, dependency edge and evidence link before moving text. Extract existing packet content without changing meaning or status. Keep one authoritative maintained contract definition; a builder packet assembler must include the referenced exact contract/DTO/schema content when handing a task to someone without repository access. Do not replace self-contained execution context with unexplained IDs. Preserve historical anchors with index redirects/links and fix relative links for their new directories. Include RF-01’s accepted graph revision, not an obsolete scheduling copy.
+
+**PASS/FAIL:** before/after inventories match for all original 67 packets plus five follow-ups; no required test, failure behavior, rollback step, external blocker or historical evidence is lost; all local links resolve; every ticket is reachable from the master index; no independent duplicate source of contract truth remains; a sample checkout, worker and UI handoff includes all referenced definitions and can be reviewed without the old giant guide. Record actual validation commands/results in the PR description rather than a generic PASS assertion. Status changes require implementation evidence, not file movement.
+
+**Handoff/recovery:** the integration owner freezes documentation edits during extraction, reviews the move-only diff and supplies the new reading order. Revert the documentation move as one unit if coverage/link checks fail. No runtime tests or deployment are required for a text-only extraction; no runtime readiness claim follows from it.
