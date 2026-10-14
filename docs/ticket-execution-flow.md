@@ -1588,4 +1588,3 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 - [ ] **RS-RELEASE.09** — Verify all numbered acceptance criteria and required evidence in the source packet; review/merge under the applicable authorization, record source SHA and handoff, then update completion status. Unrun or blocked checks are not passes.
 
 **Then:** the scoped first restaurant-service release is accepted only when the actual gate evidence passes. Future online payments require their own approved ticket plan.
-
