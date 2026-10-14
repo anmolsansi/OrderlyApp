@@ -3422,6 +3422,8 @@ No credentials, real customer data or new paid provider needed for Phase1/2. Run
 
 ## 18. Restaurant service implementation tickets
 
+**Ticket execution guide:** [Start here: sequence, diagrams and completion checklist](docs/ticket-execution-flow.md).
+
 **Documentation status: Completed decomposition draft. Implementation status: Not completed (0/67).** Written 2026-10-11 against `81f7996`, using the approved [restaurant-service design](docs/designs/restaurant-service.md) and [combined test plan](docs/designs/restaurant-service-ui-engineering-test-plan.md). No application files, schema, live settings, tracker issues or runtime dependencies are changed by this section.
 
 **Authority and reconciliation:** This section is the execution entrypoint for the approved restaurant-service direction. Sections1–16 retain stabilization evidence and unfinished release gates. Section17 retains the earlier mock-product roadmap and its approvals, but its OH/discovery/voice tickets are **Not completed / held for reconciliation**, not silently completed, deleted or scheduled ahead of this service. Reuse their verified checkout/catalog insights; do not execute both roadmaps blindly. The design T1–T8/DT1–DT8/ET1–ET3 are umbrella work, decomposed here rather than additional parallel backlogs. Online payments follow this complete first workflow, then delivery and authorized aggregator integrations.
@@ -8006,7 +8008,7 @@ All are **Not completed**. A planned contract is not a merged provider. Readines
 | [RS-41](#rs-41) — Not completed | Create a typed live API adapter with safe uncertainty | client / W7 | RS-07, RS-01 | CON-41 | 1d | Required for complete first release |
 | [RS-42](#rs-42) — Not completed | Render menu-first live ordering with fulfillment context | customer-ui / W10 | RS-01, RS-13, RS-40, RS-41 | CON-42 | 0.5d | Required for complete first release |
 | [RS-43](#rs-43) — Not completed | Render one live basket with responsive summary and review | customer-ui / W11 | RS-01, RS-14, RS-42 | CON-43 | 1.5d | Required for complete first release |
-| [RS-44](#rs-44) — Not completed | Review and submit a live pay-at-restaurant order | customer-ui / W18 | RS-01, RS-18, RS-43, RS-41 | CON-44 | 1d | Required for complete first release |
+| [RS-44](#rs-44) — Not completed | Review and submit a live pay-at-restaurant order | customer-ui / W16 | RS-01, RS-18, RS-43, RS-41 | CON-44 | 1d | Required for complete first release |
 | [RS-45](#rs-45) — Not completed | Recover an uncertain live order across reload and theme changes | customer-ui / W17 | RS-01, RS-44 | CON-45 | 0.5d | Required for complete first release |
 | [RS-46](#rs-46) — Not completed | Show receipt/status and separate optional marketing opt-in | customer-ui / W18 | RS-01, RS-19, RS-25, RS-45 | CON-46 | 0.5d | Required for complete first release |
 | [RS-47](#rs-47) — Not completed | Render the staff queue with stale-data protection | staff-ui / W16 | RS-01, RS-20, RS-40, RS-41 | CON-47 | 0.5d | Required for complete first release |
@@ -14569,7 +14571,7 @@ Review and submit a live pay-at-restaurant order. The screen exposes only the ex
 This first restaurant release needs the following bounded outcome: CON-44: checkout obtains CON-15/17 quote, renders receipt preview and explicit Place order · Pay at restaurant. Before POST persist {schema_version:1,restaurant_id,key,body,summary,created_at} in sessionStorage under orderlyapp.liveCheckoutRecovery.v1. Failed write blocks submit. Body/key are immutable until definitive outcome. Unknown outcome routes recovery; confirmed receipt routes status. No online payment.
 
 **Workstream / execution wave / effort**
-customer-ui, merge W18; 1d engineer effort (implementation ~50%, behavior/negative checks ~40%, docs/diff ~10%). External waiting time excluded. Checklist share1/67≈1.49%, not an effort estimate. One focused behavior with tests; split if implementation exceeds this bound.
+customer-ui, merge W16; 1d engineer effort (implementation ~50%, behavior/negative checks ~40%, docs/diff ~10%). External waiting time excluded. Checklist share1/67≈1.49%, not an effort estimate. One focused behavior with tests; split if implementation exceeds this bound.
 
 **Depends on / blocks / inputs / outputs**
 - Merge checkpoint: RS-INT01 must pass; fixture-based preparation may begin earlier.
