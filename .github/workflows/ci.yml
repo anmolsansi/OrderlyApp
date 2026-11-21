@@ -268,7 +268,7 @@ jobs:
 
   browser-runtime:
     name: Chromium runtime
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       chromium_version: ${{ steps.chromium.outputs.chromium_version }}
       playwright_version: ${{ steps.chromium.outputs.playwright_version }}
