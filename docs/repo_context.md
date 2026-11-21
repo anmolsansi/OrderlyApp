@@ -8,6 +8,27 @@ OrderlyApp is a portfolio voice-assisted food-ordering marketplace with mock che
 
 ST-01 established reproducible baseline contracts and CI. ST-02 moved cart/order ownership to a private server-issued guest session. ST-03 replaced local password/account simulation with a browser-only demo profile that has no ownership authority. ST-04 made the backend catalog authoritative. ST-05 made `/v1/cart` a PostgreSQL-only, owner-scoped, revisioned compare-and-swap resource. ST-06 added deterministic `mock-v1` quotes and immutable receipt snapshots. ST-07 made C6 checkout atomic and idempotent. ST-08 cut discovery, menu customization, and basket review over to typed C3/C4 browser adapters. Later stabilization slices completed the checkout/recovery and UI-resilience work. ST-11 now adds C8 operational readiness: truthful live/readiness probes, non-mutating serving startup, serialized/checksummed migrations, bounded guest retention, checkout abuse limits, and recovery evidence. ST-13 still owns final release-guide reconciliation and public deployment acceptance.
 
+## CI runner and dependency-audit troubleshooting (2026-11-21)
+
+The shared stabilization workflow is `.github/workflows/ci.yml`. GitHub's `ubuntu-latest` runner resolved to Ubuntu 26.04 on November 21, 2026, while the locked Playwright 1.59.1 browser installer refused `playwright install --with-deps chromium` on that operating system. The browser-runtime, API E2E, and local-demo E2E jobs use the explicit supported `ubuntu-24.04` runner. This is a CI runner compatibility pin, not a change to the deployed application or its browser-test coverage. Reevaluate it when the project's Playwright version supports the newer image.
+
+The dependency-security job installs with `npm ci --ignore-scripts` under Node 22 and npm 11.20.0, then runs strict `npm audit --audit-level=high` and `pip-audit --local --strict`. The November 21 run identified high/critical Node findings in Next.js, Vite and Zod; Python audit was clean. Resolve dependency advisories in the manifest and committed `package-lock.json`, never by disabling audits, changing the severity threshold, or relying on uncommitted runtime dependency updates.
+
+To reproduce the JavaScript checks after a lockfile update on Node 22:
+
+```bash
+npm install --global npm@11.20.0
+npm ci --ignore-scripts
+npm audit --audit-level=high
+npm run lint
+npm run test:contracts
+npm run test
+npm run typecheck
+npm run build
+```
+
+All browser suites remain mandatory, with real Chromium launch and positive Playwright test discovery; the release-evidence job must continue failing closed if any required job fails or is skipped. A working branch's CI results prove the branch, not a previously failed commit on `main`. Rollback is the tested repair commit revert, followed by another fully green CI run. See [the failure and repair tracker](https://github.com/anmolsansi/OrderlyApp/issues/58) for the exact affected run and completion evidence.
+
 ## Current architecture
 
 | Area | Source | Current behavior |

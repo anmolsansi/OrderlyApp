@@ -268,7 +268,7 @@ jobs:
 
   browser-runtime:
     name: Chromium runtime
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       chromium_version: ${{ steps.chromium.outputs.chromium_version }}
       playwright_version: ${{ steps.chromium.outputs.playwright_version }}
@@ -300,7 +300,7 @@ jobs:
   e2e:
     name: API product E2E
     needs: [dependency-security, web, backend, browser-runtime]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgres:16-alpine
@@ -434,7 +434,7 @@ jobs:
   local-demo:
     name: Local fixture preview E2E
     needs: [dependency-security, web, browser-runtime]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       NEXT_PUBLIC_ORDERLY_DATA_MODE: local_demo
       ORDERLY_DATA_MODE: local_demo
