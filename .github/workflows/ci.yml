@@ -434,7 +434,7 @@ jobs:
   local-demo:
     name: Local fixture preview E2E
     needs: [dependency-security, web, browser-runtime]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       NEXT_PUBLIC_ORDERLY_DATA_MODE: local_demo
       ORDERLY_DATA_MODE: local_demo
