@@ -1,0 +1,47 @@
+# Temporary, branch-only workflow used once to resolve and commit the audited
+# npm lockfile on the CI repair branch. Delete before opening the final PR.
+name: One-time npm lockfile repair
+on:
+  push:
+    branches:
+      - fix/ci-playwright-security-20261121
+    paths:
+      - .github/workflows/ci-lock-refresh-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  refresh-lock:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out repair branch
+        uses: actions/checkout@v4
+      - name: Use Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Use repository's pinned npm version
+        run: npm install --global npm@11.20.0
+      - name: Reconcile and audit npm lock
+        shell: bash
+        run: |
+          npm install --package-lock-only --ignore-scripts --no-audit
+          npm audit fix --package-lock-only --ignore-scripts --audit-level=high
+          npm ci --ignore-scripts
+          npm audit --audit-level=high
+          git diff --check
+      - name: Commit verified lockfile to repair branch
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          if git diff --cached --quiet; then
+            echo "Lockfile already consistent"
+            exit 0
+          fi
+          git commit -m "fix(deps): commit audited reproducible lockfile [08/15] (#58)"
+          git push origin "HEAD:refs/heads/${GITHUB_REF_NAME}"
