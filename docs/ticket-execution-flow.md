@@ -4,7 +4,7 @@
 
 Start with **RS-01 → RF-01 → RF-05**, then implement the ready foundation tickets. Draft the commercial offer in RF-02 alongside implementation. Do not execute tickets simply by increasing their number: **RS-67 comes before RS-04**, for example.
 
-This is a navigation companion to [development.md](../development.md#18-restaurant-service-implementation-tickets), not a replacement for its detailed packets. It includes the PR55 review amendments. No ticket is completed by creating this guide. The baseline below is calculated from section18.7’s dependency graph; RF follow-ups add the gates explained here. Recheck merged code and evidence before selecting work.
+Use this guide to pick the next assignment. Each numbered checklist links to its individual ticket. The [master plan](../development.md#18-restaurant-service-implementation-tickets) owns the dependency graph and draft contracts. It includes the PR55 review amendments. No ticket is completed by creating this guide. The baseline below is calculated from section18.7’s dependency graph; RF follow-ups add the gates explained here. Recheck merged code and evidence before selecting work.
 
 ## 1. Start here
 
@@ -28,10 +28,10 @@ This first diagram expresses priorities, not every dependency. `DEMO-SALES` is s
 
 | Pick | Task | What must exist when you finish |
 |---|---|---|
-| 1 | [RS-01](../development.md#rs-01) | Shared synthetic contract fixtures and passing Python/TypeScript checks, including the three review corrections; unresolved live provider/policy inputs remain explicitly blocked |
-| 2 | [RF-01](../development.md#rf-01) | Exact earlier-demo prerequisites, bounded child tickets if needed, updated dependency graph/waves, five-minute walkthrough and no-real-send criteria |
-| 3 | [RF-05](../development.md#rf-05) | A concise master index, individual detailed tickets, one maintained contract source and validated links/coverage; no lost acceptance requirements |
-| Alongside the build | [RF-02](../development.md#rf-02) | Draft pilot offer, onboarding responsibilities and success criteria; demonstrated claims and payment status require actual evidence |
+| 1 | [RS-01](tickets/restaurant-service/RS-01.md) | Shared synthetic contract fixtures and passing Python/TypeScript checks, including the three review corrections; unresolved live provider/policy inputs remain explicitly blocked |
+| 2 | [RF-01](tickets/restaurant-service/RF-01.md) | Exact earlier-demo prerequisites, bounded child tickets if needed, updated dependency graph/waves, five-minute walkthrough and no-real-send criteria |
+| 3 | [RF-05](tickets/restaurant-service/RF-05.md) | A concise master index, individual detailed tickets, one maintained contract source and validated links/coverage; no lost acceptance requirements |
+| Alongside the build | [RF-02](tickets/restaurant-service/RF-02.md) | Draft pilot offer, onboarding responsibilities and success criteria; demonstrated claims and payment status require actual evidence |
 | First implementation wave after planning | RS-02, RS-11, RS-39 | Additive restaurant schema; pricing/receipt input contract; light/dark theme foundation |
 
 RS-01 freezes the reviewed synthetic shapes that can be implemented. It does not invent real tax rules, provider payloads or legal policy. RF-01 changes any affected drafts and fixture examples together. This guide does not count as completion of RF-01 or RF-05.
@@ -67,34 +67,34 @@ You do not need every unrelated ticket in an earlier row to finish before starti
 
 | Baseline wave | Tickets and outcomes |
 |---|---|
-| W0 | [RS-01](../development.md#rs-01): Freeze live-v1 envelopes and synthetic consumer fixtures |
-| W1 | [RS-02](../development.md#rs-02): Add live restaurant configuration and table storage<br>[RS-11](../development.md#rs-11): Freeze restaurant-specific pricing and receipt inputs<br>[RS-39](../development.md#rs-39): Apply light/dark tokens with pre-paint preference restoration |
-| W2 | [RS-03](../development.md#rs-03): Add restaurant-owned order, receipt and action ledgers<br>[RS-67](../development.md#rs-67): Provision a disabled live restaurant without adopting mock data |
-| W3 | [RS-04](../development.md#rs-04): Add memberships and an explicit initial-owner bootstrap |
-| W4 | [RS-05](../development.md#rs-05): Verify Clerk session tokens in the backend |
-| W5 | [RS-06](../development.md#rs-06): Authorize restaurant roles and revoke staff membership |
-| W6 | [RS-07](../development.md#rs-07): Extend the same-origin gateway for explicit live routes<br>[RS-09](../development.md#rs-09): Read and update restaurant branding and ordering hours |
-| W7 | [RS-08](../development.md#rs-08): Provide staff sign-in and active restaurant selection<br>[RS-10](../development.md#rs-10): Publish owner menu edits and staff availability edits<br>[RS-41](../development.md#rs-41): Create a typed live API adapter with safe uncertainty |
-| W8 | [RS-12](../development.md#rs-12): Create active table links without granting order access<br>[RS-40](../development.md#rs-40): Build live role shells and stable accessible feedback |
-| W9 | [RS-13](../development.md#rs-13): Serve a scoped live menu and current availability<br>[RS-16](../development.md#rs-16): Store owner-defined public promotion rules<br>[RS-50](../development.md#rs-50): Provide owner settings, tables and staff membership screens<br>[RS-51](../development.md#rs-51): Provide owner menu pricing and staff availability controls |
-| W10 | [RS-14](../development.md#rs-14): Persist a separate revisioned live basket<br>[RS-24](../development.md#rs-24): Persist contacts and separate channel-consent evidence<br>[RS-42](../development.md#rs-42): Render menu-first live ordering with fulfillment context<br>[RS-66](../development.md#rs-66): Edit public offers in the owner marketing workspace |
-| W11 | [RS-15](../development.md#rs-15): Calculate one versioned live quote<br>[RS-26](../development.md#rs-26): Suppress a channel through an unguessable unsubscribe link<br>[RS-27](../development.md#rs-27): Store campaign drafts, approvals and recipient work<br>[RS-43](../development.md#rs-43): Render one live basket with responsive summary and review<br>[RS-55](../development.md#rs-55): Capture editable browser speech with manual fallback |
-| W12 | [RS-17](../development.md#rs-17): Apply promotion checks to live quotes<br>[RS-28](../development.md#rs-28): Create and edit owner campaign drafts<br>[RS-56](../development.md#rs-56): Parse voice against only the selected live catalog<br>[RS-63](../development.md#rs-63): Specify retention, export and deletion policy before destructive work |
-| W13 | [RS-18](../development.md#rs-18): Commit or replay one live order atomically<br>[RS-29](../development.md#rs-29): Freeze and approve a bounded campaign preview<br>[RS-52](../development.md#rs-52): Create a draft-first marketing screen<br>[RS-57](../development.md#rs-57): Apply reviewed voice proposals through the same basket path |
-| W14 | [RS-19](../development.md#rs-19): Read live receipts through revocable guest access<br>[RS-30](../development.md#rs-30): Validate restaurant-owned provider configuration without exposing secrets<br>[RS-53](../development.md#rs-53): Review exact campaign recipients, content and maximum cost |
-| W15 | [RS-20](../development.md#rs-20): Read a bounded staff queue and selected order<br>[RS-25](../development.md#rs-25): Capture optional customer marketing consent independently<br>[RS-31](../development.md#rs-31): Send one approved SMS through MSG91<br>[RS-32](../development.md#rs-32): Send one approved email through SendGrid<br>**RS-INT01**: Identity, catalog and live checkout integration |
-| W16 | [RS-21](../development.md#rs-21): Apply versioned staff order transitions<br>[RS-33](../development.md#rs-33): Claim recipient work with durable leases and cost reservations<br>[RS-44](../development.md#rs-44): Review and submit a live pay-at-restaurant order<br>[RS-47](../development.md#rs-47): Render the staff queue with stale-data protection |
-| W17 | [RS-22](../development.md#rs-22): Record exactly one full payment<br>[RS-34](../development.md#rs-34): Dispatch claimed work and reconcile durable outcomes<br>[RS-45](../development.md#rs-45): Recover an uncertain live order across reload and theme changes<br>[RS-48](../development.md#rs-48): Use one order-detail controller across phone and wide layouts |
-| W18 | [RS-23](../development.md#rs-23): Append payment reversals and close settlement work<br>[RS-35](../development.md#rs-35): Authenticate and reduce SendGrid event callbacks<br>[RS-36](../development.md#rs-36): Reconcile SMS delivery using authenticated provider evidence<br>[RS-46](../development.md#rs-46): Show receipt/status and separate optional marketing opt-in |
-| W19 | [RS-37](../development.md#rs-37): Pause campaigns and expose safe reconciliation status<br>[RS-49](../development.md#rs-49): Record payment and reversal through explicit inline forms |
-| W20 | [RS-38](../development.md#rs-38): Read operational and campaign summaries without revenue claims<br>[RS-58](../development.md#rs-58): Isolate synthetic role demos and deny all external side effects<br>**RS-INT02**: Customer/staff/payment integration |
-| W21 | [RS-54](../development.md#rs-54): Display campaign outcomes and owner activity summaries<br>[RS-60](../development.md#rs-60): Expose live readiness, safe logs and worker heartbeat |
-| W22 | [RS-61](../development.md#rs-61): Declare an opt-in worker and compatible deployment sequence<br>**RS-INT03**: Campaign, worker and feedback integration |
-| W23 | [RS-59](../development.md#rs-59): Present a connected sales demo with visible simulation labels |
-| W24 | [RS-62](../development.md#rs-62): Add live contract and critical-path tests to existing CI |
+| W0 | [RS-01](tickets/restaurant-service/RS-01.md): Freeze live-v1 envelopes and synthetic consumer fixtures |
+| W1 | [RS-02](tickets/restaurant-service/RS-02.md): Add live restaurant configuration and table storage<br>[RS-11](tickets/restaurant-service/RS-11.md): Freeze restaurant-specific pricing and receipt inputs<br>[RS-39](tickets/restaurant-service/RS-39.md): Apply light/dark tokens with pre-paint preference restoration |
+| W2 | [RS-03](tickets/restaurant-service/RS-03.md): Add restaurant-owned order, receipt and action ledgers<br>[RS-67](tickets/restaurant-service/RS-67.md): Provision a disabled live restaurant without adopting mock data |
+| W3 | [RS-04](tickets/restaurant-service/RS-04.md): Add memberships and an explicit initial-owner bootstrap |
+| W4 | [RS-05](tickets/restaurant-service/RS-05.md): Verify Clerk session tokens in the backend |
+| W5 | [RS-06](tickets/restaurant-service/RS-06.md): Authorize restaurant roles and revoke staff membership |
+| W6 | [RS-07](tickets/restaurant-service/RS-07.md): Extend the same-origin gateway for explicit live routes<br>[RS-09](tickets/restaurant-service/RS-09.md): Read and update restaurant branding and ordering hours |
+| W7 | [RS-08](tickets/restaurant-service/RS-08.md): Provide staff sign-in and active restaurant selection<br>[RS-10](tickets/restaurant-service/RS-10.md): Publish owner menu edits and staff availability edits<br>[RS-41](tickets/restaurant-service/RS-41.md): Create a typed live API adapter with safe uncertainty |
+| W8 | [RS-12](tickets/restaurant-service/RS-12.md): Create active table links without granting order access<br>[RS-40](tickets/restaurant-service/RS-40.md): Build live role shells and stable accessible feedback |
+| W9 | [RS-13](tickets/restaurant-service/RS-13.md): Serve a scoped live menu and current availability<br>[RS-16](tickets/restaurant-service/RS-16.md): Store owner-defined public promotion rules<br>[RS-50](tickets/restaurant-service/RS-50.md): Provide owner settings, tables and staff membership screens<br>[RS-51](tickets/restaurant-service/RS-51.md): Provide owner menu pricing and staff availability controls |
+| W10 | [RS-14](tickets/restaurant-service/RS-14.md): Persist a separate revisioned live basket<br>[RS-24](tickets/restaurant-service/RS-24.md): Persist contacts and separate channel-consent evidence<br>[RS-42](tickets/restaurant-service/RS-42.md): Render menu-first live ordering with fulfillment context<br>[RS-66](tickets/restaurant-service/RS-66.md): Edit public offers in the owner marketing workspace |
+| W11 | [RS-15](tickets/restaurant-service/RS-15.md): Calculate one versioned live quote<br>[RS-26](tickets/restaurant-service/RS-26.md): Suppress a channel through an unguessable unsubscribe link<br>[RS-27](tickets/restaurant-service/RS-27.md): Store campaign drafts, approvals and recipient work<br>[RS-43](tickets/restaurant-service/RS-43.md): Render one live basket with responsive summary and review<br>[RS-55](tickets/restaurant-service/RS-55.md): Capture editable browser speech with manual fallback |
+| W12 | [RS-17](tickets/restaurant-service/RS-17.md): Apply promotion checks to live quotes<br>[RS-28](tickets/restaurant-service/RS-28.md): Create and edit owner campaign drafts<br>[RS-56](tickets/restaurant-service/RS-56.md): Parse voice against only the selected live catalog<br>[RS-63](tickets/restaurant-service/RS-63.md): Specify retention, export and deletion policy before destructive work |
+| W13 | [RS-18](tickets/restaurant-service/RS-18.md): Commit or replay one live order atomically<br>[RS-29](tickets/restaurant-service/RS-29.md): Freeze and approve a bounded campaign preview<br>[RS-52](tickets/restaurant-service/RS-52.md): Create a draft-first marketing screen<br>[RS-57](tickets/restaurant-service/RS-57.md): Apply reviewed voice proposals through the same basket path |
+| W14 | [RS-19](tickets/restaurant-service/RS-19.md): Read live receipts through revocable guest access<br>[RS-30](tickets/restaurant-service/RS-30.md): Validate restaurant-owned provider configuration without exposing secrets<br>[RS-53](tickets/restaurant-service/RS-53.md): Review exact campaign recipients, content and maximum cost |
+| W15 | [RS-20](tickets/restaurant-service/RS-20.md): Read a bounded staff queue and selected order<br>[RS-25](tickets/restaurant-service/RS-25.md): Capture optional customer marketing consent independently<br>[RS-31](tickets/restaurant-service/RS-31.md): Send one approved SMS through MSG91<br>[RS-32](tickets/restaurant-service/RS-32.md): Send one approved email through SendGrid<br>**RS-INT01**: Identity, catalog and live checkout integration |
+| W16 | [RS-21](tickets/restaurant-service/RS-21.md): Apply versioned staff order transitions<br>[RS-33](tickets/restaurant-service/RS-33.md): Claim recipient work with durable leases and cost reservations<br>[RS-44](tickets/restaurant-service/RS-44.md): Review and submit a live pay-at-restaurant order<br>[RS-47](tickets/restaurant-service/RS-47.md): Render the staff queue with stale-data protection |
+| W17 | [RS-22](tickets/restaurant-service/RS-22.md): Record exactly one full payment<br>[RS-34](tickets/restaurant-service/RS-34.md): Dispatch claimed work and reconcile durable outcomes<br>[RS-45](tickets/restaurant-service/RS-45.md): Recover an uncertain live order across reload and theme changes<br>[RS-48](tickets/restaurant-service/RS-48.md): Use one order-detail controller across phone and wide layouts |
+| W18 | [RS-23](tickets/restaurant-service/RS-23.md): Append payment reversals and close settlement work<br>[RS-35](tickets/restaurant-service/RS-35.md): Authenticate and reduce SendGrid event callbacks<br>[RS-36](tickets/restaurant-service/RS-36.md): Reconcile SMS delivery using authenticated provider evidence<br>[RS-46](tickets/restaurant-service/RS-46.md): Show receipt/status and separate optional marketing opt-in |
+| W19 | [RS-37](tickets/restaurant-service/RS-37.md): Pause campaigns and expose safe reconciliation status<br>[RS-49](tickets/restaurant-service/RS-49.md): Record payment and reversal through explicit inline forms |
+| W20 | [RS-38](tickets/restaurant-service/RS-38.md): Read operational and campaign summaries without revenue claims<br>[RS-58](tickets/restaurant-service/RS-58.md): Isolate synthetic role demos and deny all external side effects<br>**RS-INT02**: Customer/staff/payment integration |
+| W21 | [RS-54](tickets/restaurant-service/RS-54.md): Display campaign outcomes and owner activity summaries<br>[RS-60](tickets/restaurant-service/RS-60.md): Expose live readiness, safe logs and worker heartbeat |
+| W22 | [RS-61](tickets/restaurant-service/RS-61.md): Declare an opt-in worker and compatible deployment sequence<br>**RS-INT03**: Campaign, worker and feedback integration |
+| W23 | [RS-59](tickets/restaurant-service/RS-59.md): Present a connected sales demo with visible simulation labels |
+| W24 | [RS-62](tickets/restaurant-service/RS-62.md): Add live contract and critical-path tests to existing CI |
 | W25 | **RS-INT04**: Whole synthetic service and compatibility |
-| W26 | [RS-64](../development.md#rs-64): Prove backup, restore and compatible rollback in isolation |
-| W27 | [RS-65](../development.md#rs-65): Collect pilot pricing, provider and real-device acceptance evidence |
+| W26 | [RS-64](tickets/restaurant-service/RS-64.md): Prove backup, restore and compatible rollback in isolation |
+| W27 | [RS-65](tickets/restaurant-service/RS-65.md): Collect pilot pricing, provider and real-device acceptance evidence |
 | W28 | **RS-RELEASE**: Controlled release after all mandatory evidence |
 
 ### Insert the follow-ups at these points
@@ -149,7 +149,7 @@ Missing input may block live acceptance without blocking a packet’s explicitly
 
 ## 6. The immediate next action
 
-Open [RS-01](../development.md#rs-01), implement its permitted synthetic contracts/fixtures and prove its acceptance cases. Apply [the three contract corrections](../development.md#18171-contract-corrections-required-before-fixture-freeze). Then complete [RF-01](../development.md#rf-01) and refresh this execution guide from its validated graph.
+Open [RS-01](tickets/restaurant-service/RS-01.md), implement its permitted synthetic contracts/fixtures and prove its acceptance cases. Apply [the three contract corrections](../development.md#18171-contract-corrections-required-before-fixture-freeze). Then complete [RF-01](tickets/restaurant-service/RF-01.md) and refresh this execution guide from its validated graph.
 
 This guide is an execution map. It does not run implementations, mark tickets completed, publish a PR or deploy a service.
 
@@ -427,7 +427,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-01"></a>
 #### Step 01 — RS-01: Freeze live-v1 envelopes and synthetic consumer fixtures
 
-**Source:** [Full ticket / gate](../development.md#rs-01). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-01.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** Approved plan and repository evidence; no earlier ticket.
 
@@ -442,7 +442,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rf-01"></a>
 #### Step 02 — RF-01: Define an earlier complete synthetic sales demo
 
-**Source:** [Full ticket / gate](../development.md#rf-01). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RF-01.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RS-01
 
@@ -457,12 +457,12 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rf-05"></a>
 #### Step 03 — RF-05: Split the master guide without losing executable ticket context
 
-**Source:** [Full ticket / gate](../development.md#rf-05). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RF-05.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-01
 
 - [ ] **RF-05.01** — Inventory all original tickets, follow-ups, statuses, contract references, dependency edges and evidence links before moving text.
-- [ ] **RF-05.02** — Move detailed packets to individual files and maintain one draft contract source; preserve full contract context for exported builder handoffs.
+- [ ] **RF-05.02** — Verify the existing individual packets, move the remaining contracts and historical material to their planned locations, and maintain one draft contract source; preserve full contract context for exported builder handoffs.
 - [ ] **RF-05.03** — Reduce the master guide to roadmap/status/decisions/gates, preserve historical evidence and repair relative links and execution-guide links.
 - [ ] **RF-05.04** — Compare before/after inventories, validate links and sample checkout/worker/UI handoffs; review the move-only diff and leave implementation statuses unchanged.
 - [ ] **RF-05.05** — Verify all numbered acceptance criteria and required evidence in the source packet; review/merge under the applicable authorization, record source SHA and handoff, then update completion status. Unrun or blocked checks are not passes.
@@ -472,7 +472,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rf-02"></a>
 #### Step 04 — RF-02: Prepare the paid-pilot offer and evidence checklist
 
-**Source:** [Full ticket / gate](../development.md#rf-02). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RF-02.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-01, RF-05
 
@@ -487,7 +487,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-02"></a>
 #### Step 05 — RS-02: Add live restaurant configuration and table storage
 
-**Source:** [Full ticket / gate](../development.md#rs-02). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-02.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01
 
@@ -502,7 +502,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-11"></a>
 #### Step 06 — RS-11: Freeze restaurant-specific pricing and receipt inputs
 
-**Source:** [Full ticket / gate](../development.md#rs-11). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-11.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01
 
@@ -517,7 +517,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-39"></a>
 #### Step 07 — RS-39: Apply light/dark tokens with pre-paint preference restoration
 
-**Source:** [Full ticket / gate](../development.md#rs-39). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-39.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01
 
@@ -532,7 +532,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-03"></a>
 #### Step 08 — RS-03: Add restaurant-owned order, receipt and action ledgers
 
-**Source:** [Full ticket / gate](../development.md#rs-03). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-03.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-02
 
@@ -547,7 +547,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-67"></a>
 #### Step 09 — RS-67: Provision a disabled live restaurant without adopting mock data
 
-**Source:** [Full ticket / gate](../development.md#rs-67). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-67.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-02
 
@@ -562,7 +562,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-04"></a>
 #### Step 10 — RS-04: Add memberships and an explicit initial-owner bootstrap
 
-**Source:** [Full ticket / gate](../development.md#rs-04). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-04.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-03, RS-67
 
@@ -577,7 +577,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-05"></a>
 #### Step 11 — RS-05: Verify Clerk session tokens in the backend
 
-**Source:** [Full ticket / gate](../development.md#rs-05). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-05.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-04
 
@@ -592,7 +592,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-06"></a>
 #### Step 12 — RS-06: Authorize restaurant roles and revoke staff membership
 
-**Source:** [Full ticket / gate](../development.md#rs-06). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-06.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-05
 
@@ -607,7 +607,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-07"></a>
 #### Step 13 — RS-07: Extend the same-origin gateway for explicit live routes
 
-**Source:** [Full ticket / gate](../development.md#rs-07). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-07.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-06
 
@@ -622,7 +622,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-09"></a>
 #### Step 14 — RS-09: Read and update restaurant branding and ordering hours
 
-**Source:** [Full ticket / gate](../development.md#rs-09). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-09.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-06
 
@@ -637,7 +637,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-08"></a>
 #### Step 15 — RS-08: Provide staff sign-in and active restaurant selection
 
-**Source:** [Full ticket / gate](../development.md#rs-08). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-08.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-07
 
@@ -652,7 +652,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-10"></a>
 #### Step 16 — RS-10: Publish owner menu edits and staff availability edits
 
-**Source:** [Full ticket / gate](../development.md#rs-10). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-10.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-09
 
@@ -667,7 +667,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-41"></a>
 #### Step 17 — RS-41: Create a typed live API adapter with safe uncertainty
 
-**Source:** [Full ticket / gate](../development.md#rs-41). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-41.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-07
 
@@ -682,7 +682,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-12"></a>
 #### Step 18 — RS-12: Create active table links without granting order access
 
-**Source:** [Full ticket / gate](../development.md#rs-12). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-12.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-09, RS-10
 
@@ -697,7 +697,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-40"></a>
 #### Step 19 — RS-40: Build live role shells and stable accessible feedback
 
-**Source:** [Full ticket / gate](../development.md#rs-40). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-40.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-08, RS-39
 
@@ -712,7 +712,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-13"></a>
 #### Step 20 — RS-13: Serve a scoped live menu and current availability
 
-**Source:** [Full ticket / gate](../development.md#rs-13). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-13.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-06, RS-10, RS-12
 
@@ -727,7 +727,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-16"></a>
 #### Step 21 — RS-16: Store owner-defined public promotion rules
 
-**Source:** [Full ticket / gate](../development.md#rs-16). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-16.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-09, RS-12
 
@@ -742,7 +742,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-50"></a>
 #### Step 22 — RS-50: Provide owner settings, tables and staff membership screens
 
-**Source:** [Full ticket / gate](../development.md#rs-50). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-50.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-06, RS-09, RS-12, RS-40, RS-41
 
@@ -757,7 +757,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-51"></a>
 #### Step 23 — RS-51: Provide owner menu pricing and staff availability controls
 
-**Source:** [Full ticket / gate](../development.md#rs-51). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-51.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-10, RS-40, RS-41
 
@@ -772,7 +772,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-14"></a>
 #### Step 24 — RS-14: Persist a separate revisioned live basket
 
-**Source:** [Full ticket / gate](../development.md#rs-14). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-14.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-03, RS-13
 
@@ -787,7 +787,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-24"></a>
 #### Step 25 — RS-24: Persist contacts and separate channel-consent evidence
 
-**Source:** [Full ticket / gate](../development.md#rs-24). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-24.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-04, RS-16
 
@@ -802,7 +802,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-42"></a>
 #### Step 26 — RS-42: Render menu-first live ordering with fulfillment context
 
-**Source:** [Full ticket / gate](../development.md#rs-42). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-42.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-13, RS-40, RS-41
 
@@ -817,7 +817,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-66"></a>
 #### Step 27 — RS-66: Edit public offers in the owner marketing workspace
 
-**Source:** [Full ticket / gate](../development.md#rs-66). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-66.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-16, RS-40, RS-41
 
@@ -832,7 +832,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-15"></a>
 #### Step 28 — RS-15: Calculate one versioned live quote
 
-**Source:** [Full ticket / gate](../development.md#rs-15). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-15.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-11, RS-14
 
@@ -847,7 +847,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-26"></a>
 #### Step 29 — RS-26: Suppress a channel through an unguessable unsubscribe link
 
-**Source:** [Full ticket / gate](../development.md#rs-26). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-26.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-13, RS-24
 
@@ -862,7 +862,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-27"></a>
 #### Step 30 — RS-27: Store campaign drafts, approvals and recipient work
 
-**Source:** [Full ticket / gate](../development.md#rs-27). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-27.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-16, RS-24
 
@@ -877,7 +877,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-43"></a>
 #### Step 31 — RS-43: Render one live basket with responsive summary and review
 
-**Source:** [Full ticket / gate](../development.md#rs-43). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-43.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-14, RS-42
 
@@ -892,7 +892,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-55"></a>
 #### Step 32 — RS-55: Capture editable browser speech with manual fallback
 
-**Source:** [Full ticket / gate](../development.md#rs-55). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-55.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-42
 
@@ -907,7 +907,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-17"></a>
 #### Step 33 — RS-17: Apply promotion checks to live quotes
 
-**Source:** [Full ticket / gate](../development.md#rs-17). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-17.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-15, RS-16
 
@@ -922,7 +922,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-28"></a>
 #### Step 34 — RS-28: Create and edit owner campaign drafts
 
-**Source:** [Full ticket / gate](../development.md#rs-28). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-28.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-06, RS-16, RS-27
 
@@ -937,7 +937,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-56"></a>
 #### Step 35 — RS-56: Parse voice against only the selected live catalog
 
-**Source:** [Full ticket / gate](../development.md#rs-56). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-56.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-13, RS-55
 
@@ -952,7 +952,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-63"></a>
 #### Step 36 — RS-63: Specify retention, export and deletion policy before destructive work
 
-**Source:** [Full ticket / gate](../development.md#rs-63). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-63.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-03, RS-24, RS-27
 
@@ -967,7 +967,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-18"></a>
 #### Step 37 — RS-18: Commit or replay one live order atomically
 
-**Source:** [Full ticket / gate](../development.md#rs-18). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-18.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-15, RS-17
 
@@ -983,7 +983,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-29"></a>
 #### Step 38 — RS-29: Freeze and approve a bounded campaign preview
 
-**Source:** [Full ticket / gate](../development.md#rs-29). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-29.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-26, RS-28
 
@@ -998,7 +998,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-52"></a>
 #### Step 39 — RS-52: Create a draft-first marketing screen
 
-**Source:** [Full ticket / gate](../development.md#rs-52). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-52.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-28, RS-40, RS-41
 
@@ -1013,7 +1013,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-57"></a>
 #### Step 40 — RS-57: Apply reviewed voice proposals through the same basket path
 
-**Source:** [Full ticket / gate](../development.md#rs-57). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-57.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-42, RS-43, RS-56
 
@@ -1028,7 +1028,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-19"></a>
 #### Step 41 — RS-19: Read live receipts through revocable guest access
 
-**Source:** [Full ticket / gate](../development.md#rs-19). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-19.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-18
 
@@ -1043,7 +1043,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-30"></a>
 #### Step 42 — RS-30: Validate restaurant-owned provider configuration without exposing secrets
 
-**Source:** [Full ticket / gate](../development.md#rs-30). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-30.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-29
 
@@ -1058,7 +1058,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-53"></a>
 #### Step 43 — RS-53: Review exact campaign recipients, content and maximum cost
 
-**Source:** [Full ticket / gate](../development.md#rs-53). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-53.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-29, RS-52
 
@@ -1073,7 +1073,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-20"></a>
 #### Step 44 — RS-20: Read a bounded staff queue and selected order
 
-**Source:** [Full ticket / gate](../development.md#rs-20). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-20.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-06, RS-18, RS-30
 
@@ -1088,7 +1088,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-25"></a>
 #### Step 45 — RS-25: Capture optional customer marketing consent independently
 
-**Source:** [Full ticket / gate](../development.md#rs-25). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-25.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-19, RS-24, RS-26
 
@@ -1103,7 +1103,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-31"></a>
 #### Step 46 — RS-31: Send one approved SMS through MSG91
 
-**Source:** [Full ticket / gate](../development.md#rs-31). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-31.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-30
 
@@ -1118,7 +1118,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-32"></a>
 #### Step 47 — RS-32: Send one approved email through SendGrid
 
-**Source:** [Full ticket / gate](../development.md#rs-32). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-32.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-30
 
@@ -1133,7 +1133,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-int01"></a>
 #### Step 48 — RS-INT01: Identity, catalog and live checkout
 
-**Source:** [Full ticket / gate](../development.md#1811-integration-checkpoints). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-INT01.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-06, RS-14, RS-18, RS-19
 
@@ -1149,7 +1149,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-21"></a>
 #### Step 49 — RS-21: Apply versioned staff order transitions
 
-**Source:** [Full ticket / gate](../development.md#rs-21). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-21.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-20
 
@@ -1164,7 +1164,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-33"></a>
 #### Step 50 — RS-33: Claim recipient work with durable leases and cost reservations
 
-**Source:** [Full ticket / gate](../development.md#rs-33). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-33.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-31, RS-32
 
@@ -1180,7 +1180,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-44"></a>
 #### Step 51 — RS-44: Review and submit a live pay-at-restaurant order
 
-**Source:** [Full ticket / gate](../development.md#rs-44). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-44.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-18, RS-41, RS-43, RS-INT01
 
@@ -1195,7 +1195,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-47"></a>
 #### Step 52 — RS-47: Render the staff queue with stale-data protection
 
-**Source:** [Full ticket / gate](../development.md#rs-47). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-47.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-20, RS-40, RS-41
 
@@ -1210,7 +1210,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-22"></a>
 #### Step 53 — RS-22: Record exactly one full payment
 
-**Source:** [Full ticket / gate](../development.md#rs-22). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-22.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-20, RS-21
 
@@ -1225,7 +1225,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-34"></a>
 #### Step 54 — RS-34: Dispatch claimed work and reconcile durable outcomes
 
-**Source:** [Full ticket / gate](../development.md#rs-34). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-34.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-33
 
@@ -1240,7 +1240,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-45"></a>
 #### Step 55 — RS-45: Recover an uncertain live order across reload and theme changes
 
-**Source:** [Full ticket / gate](../development.md#rs-45). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-45.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-44
 
@@ -1255,7 +1255,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-48"></a>
 #### Step 56 — RS-48: Use one order-detail controller across phone and wide layouts
 
-**Source:** [Full ticket / gate](../development.md#rs-48). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-48.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-21, RS-47
 
@@ -1270,7 +1270,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rf-03"></a>
 #### Step 57 — RF-03: Make new and waiting orders noticeable to staff
 
-**Source:** [Full ticket / gate](../development.md#rf-03). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RF-03.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RS-20, RS-40, RS-47, RS-48
 
@@ -1285,7 +1285,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rf-04"></a>
 #### Step 58 — RF-04: Rehearse manual service during outages without duplicate orders
 
-**Source:** [Full ticket / gate](../development.md#rf-04). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RF-04.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-02, RS-19, RS-20, RS-45, RS-48
 
@@ -1300,7 +1300,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-23"></a>
 #### Step 59 — RS-23: Append payment reversals and close settlement work
 
-**Source:** [Full ticket / gate](../development.md#rs-23). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-23.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-21, RS-22
 
@@ -1315,7 +1315,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-35"></a>
 #### Step 60 — RS-35: Authenticate and reduce SendGrid event callbacks
 
-**Source:** [Full ticket / gate](../development.md#rs-35). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-35.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-25, RS-34
 
@@ -1330,7 +1330,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-36"></a>
 #### Step 61 — RS-36: Reconcile SMS delivery using authenticated provider evidence
 
-**Source:** [Full ticket / gate](../development.md#rs-36). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-36.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-34
 
@@ -1345,7 +1345,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-46"></a>
 #### Step 62 — RS-46: Show receipt/status and separate optional marketing opt-in
 
-**Source:** [Full ticket / gate](../development.md#rs-46). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-46.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-19, RS-25, RS-45
 
@@ -1360,7 +1360,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-37"></a>
 #### Step 63 — RS-37: Pause campaigns and expose safe reconciliation status
 
-**Source:** [Full ticket / gate](../development.md#rs-37). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-37.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-23, RS-28, RS-35, RS-36
 
@@ -1375,7 +1375,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-49"></a>
 #### Step 64 — RS-49: Record payment and reversal through explicit inline forms
 
-**Source:** [Full ticket / gate](../development.md#rs-49). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-49.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-22, RS-23, RS-48
 
@@ -1390,7 +1390,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-38"></a>
 #### Step 65 — RS-38: Read operational and campaign summaries without revenue claims
 
-**Source:** [Full ticket / gate](../development.md#rs-38). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-38.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-23, RS-37
 
@@ -1405,7 +1405,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-58"></a>
 #### Step 66 — RS-58: Isolate synthetic role demos and deny all external side effects
 
-**Source:** [Full ticket / gate](../development.md#rs-58). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-58.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-07, RS-19, RS-23, RS-37, RS-41
 
@@ -1420,7 +1420,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-int02"></a>
 #### Step 67 — RS-INT02: Customer and staff operational/payment handoff
 
-**Source:** [Full ticket / gate](../development.md#1811-integration-checkpoints). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-INT02.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-03, RF-05, RS-23, RS-46, RS-49
 
@@ -1436,7 +1436,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-54"></a>
 #### Step 68 — RS-54: Display campaign outcomes and owner activity summaries
 
-**Source:** [Full ticket / gate](../development.md#rs-54). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-54.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-37, RS-38, RS-53
 
@@ -1451,7 +1451,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-60"></a>
 #### Step 69 — RS-60: Expose live readiness, safe logs and worker heartbeat
 
-**Source:** [Full ticket / gate](../development.md#rs-60). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-60.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-34, RS-35, RS-58
 
@@ -1466,7 +1466,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-61"></a>
 #### Step 70 — RS-61: Declare an opt-in worker and compatible deployment sequence
 
-**Source:** [Full ticket / gate](../development.md#rs-61). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-61.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-60, RS-63
 
@@ -1481,7 +1481,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-int03"></a>
 #### Step 71 — RS-INT03: Campaign approval, worker and feedback handoff
 
-**Source:** [Full ticket / gate](../development.md#1811-integration-checkpoints). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-INT03.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-37, RS-54, RS-66
 
@@ -1497,7 +1497,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-59"></a>
 #### Step 72 — RS-59: Present a connected sales demo with visible simulation labels
 
-**Source:** [Full ticket / gate](../development.md#rs-59). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-59.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-46, RS-49, RS-54, RS-57, RS-58, RS-INT02, RS-INT03
 
@@ -1512,7 +1512,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-62"></a>
 #### Step 73 — RS-62: Add live contract and critical-path tests to existing CI
 
-**Source:** [Full ticket / gate](../development.md#rs-62). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-62.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-59, RS-61
 
@@ -1527,7 +1527,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-int04"></a>
 #### Step 74 — RS-INT04: Whole synthetic service and compatibility
 
-**Source:** [Full ticket / gate](../development.md#1811-integration-checkpoints). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-INT04.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-05, RS-59, RS-62, RS-63
 
@@ -1543,7 +1543,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-64"></a>
 #### Step 75 — RS-64: Prove backup, restore and compatible rollback in isolation
 
-**Source:** [Full ticket / gate](../development.md#rs-64). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-64.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-04, RF-05, RS-01, RS-61, RS-62, RS-63, RS-INT04
 
@@ -1558,7 +1558,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-65"></a>
 #### Step 76 — RS-65: Collect pilot pricing, provider and real-device acceptance evidence
 
-**Source:** [Full ticket / gate](../development.md#rs-65). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-65.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** RF-02, RF-05, RS-01, RS-59, RS-64
 
@@ -1573,7 +1573,7 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-release"></a>
 #### Step 77 — RS-RELEASE: Controlled live release and final acceptance
 
-**Source:** [Full ticket / gate](../development.md#1814-release-migration-rollback-and-observability-gates). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-RELEASE.md). **Status:** Not completed.
 
 **Prerequisites in this serial plan:** Every other entry in this guide; all original release requirements and U1–U4 evidence.
 
