@@ -129,3 +129,20 @@ Use this table before showing a demonstration or sending an offer. An architectu
 
 **Verification rule:** Before making any stronger claim, add a dated private build/test/participant reference and its exact observed result to the onboarding evidence ledger. Do not treat provider-accepted as delivered, a recorded payment assertion as settled funds, or an interested lead as paid work.
 
+## 9. Proposal approval and handoff
+
+A real restaurant version must contain a proposal ID and revision, legal parties, approved offer line items, payer-by-cost matrix, exact service/contact coverage, activation dependencies, pilot start/end window, success thresholds, termination/export terms, signed date and authorized approval record.
+
+| Decision or signoff | Accountable role | Current state |
+|---|---|---|
+| Price, taxes, invoices, support and hosting | Provider commercial owner + restaurant authorized financial signatory | **OWNER DECISION REQUIRED** |
+| Technical features, acceptance build and operational fallback | Provider technical lead + restaurant operations lead | **OWNER DECISION REQUIRED**, implementation pending |
+| U1 pricing and receipt/tax rules | Restaurant authorized commercial owner + technical/pricing owner | **OWNER DECISION REQUIRED** |
+| U2 privacy, consent, retention and export/deletion | Restaurant data owner + provider privacy/data owner | **OWNER DECISION REQUIRED** |
+| U3 MSG91/SendGrid ownership, templates, caps and provider approvals | Restaurant marketing/account owner + provider integration operator | **OWNER DECISION REQUIRED** |
+| U4 restaurant, staff, actual devices/network and pilot evidence | Restaurant operator/staff lead + provider test owner | **OWNER DECISION REQUIRED** |
+
+**Approval state:** unapproved draft, no signatures, no customer engagement recorded, no charge made. A reviewer may edit variables and request approval, but cannot send this draft as an agreed contract. Keep executed contracts, signatory identities, payment references, credentials and real pilot observations in restricted storage. See the matching [onboarding and evidence checklist](restaurant-onboarding.md), which separately records commercial stages and acceptance.
+
+**Reviewer verdict:** A restaurant owner can see the topics and provisional responsibility boundaries. Actual named payers, support contact, duration, price, response time and exit schedule are intentionally **blocked decisions**, not completed answers. No external role-player feedback has been obtained.
+
