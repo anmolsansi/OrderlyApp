@@ -39,3 +39,16 @@ Every **OWNER DECISION REQUIRED** cell blocks a contractual offer or price claim
 
 **Billing rule:** A proposal request is not an accepted pilot. A signed pilot is not a paid project. Record **paid_project** only after a real matched payment receipt or verified settlement confirmation, held privately. Do not create invoices, initiate payment collection or assert customer acceptance from this document. This project does not implement online payments.
 
+## 3. Who pays and owns each operating dependency
+
+| Cost / account | Commercial responsibility | Required approval before use |
+|---|---|---|
+| MSG91 SMS account, usage and approved templates | **Restaurant-funded messaging expense**. Whether the restaurant pays MSG91 directly or reimburses a disclosed pass-through cost: **OWNER DECISION REQUIRED** | Restaurant owner, provider account administrator, approved U3 spend cap and signed template/consent policy |
+| SendGrid email account and per-message/plan usage | **Restaurant-funded messaging expense**. Account billing method, ownership, sender/domain and cap: **OWNER DECISION REQUIRED** | Restaurant owner, provider account administrator, approved U3 domain/sender/consent controls |
+| App/API hosting, database, backups, domain and operational monitoring | Hosting owner and whether included in recurring service vs separately billed: **OWNER DECISION REQUIRED** | Both commercial signatories and technical operator approve responsibility, account owner and cost ceiling |
+| Device, connectivity, printer/terminal and restaurant Wi-Fi | Who supplies/pays each local dependency: **OWNER DECISION REQUIRED** | Restaurant operations lead and provider technical lead |
+| External taxes, delivery, payment processors or extras | Not included or integrated in first pilot unless separately scoped. No online payment service is supplied. | Written change order required, not implied |
+| Customer personal data and consent records | Restaurant control/operator role, provider processing role, retention/export/deletion rules: **OWNER DECISION REQUIRED** under U2 | Restaurant owner, privacy decision owner and provider data custodian |
+
+**Do not collect real provider credentials into this repository or the pilot evidence sheet.** Keep provider keys, customer contact details, signed agreements and proof of payment in separately restricted systems. Before provider activation, obtain cost caps, allowed regions and approved templates. Failed/uncertain sends are not proof of successful delivery.
+
