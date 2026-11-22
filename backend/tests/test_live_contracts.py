@@ -198,6 +198,14 @@ SCHEMAS: dict[str, Any] = {
     "guest_order": {"receipt": "@receipt", "operation": "@operation", "payment": "@payment"},
     "recorded": {"recorded": "bool"},
     "messaging_setup": {"sms": "@setup", "email": "@setup"},
+    "daily_budget": {
+        "restaurant_id": "rid", "channel": "enum:sms|email", "budget_day": "date",
+        "cap_minor": "money", "reserved_minor": "money",
+    },
+    "delivery_budget_ref": {
+        "restaurant_id": "rid", "budget_channel": "enum:sms|email",
+        "budget_day": "date", "reserved_minor": "money",
+    },
     "cart_item_input": {
         "id": "str", "restaurant_id": "rid", "menu_item_id": "str",
         "quantity": "quantity", "modifiers": ["@modifier_selection"],
@@ -500,6 +508,45 @@ def test_malformed_wire_requests_and_protocol_negatives_fail_closed() -> None:
         assert item["error"]["code"] == item["code"]
         assert item["error"]["fields"] == item["fields"]
         assert item["error"]["request_id"].startswith("synthetic-request-")
+
+
+def test_c_b_budget_reservations_are_bounded_and_tenant_scoped() -> None:
+    fixture = read_bundle()["daily_send_budget_fixture"]
+    assert fixture["synthetic"] is True and fixture["live_provider_verified"] is False
+    assert fixture["time_zone"] == "Asia/Kolkata"
+    assert fixture["lock_order"] == [
+        "live_restaurants", "live_daily_send_budgets",
+        "live_campaigns_and_approvals", "live_contacts", "live_deliveries",
+    ]
+    assert all(fixture["rules"].values())
+
+    def problems(value: dict[str, Any]) -> list[str]:
+        errors = [
+            *validate(SCHEMAS["daily_budget"], value["current"], "current"),
+            *validate(SCHEMAS["daily_budget"], value["following_day"], "following_day"),
+            *validate(SCHEMAS["delivery_budget_ref"], value["delivery_reference"], "delivery_reference"),
+        ]
+        current = value["current"]
+        delivery = value["delivery_reference"]
+        after = value["following_day"]
+        if type(current.get("cap_minor")) is int and type(current.get("reserved_minor")) is int:
+            if current["reserved_minor"] > current["cap_minor"]:
+                errors.append("current.reserved_minor")
+        if delivery.get("budget_channel") != current.get("channel"):
+            errors.append("delivery_reference.budget_channel")
+        if delivery.get("budget_day") != current.get("budget_day"):
+            errors.append("delivery_reference.budget_day")
+        if delivery.get("reserved_minor") != current.get("reserved_minor"):
+            errors.append("delivery_reference.reserved_minor")
+        if after.get("budget_day") == current.get("budget_day"):
+            errors.append("following_day.budget_day")
+        return errors
+
+    assert problems(fixture) == []
+    for case in fixture["negative"]:
+        errors = problems(apply_mutation(fixture, case))
+        assert case["expected_field"] in errors, (case["name"], errors)
+
 
 def test_old_mock_fixture_blobs_are_byte_identical_to_base() -> None:
     expected = read_bundle()["mock_fixture_blob_sha"]
