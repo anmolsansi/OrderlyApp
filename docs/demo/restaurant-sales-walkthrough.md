@@ -124,3 +124,17 @@ These are **proposed new tickets**, not implemented providers and not additional
 
 **Non-goals for child packets:** no real delivery feedback, no real currency settlement, no SMS/SendGrid dependency, no new database broker, no AI model call, no production tenant provisioning. If a reused component cannot accept an injected demo adapter without broadening its public contract, stop and file `Needs Architect Decision: component adapter contract` with the exact conflict; do not add an implicit auth bypass.
 
+## 7. Dependency correction and two separate exit gates
+
+**Source problem:** draft RS-20's staff order **read** depends on RS-30 provider setup solely through a shared edit to `backend/app/staff_routes.py`. Its CON-20 staff queue/order responses contain no provider readiness field and require no vendor credentials. Provider setup must not gate reading, transitioning or recording a synthetic order. Make this a reviewed **schedule-only** correction in the canonical DAG: remove `RS-30 → RS-20`, add `RS-20 → RS-30` as an exact-file serialization edge. This reverses the authoring order of their edits without dropping RS-30 from production scope. If implementation reveals a hidden provider read in RS-20, halt that slice rather than bypassing a runtime requirement.
+
+**Earlier demo path:** `RS-01, RS-07, RS-19, RS-22, RS-29, RS-41 → DS-01 → DS-02 → DS-03`, split into `DS-04` (staff, after RS-47/48/49) and `DS-05` (owner, after RS-51/52/53), then `DS-04 + DS-05 + RS-44/45/46/57 → DS-06 → DEMO-SALES`. Every arrow is a merge prerequisite, not permission to start a consumer before its provider is ready. Live customer checkout still depends on **RS-INT01** via RS-44.
+
+**Original full-release path remains:** RS-30 → RS-31/32 → RS-33/34 → RS-35/36 → RS-37 → RS-38/54; RS-37 → RS-58 → RS-59, plus RS-INT02/03 → RS-59, then RS-62/INT04/64/65/RELEASE. Add DS-01/02/03 → RS-58 and DS-06 → RS-59 for safe file ownership and conformance handoff. Demo approval is never a substitute for RS-33/34/35/36, RS-INT03, live U3 evidence or RS-60 readiness.
+
+**DEMO-SALES acceptance is explicitly independent of provider credentials**, but not independent of correct storage, order idempotency, synthetic tenant isolation, real browser coverage, or the listed component builds. Full-release gates cannot consume DEMO-SALES as evidence of real sends, real financial settlement, signed callbacks, real staff login or U1–U4 signoff.
+
+**Before any DS implementation:** the integrator must update the standalone draft copies of RS-20/30/58/59 and the RS-INT02/03/04 consumer notes to reflect this approved split. RF-05 owns guide extraction/link reconciliation, not an authorization to silently change runtime contracts. If that sync has not happened, child implementation is **WAITING_DEPENDENCY**, not ready.
+
+**Rollback:** if a live staff queue unexpectedly needs RS-30 or demo mode cannot be isolated, revert the schedule/child overlay and keep the prior full-release DAG. Do not revert RS-01, change already-shipped mock behavior, delete restaurant business data or ship a weaker gateway. Stop fake transport entirely if zero-send enforcement cannot be proved.
+
