@@ -13,6 +13,8 @@ type Mutation = {
   value?: unknown;
   expected_field: string;
   code: string;
+  expected_status?: number;
+  error?: { code: string; message: string; fields: string[]; request_id: string };
 };
 type ContractCase = {
   contract: string;
@@ -51,7 +53,8 @@ type Bundle = {
   }>;
   protocol_negative_cases: Array<{
     name: string; contract: string; expected_status: number; code: string;
-    fields: string[]; no_write: boolean;
+    fields: string[]; no_write: boolean; synthetic: boolean;
+    error: { code: string; message: string; fields: string[]; request_id: string };
   }>;
 };
 const root = process.cwd();
@@ -364,6 +367,12 @@ describe('RS-01 live-v1 synthetic contract readers', () => {
         const fields = validate(schemas[entry.kind], mutated(entry.positive.payload, change));
         expect(fields, id + '/' + change.name).toContain(change.expected_field);
         expect(['invalid_input', 'not_found']).toContain(change.code);
+        if (!change.error) throw new Error('Missing safe error envelope ' + id + '/' + change.name);
+        expect(validate(schemas.error, { error: change.error })).toEqual([]);
+        expect(change.error.code).toBe(change.code);
+        expect(change.error.fields).toEqual(change.code === 'not_found' ? [] : [change.expected_field]);
+        expect(change.expected_status).toBe(change.code === 'not_found' ? 404 : 422);
+        expect(change.error.request_id).toMatch(/^synthetic-request-/);
         count += 1;
       }
     }
@@ -465,8 +474,13 @@ describe('RS-01 live-v1 synthetic contract readers', () => {
     expect(bundle.protocol_negative_cases.map(c => c.expected_status)).toEqual([401, 403, 404, 409, 409, 404, 503]);
     for (const caseRecord of bundle.protocol_negative_cases) {
       expect(caseRecord.no_write).toBe(true);
+      expect(caseRecord.synthetic).toBe(true);
       expect(bundle.contracts[caseRecord.contract]).toBeDefined();
       expect(caseRecord.code.length).toBeGreaterThan(0);
+      expect(validate(schemas.error, { error: caseRecord.error })).toEqual([]);
+      expect(caseRecord.error.code).toBe(caseRecord.code);
+      expect(caseRecord.error.fields).toEqual(caseRecord.fields);
+      expect(caseRecord.error.request_id).toMatch(/^synthetic-request-/);
     }
   });
 
