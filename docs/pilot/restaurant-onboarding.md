@@ -56,3 +56,28 @@ Complete these items in the restaurant's controlled onboarding record; do not pa
 
 **No real tenant, production menu, device test or settlement is claimed by checking this template.** The deployed restaurant service and corresponding tests are still future RS/integration gates.
 
+## 3. Training, help and operational handoff
+
+**Required training session details:** session date/time, remote/on-site mode, language, trainer, staff list reference, devices tested, attendance evidence, task outcomes and next refresher are all **OWNER DECISION REQUIRED**. Contact/attendance identities live in the restricted pilot record.
+
+Training rehearsal using approved **synthetic fixtures** before live service:
+1. Guest orders from the correct menu and table/takeaway context, then opens a receipt. Label the transaction synthetic and payment nonexistent.
+2. Staff sees a new/waiting order, acknowledges it, moves it through allowed status transitions and checks which actions are unavailable to their role.
+3. Cashier records exactly one **simulated** full pay-at-counter payment; repeat a request with the original command identity after a deliberately lost response and verify there is not a duplicate.
+4. Restaurant owner changes item availability or hours, verifies cross-role updates, and follows a marketing preview with a conspicuous **simulation only, zero actual sends** label.
+5. Staff demonstrates browser voice **only if actually implemented and accepted**; otherwise trains typed ordering and records the voice limitation without claiming recognition accuracy.
+6. Operator disables network/API availability; staff switches to the agreed manual order procedure, protects original identifiers, and reconciles recovered orders before reentry.
+7. Staff escalates a support issue through the **named** contact and can locate the agreed response window and backup. Unnamed contact = **BLOCKED** for support handoff.
+8. Operator and authorized owner rehearse stop/rollback, outstanding-order reconciliation and restricted data-export procedure, without actually deleting real data during a synthetic rehearsal.
+
+| Training checkpoint | Expected evidence | Current status |
+|---|---|---|
+| Menu, guest ordering and staff queue | Named build, device, actor, observed workflow with screenshots in private record | NOT STARTED |
+| Payment recording and duplicate prevention | Original command reference, idempotent response, receipt/payment state assertions | NOT STARTED |
+| Marketing preview safety | Synthetic transport spy shows **zero** actual MSG91/SendGrid sends | NOT STARTED |
+| Voice or typed fallback | Actual supported phone/locale and failure/fallback or explicit absent feature | NOT STARTED |
+| Support route and manual outage | Named contact, staff response, manual reconciliation walkthrough | BLOCKED, owner/contact decisions pending |
+| Exit drill and staff access removal | Authorized actor, export manifest draft and revocation proof | NOT STARTED |
+
+**Change-control workflow:** restaurant requester submits a written request to the named provider lead. Provider scopes effort, pricing, risk, test impact and timing. Restaurant financial/operational signatories approve before work, and both sides update the offer revision. Urgent operational recovery does not silently expand promised features.
+
