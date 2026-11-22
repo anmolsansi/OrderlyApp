@@ -72,3 +72,36 @@ All routes have the explicit prefix `/v1/live/demo/restaurants/{rid}/`, exact me
 
 **Reset:** a fresh `POST /v1/live/demo/session` creates a fresh scoped fixture. Old scope must no longer authorize the initiating guest, and resetting guest A cannot change B or a real tenant. An interrupted reset or uncertain POST remains an error/reconciliation state, not a silent fallback to the shared fixture. Historical real business records are never cascaded by demo reset.
 
+## 5. Marketing split and transport safety
+
+**Scope comparison:**
+
+| Feature | DEMO-SALES | Real restaurant service |
+|---|---|---|
+| Campaign draft and offer | Synthetic owner-owned data; reuse CON-16/28 | Real Clerk owner and restaurant-owned contacts |
+| Audience preview | Synthetic eligible/suppressed test contacts, count only | Real consent, suppression, provider configuration, signed-off U3 |
+| Approve | Stores only synthetic scenario state with replay protection | Frozen approval plus verified caps, budgets and queued recipient work |
+| Results | **Would be eligible / queued / suppressed** scenario numbers, not delivery evidence | Authenticated MSG91/SendGrid send/callback/reconciliation states |
+| Monetary claim | `actual_spend_minor=0`, `actual_revenue_minor=0`, simulated recorded cash/UPI assertion explicitly labeled | Real receipt and staff record, separate from settlement; no auto-confirmed payments |
+| Provider transport | No worker claim, no SDK, no HTTP egress and **zero provider calls** | RS-30–37, separate U3 evidence, signed webhooks/budgets/uncertainty |
+
+**Proposed `GET /v1/live/demo/restaurants/{rid}/campaigns/{cid}/simulation`:** only for a saved synthetic campaign and owned demo scope. Returns `200` with
+```json
+{
+  "schema_version": 1,
+  "synthetic": true,
+  "restaurant_id": "r-demo-session-specific",
+  "campaign_id": "00000000-0000-4000-8000-000000000001",
+  "preview_id": "00000000-0000-4000-8000-000000000002",
+  "scenario": {"would_be_eligible": 2, "would_be_queued": 2, "would_be_suppressed": 1},
+  "actual_sent": 0,
+  "actual_delivered": 0,
+  "actual_spend_minor": 0,
+  "label": "Simulation only. No messages sent.",
+  "as_of": "2026-11-22T00:00:00Z"
+}
+```
+Identifiers and counts are illustrative synthetic *test vectors*, not provider evidence. No real person or send target is permitted. Expired, edited or missing preview returns 409/404 with the common safe error envelope; a zero-eligible scenario returns all zero counts. A second read is deterministic and side-effect free. This read is **not** the RS-37 live reconciliation status or CON-38 live revenue summary.
+
+**Negative proof:** inject an outbound HTTP/MSG91/SendGrid transport spy into demo tests. Assert zero constructed provider clients, network sends, worker claims, payment gateway operations, credential lookups or money movement from session creation through reset. A request that attempts `send`, `dispatch`, `retry` or a non-allowlisted demo method returns 404/403 and produces no durable outbox work. The worker, when implemented in RS-34, must reject synthetic restaurants at claim **and** immediately before transport. Fake email/SMS is never called “delivered.” Actual live launch continues to require full U3 consent, provider shape, cost caps and callbacks.
+
