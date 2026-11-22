@@ -171,3 +171,128 @@ The [C-A command fingerprint](docs/contracts/restaurant-service-v1.md), [C-B dur
 | DS-06 | [Connected demo launcher, reset and real-browser A1–A9](docs/tickets/restaurant-service/DS-06.md) | Proposed, not implemented |
 
 [Full demo route/permission/side-effect matrix](docs/demo/restaurant-sales-walkthrough.md) · [Source and consumer handoff map](docs/contracts/restaurant-service-plan.md) · [RF-05 issue checklist](https://github.com/anmolsansi/OrderlyApp/issues/64)
+
+## Historical bookmark redirects
+
+The retired stabilization (sections 1–16) and history/discovery/voice plan (section 17) are preserved **verbatim in substance** in [the historical guide](docs/plans/orderly-history.md). The fragment aliases below keep older links targeting `development.md#...` navigable. They are not current implementation authority; opening the linked archived heading shows the original acceptance evidence and unfinished gates.
+
+<a id="orderlyapp-intern-development-guide"></a> [OrderlyApp intern development guide](docs/plans/orderly-history.md#orderlyapp-intern-development-guide)  
+<a id="earlier-stabilization-and-product-roadmap"></a> [Earlier stabilization and product roadmap](docs/plans/orderly-history.md#earlier-stabilization-and-product-roadmap)  
+<a id="navigation"></a> [Navigation](docs/plans/orderly-history.md#navigation)  
+<a id="01-what-to-receive-before-starting-one-task"></a> [0.1 What to receive before starting one task](docs/plans/orderly-history.md#01-what-to-receive-before-starting-one-task)  
+<a id="03-use-disposable-services-for-database-and-browser-verification"></a> [0.3 Use disposable services for database and browser verification](docs/plans/orderly-history.md#03-use-disposable-services-for-database-and-browser-verification)  
+<a id="04-complete-one-small-verified-change-at-a-time"></a> [0.4 Complete one small verified change at a time](docs/plans/orderly-history.md#04-complete-one-small-verified-change-at-a-time)  
+<a id="05-worked-scenarios-evidence-and-handoff"></a> [0.5 Worked scenarios, evidence and handoff](docs/plans/orderly-history.md#05-worked-scenarios-evidence-and-handoff)  
+<a id="06-diagnose-failures-without-weakening-the-checks"></a> [0.6 Diagnose failures without weakening the checks](docs/plans/orderly-history.md#06-diagnose-failures-without-weakening-the-checks)  
+<a id="1-project-charter"></a> [1. Project charter](docs/plans/orderly-history.md#1-project-charter)  
+<a id="2-codebase-reconnaissance"></a> [2. Codebase reconnaissance](docs/plans/orderly-history.md#2-codebase-reconnaissance)  
+<a id="3-architecture-decision-register"></a> [3. Architecture Decision Register](docs/plans/orderly-history.md#3-architecture-decision-register)  
+<a id="4-system-invariants"></a> [4. System invariants](docs/plans/orderly-history.md#4-system-invariants)  
+<a id="5-component-graph"></a> [5. Component graph](docs/plans/orderly-history.md#5-component-graph)  
+<a id="6-contract-registry"></a> [6. Contract registry](docs/plans/orderly-history.md#6-contract-registry)  
+<a id="c0-mode-and-verification-baseline"></a> [C0 — Mode and verification baseline](docs/plans/orderly-history.md#c0-mode-and-verification-baseline)  
+<a id="c1-guest-session-and-ownership"></a> [C1 — Guest session and ownership](docs/plans/orderly-history.md#c1-guest-session-and-ownership)  
+<a id="c2-password-free-presentation-profile"></a> [C2 — Password-free presentation profile](docs/plans/orderly-history.md#c2-password-free-presentation-profile)  
+<a id="c3-canonical-catalog-and-cart-validation"></a> [C3 — Canonical catalog and cart validation](docs/plans/orderly-history.md#c3-canonical-catalog-and-cart-validation)  
+<a id="c4-durable-revisioned-cart"></a> [C4 — Durable revisioned cart](docs/plans/orderly-history.md#c4-durable-revisioned-cart)  
+<a id="c5-server-quote-and-immutable-receipt"></a> [C5 — Server quote and immutable receipt](docs/plans/orderly-history.md#c5-server-quote-and-immutable-receipt)  
+<a id="c6-atomic-idempotent-checkout"></a> [C6 — Atomic idempotent checkout](docs/plans/orderly-history.md#c6-atomic-idempotent-checkout)  
+<a id="c7-web-adapter-and-recovery-state"></a> [C7 — Web adapter and recovery state](docs/plans/orderly-history.md#c7-web-adapter-and-recovery-state)  
+<a id="c8-readiness-lifecycle-and-restart"></a> [C8 — Readiness, lifecycle and restart](docs/plans/orderly-history.md#c8-readiness-lifecycle-and-restart)  
+<a id="c5-pricing-and-checkout-details-exact-rules"></a> [C5 pricing and checkout details — exact rules](docs/plans/orderly-history.md#c5-pricing-and-checkout-details-exact-rules)  
+<a id="7-dependency-dag"></a> [7. Dependency DAG](docs/plans/orderly-history.md#7-dependency-dag)  
+<a id="machine-readable-edge-table"></a> [Machine-readable edge table](docs/plans/orderly-history.md#machine-readable-edge-table)  
+<a id="8-workstreams-and-execution-waves"></a> [8. Workstreams and execution waves](docs/plans/orderly-history.md#8-workstreams-and-execution-waves)  
+<a id="9-task-index-and-remaining-work"></a> [9. Task index and remaining work](docs/plans/orderly-history.md#9-task-index-and-remaining-work)  
+<a id="priority-and-execution-rationale"></a> [Priority and execution rationale](docs/plans/orderly-history.md#priority-and-execution-rationale)  
+<a id="10-full-implementation-packets"></a> [10. Full implementation packets](docs/plans/orderly-history.md#10-full-implementation-packets)  
+<a id="st-01-reproduce-the-baseline-and-publish-executable-contracts"></a> [ST-01 — Reproduce the baseline and publish executable contracts](docs/plans/orderly-history.md#st-01-reproduce-the-baseline-and-publish-executable-contracts)  
+<a id="st-02-give-each-visitor-a-private-server-issued-guest-session"></a> [ST-02 — Give each visitor a private server-issued guest session](docs/plans/orderly-history.md#st-02-give-each-visitor-a-private-server-issued-guest-session)  
+<a id="st-03-replace-local-passwords-with-honest-demo-profiles"></a> [ST-03 — Replace local passwords with honest demo profiles](docs/plans/orderly-history.md#st-03-replace-local-passwords-with-honest-demo-profiles)  
+<a id="st-04-validate-and-price-items-from-one-canonical-catalog"></a> [ST-04 — Validate and price items from one canonical catalog](docs/plans/orderly-history.md#st-04-validate-and-price-items-from-one-canonical-catalog)  
+<a id="st-05-persist-baskets-with-revisions-and-no-hidden-failover"></a> [ST-05 — Persist baskets with revisions and no hidden failover](docs/plans/orderly-history.md#st-05-persist-baskets-with-revisions-and-no-hidden-failover)  
+<a id="st-06-save-complete-receipts-with-deterministic-money-rules"></a> [ST-06 — Save complete receipts with deterministic money rules](docs/plans/orderly-history.md#st-06-save-complete-receipts-with-deterministic-money-rules)  
+<a id="st-07-make-checkout-atomic-and-safe-to-retry"></a> [ST-07 — Make checkout atomic and safe to retry](docs/plans/orderly-history.md#st-07-make-checkout-atomic-and-safe-to-retry)  
+<a id="st-08-connect-discovery-customization-and-basket-to-the-api"></a> [ST-08 — Connect discovery, customization and basket to the API](docs/plans/orderly-history.md#st-08-connect-discovery-customization-and-basket-to-the-api)  
+<a id="st-09-make-checkout-confirmation-and-history-recover-honestly"></a> [ST-09 — Make checkout, confirmation and history recover honestly](docs/plans/orderly-history.md#st-09-make-checkout-confirmation-and-history-recover-honestly)  
+<a id="st-10-finish-address-selection-safe-navigation-and-resilient-ui"></a> [ST-10 — Finish address selection, safe navigation and resilient UI](docs/plans/orderly-history.md#st-10-finish-address-selection-safe-navigation-and-resilient-ui)  
+<a id="st-11-make-startup-readiness-retention-and-recovery-truthful"></a> [ST-11 — Make startup, readiness, retention and recovery truthful](docs/plans/orderly-history.md#st-11-make-startup-readiness-retention-and-recovery-truthful)  
+<a id="st-12-expand-ci-and-refresh-release-dependencies"></a> [ST-12 — Expand CI and refresh release dependencies](docs/plans/orderly-history.md#st-12-expand-ci-and-refresh-release-dependencies)  
+<a id="st-13-reconcile-documentation-and-verify-the-public-candidate"></a> [ST-13 — Reconcile documentation and verify the public candidate](docs/plans/orderly-history.md#st-13-reconcile-documentation-and-verify-the-public-candidate)  
+<a id="11-integration-checkpoints"></a> [11. Integration checkpoints](docs/plans/orderly-history.md#11-integration-checkpoints)  
+<a id="int-01-real-manual-ordering-journey-completed-disclosed-separate-local-pass"></a> [INT-01 — Real manual ordering journey — Completed (disclosed separate local pass)](docs/plans/orderly-history.md#int-01-real-manual-ordering-journey-completed-disclosed-separate-local-pass)  
+<a id="int-02-release-persistence-and-recovery-rehearsal-not-completed"></a> [INT-02 — Release, persistence and recovery rehearsal — Not completed](docs/plans/orderly-history.md#int-02-release-persistence-and-recovery-rehearsal-not-completed)  
+<a id="12-test-matrix"></a> [12. Test matrix](docs/plans/orderly-history.md#12-test-matrix)  
+<a id="13-critical-path-and-parallelization"></a> [13. Critical path and parallelization](docs/plans/orderly-history.md#13-critical-path-and-parallelization)  
+<a id="14-release-migration-rollback-and-observability-gates"></a> [14. Release, migration, rollback, and observability gates](docs/plans/orderly-history.md#14-release-migration-rollback-and-observability-gates)  
+<a id="release-gate-stable-public-mock-demo-not-completed"></a> [RELEASE-GATE — Stable public mock demo — Not completed](docs/plans/orderly-history.md#release-gate-stable-public-mock-demo-not-completed)  
+<a id="evidence-ledger-template"></a> [Evidence ledger template](docs/plans/orderly-history.md#evidence-ledger-template)  
+<a id="15-risks-and-true-blockers"></a> [15. Risks and true blockers](docs/plans/orderly-history.md#15-risks-and-true-blockers)  
+<a id="16-delegation-readiness-report"></a> [16. Delegation readiness report](docs/plans/orderly-history.md#16-delegation-readiness-report)  
+<a id="st-01-implementation-evidence-2026-10-04"></a> [ST-01 implementation evidence — 2026-10-04](docs/plans/orderly-history.md#st-01-implementation-evidence-2026-10-04)  
+<a id="verified-source-and-runners"></a> [Verified source and runners](docs/plans/orderly-history.md#verified-source-and-runners)  
+<a id="dependency-assessment-and-decisions"></a> [Dependency assessment and decisions](docs/plans/orderly-history.md#dependency-assessment-and-decisions)  
+<a id="contract-freeze-status"></a> [Contract freeze status](docs/plans/orderly-history.md#contract-freeze-status)  
+<a id="17-product-implementation-roadmap-history-discovery-voice"></a> [17. Product implementation roadmap — history, discovery, voice](docs/plans/orderly-history.md#17-product-implementation-roadmap-history-discovery-voice)  
+<a id="171-project-charter"></a> [17.1 Project charter](docs/plans/orderly-history.md#171-project-charter)  
+<a id="172-codebase-reconnaissance"></a> [17.2 Codebase reconnaissance](docs/plans/orderly-history.md#172-codebase-reconnaissance)  
+<a id="173-architecture-decision-register"></a> [17.3 Architecture Decision Register](docs/plans/orderly-history.md#173-architecture-decision-register)  
+<a id="174-system-invariants"></a> [17.4 System invariants](docs/plans/orderly-history.md#174-system-invariants)  
+<a id="175-component-graph"></a> [17.5 Component graph](docs/plans/orderly-history.md#175-component-graph)  
+<a id="176-contract-registry"></a> [17.6 Contract registry](docs/plans/orderly-history.md#176-contract-registry)  
+<a id="fh-guest-history-pages"></a> [FH — Guest history pages](docs/plans/orderly-history.md#fh-guest-history-pages)  
+<a id="fp-reorder-proposal-from-an-immutable-receipt"></a> [FP — Reorder proposal from an immutable receipt](docs/plans/orderly-history.md#fp-reorder-proposal-from-an-immutable-receipt)  
+<a id="fa-reviewed-proposal-application-and-conflict-recovery"></a> [FA — Reviewed proposal application and conflict recovery](docs/plans/orderly-history.md#fa-reviewed-proposal-application-and-conflict-recovery)  
+<a id="fd-canonical-discovery-url-and-selection"></a> [FD — Canonical discovery URL and selection](docs/plans/orderly-history.md#fd-canonical-discovery-url-and-selection)  
+<a id="fm-searchable-restaurant-menu"></a> [FM — Searchable restaurant menu](docs/plans/orderly-history.md#fm-searchable-restaurant-menu)  
+<a id="fv-catalog-grounded-voice-interpretation"></a> [FV — Catalog-grounded voice interpretation](docs/plans/orderly-history.md#fv-catalog-grounded-voice-interpretation)  
+<a id="fs-deliberate-microphonetext-input"></a> [FS — Deliberate microphone/text input](docs/plans/orderly-history.md#fs-deliberate-microphonetext-input)  
+<a id="feature-integration-gate-contracts-fg1-fg2-fg3"></a> [Feature integration gate contracts FG1, FG2, FG3](docs/plans/orderly-history.md#feature-integration-gate-contracts-fg1-fg2-fg3)  
+<a id="177-dependency-dag"></a> [17.7 Dependency DAG](docs/plans/orderly-history.md#177-dependency-dag)  
+<a id="178-workstreams-and-execution-waves"></a> [17.8 Workstreams and execution waves](docs/plans/orderly-history.md#178-workstreams-and-execution-waves)  
+<a id="179-task-index"></a> [17.9 Task index](docs/plans/orderly-history.md#179-task-index)  
+<a id="1710-full-implementation-packets"></a> [17.10 Full implementation packets](docs/plans/orderly-history.md#1710-full-implementation-packets)  
+<a id="oh-01-make-guest-history-browseable-beyond-the-first-page"></a> [OH-01 — Make guest history browseable beyond the first page](docs/plans/orderly-history.md#oh-01-make-guest-history-browseable-beyond-the-first-page)  
+<a id="oh-02-build-a-safe-reorder-draft-using-todays-catalog"></a> [OH-02 — Build a safe reorder draft using today’s catalog](docs/plans/orderly-history.md#oh-02-build-a-safe-reorder-draft-using-todays-catalog)  
+<a id="oh-03-review-and-atomically-apply-reorder-with-safe-recovery"></a> [OH-03 — Review and atomically apply reorder with safe recovery](docs/plans/orderly-history.md#oh-03-review-and-atomically-apply-reorder-with-safe-recovery)  
+<a id="g1-accept-history-and-reorder-on-the-integrated-candidate"></a> [G1 — Accept history and reorder on the integrated candidate](docs/plans/orderly-history.md#g1-accept-history-and-reorder-on-the-integrated-candidate)  
+<a id="ds-01-freeze-one-discovery-query-url-and-matching-contract"></a> [DS-01 — Freeze one discovery query, URL and matching contract](docs/plans/orderly-history.md#ds-01-freeze-one-discovery-query-url-and-matching-contract)  
+<a id="ds-02-make-restaurant-discovery-controls-useful-and-consistent"></a> [DS-02 — Make restaurant discovery controls useful and consistent](docs/plans/orderly-history.md#ds-02-make-restaurant-discovery-controls-useful-and-consistent)  
+<a id="ds-03-find-dishes-within-a-restaurant-without-losing-customization"></a> [DS-03 — Find dishes within a restaurant without losing customization](docs/plans/orderly-history.md#ds-03-find-dishes-within-a-restaurant-without-losing-customization)  
+<a id="g2-accept-discovery-and-menu-browsing-before-voice-work"></a> [G2 — Accept discovery and menu browsing before voice work](docs/plans/orderly-history.md#g2-accept-discovery-and-menu-browsing-before-voice-work)  
+<a id="vo-01-interpret-short-commands-using-the-selected-real-menu"></a> [VO-01 — Interpret short commands using the selected real menu](docs/plans/orderly-history.md#vo-01-interpret-short-commands-using-the-selected-real-menu)  
+<a id="vo-02-capture-speech-deliberately-with-an-editable-text-fallback"></a> [VO-02 — Capture speech deliberately with an editable text fallback](docs/plans/orderly-history.md#vo-02-capture-speech-deliberately-with-an-editable-text-fallback)  
+<a id="vo-03-review-voice-proposals-through-the-existing-safe-basket-flow"></a> [VO-03 — Review voice proposals through the existing safe basket flow](docs/plans/orderly-history.md#vo-03-review-voice-proposals-through-the-existing-safe-basket-flow)  
+<a id="g3-accept-all-three-features-and-real-microphone-behavior"></a> [G3 — Accept all three features and real microphone behavior](docs/plans/orderly-history.md#g3-accept-all-three-features-and-real-microphone-behavior)  
+<a id="1711-integration-checkpoints"></a> [17.11 Integration checkpoints](docs/plans/orderly-history.md#1711-integration-checkpoints)  
+<a id="1712-test-matrix"></a> [17.12 Test matrix](docs/plans/orderly-history.md#1712-test-matrix)  
+<a id="1713-critical-path-and-parallelization-plan"></a> [17.13 Critical path and parallelization plan](docs/plans/orderly-history.md#1713-critical-path-and-parallelization-plan)  
+<a id="1714-release-migration-rollback-and-observability-gates"></a> [17.14 Release, migration, rollback, and observability gates](docs/plans/orderly-history.md#1714-release-migration-rollback-and-observability-gates)  
+<a id="1715-risks-and-true-blockers"></a> [17.15 Risks and true blockers](docs/plans/orderly-history.md#1715-risks-and-true-blockers)  
+<a id="1716-delegation-readiness-report"></a> [17.16 Delegation readiness report](docs/plans/orderly-history.md#1716-delegation-readiness-report)
+
+**Original ticket/milestone bookmarks:** <a id="orderlyapp-development-guide--stabilization-and-product-roadmap"></a>[orderlyapp-development-guide--stabilization-and-product-roadmap](docs/plans/orderly-history.md#orderlyapp-development-guide--stabilization-and-product-roadmap) · <a id="st-01"></a>[st-01](docs/plans/orderly-history.md#st-01) · <a id="st-02"></a>[st-02](docs/plans/orderly-history.md#st-02) · <a id="st-03"></a>[st-03](docs/plans/orderly-history.md#st-03) · <a id="st-04"></a>[st-04](docs/plans/orderly-history.md#st-04) · <a id="st-05"></a>[st-05](docs/plans/orderly-history.md#st-05) · <a id="st-06"></a>[st-06](docs/plans/orderly-history.md#st-06) · <a id="st-07"></a>[st-07](docs/plans/orderly-history.md#st-07) · <a id="st-08"></a>[st-08](docs/plans/orderly-history.md#st-08) · <a id="st-09"></a>[st-09](docs/plans/orderly-history.md#st-09) · <a id="st-10"></a>[st-10](docs/plans/orderly-history.md#st-10) · <a id="st-11"></a>[st-11](docs/plans/orderly-history.md#st-11) · <a id="st-12"></a>[st-12](docs/plans/orderly-history.md#st-12) · <a id="st-13"></a>[st-13](docs/plans/orderly-history.md#st-13) · <a id="int-01"></a>[int-01](docs/plans/orderly-history.md#int-01) · <a id="int-02"></a>[int-02](docs/plans/orderly-history.md#int-02) · <a id="release-gate"></a>[release-gate](docs/plans/orderly-history.md#release-gate) · <a id="oh-01"></a>[oh-01](docs/plans/orderly-history.md#oh-01) · <a id="oh-02"></a>[oh-02](docs/plans/orderly-history.md#oh-02) · <a id="oh-03"></a>[oh-03](docs/plans/orderly-history.md#oh-03) · <a id="g1"></a>[g1](docs/plans/orderly-history.md#g1) · <a id="ds-01"></a>[ds-01](docs/plans/orderly-history.md#ds-01) · <a id="ds-02"></a>[ds-02](docs/plans/orderly-history.md#ds-02) · <a id="ds-03"></a>[ds-03](docs/plans/orderly-history.md#ds-03) · <a id="g2"></a>[g2](docs/plans/orderly-history.md#g2) · <a id="vo-01"></a>[vo-01](docs/plans/orderly-history.md#vo-01) · <a id="vo-02"></a>[vo-02](docs/plans/orderly-history.md#vo-02) · <a id="vo-03"></a>[vo-03](docs/plans/orderly-history.md#vo-03) · <a id="g3"></a>[g3](docs/plans/orderly-history.md#g3)
+
+### 18.6 Contract registry
+
+Shared schema and CON-01–67: [RS-01 frozen registry](docs/contracts/restaurant-service-v1.md). Proposed demo-only contract extension and the corrected execution graph: [contract plan](docs/contracts/restaurant-service-plan.md). Original inlined plan: [archived section 18.6](docs/plans/orderly-history.md#186-contract-registry).
+
+### 18.7 Dependency DAG
+
+[Canonical accepted RF-01 proposed graph](docs/contracts/restaurant-service-plan.md#187-dependency-dag).
+
+### 18.8 Workstreams and execution waves
+
+[Canonical accepted RF-01 30-wave schedule](docs/contracts/restaurant-service-plan.md#188-workstreams-and-execution-waves).
+
+### 18.17.1 Contract corrections required before fixture freeze
+
+[C-A/B/C proposal and detailed acceptance](docs/plans/orderly-history.md#18171-contract-corrections-required-before-fixture-freeze), incorporated into the [frozen shared RS-01 registry](docs/contracts/restaurant-service-v1.md). No live provider acceptance is implied.
+
+### 18.17.2 Follow-up index and scheduling
+
+See the RF table above and [archived original estimates](docs/plans/orderly-history.md#18172-follow-up-index-and-scheduling).
+
+### 18.17.3 RF-01 provider-independent DEMO-SALES overlay (proposed, not implemented)
+
+[RF-01 original amendment](docs/plans/orderly-history.md#18173-rf-01-provider-independent-demo-sales-overlay-proposed-not-implemented) and [accepted five-minute handoff](docs/demo/restaurant-sales-walkthrough.md).
