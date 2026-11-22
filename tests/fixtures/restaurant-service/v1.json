@@ -4294,5 +4294,1185 @@
       ],
       "live_provider_verified": false
     }
-  }
+  },
+  "wire_cases": [
+    {
+      "id": "CON-06-1",
+      "contract": "CON-06",
+      "synthetic": true,
+      "method": "GET",
+      "path": "/v1/live/staff/memberships",
+      "gateway_path": "/api/orderly/live/staff/memberships",
+      "auth": "clerk_staff",
+      "request": null,
+      "response_schema": "memberships_list",
+      "response": {
+        "memberships": [
+          {
+            "restaurant_id": "r-demo",
+            "clerk_user_id": "clerk-synthetic-owner",
+            "role": "owner",
+            "active": true,
+            "version": 1
+          }
+        ]
+      },
+      "expected_status": 200,
+      "idempotency_key": null
+    },
+    {
+      "id": "CON-06-2",
+      "contract": "CON-06",
+      "synthetic": true,
+      "method": "PUT",
+      "path": "/v1/live/staff/restaurants/r-demo/members/clerk-synthetic-owner",
+      "gateway_path": "/api/orderly/live/staff/restaurants/r-demo/members/clerk-synthetic-owner",
+      "auth": "clerk_owner",
+      "request": {
+        "expected_version": 1,
+        "role": "owner",
+        "active": true
+      },
+      "response_schema": "membership",
+      "response": {
+        "restaurant_id": "r-demo",
+        "clerk_user_id": "clerk-synthetic-owner",
+        "role": "owner",
+        "active": true,
+        "version": 1
+      },
+      "expected_status": 200,
+      "idempotency_key": null
+    },
+    {
+      "id": "CON-09-1",
+      "contract": "CON-09",
+      "synthetic": true,
+      "method": "PUT",
+      "path": "/v1/live/staff/restaurants/r-demo/settings",
+      "gateway_path": "/api/orderly/live/staff/restaurants/r-demo/settings",
+      "auth": "clerk_owner",
+      "request": {
+        "expected_version": 1,
+        "name": "Synthetic Restaurant",
+        "timezone": "Asia/Kolkata",
+        "hours": [],
+        "is_open": true,
+        "brand_label": "Demo Kitchen"
+      },
+      "response_schema": "settings",
+      "response": {
+        "id": "r-demo",
+        "name": "Synthetic Restaurant",
+        "brand_label": "Demo Kitchen",
+        "is_open": true,
+        "ordering_enabled": false,
+        "timezone": "Asia/Kolkata",
+        "version": 1,
+        "hours": []
+      },
+      "expected_status": 200,
+      "idempotency_key": null
+    },
+    {
+      "id": "CON-10-1",
+      "contract": "CON-10",
+      "synthetic": true,
+      "method": "GET",
+      "path": "/v1/live/staff/restaurants/r-demo/menu",
+      "gateway_path": "/api/orderly/live/staff/restaurants/r-demo/menu",
+      "auth": "clerk_staff",
+      "request": null,
+      "response_schema": "menu",
+      "response": {
+        "restaurant_id": "r-demo",
+        "catalog_version": 1,
+        "items": [
+          {
+            "id": "i-one",
+            "name": "Sample Pizza",
+            "description": "Synthetic catalog item",
+            "price_cents": 1200,
+            "image_emoji": "",
+            "popular": false,
+            "available": true,
+            "modifier_groups": []
+          }
+        ]
+      },
+      "expected_status": 200,
+      "idempotency_key": null
+    },
+    {
+      "id": "CON-10-2",
+      "contract": "CON-10",
+      "synthetic": true,
+      "method": "PUT",
+      "path": "/v1/live/staff/restaurants/r-demo/menu/i-one/availability",
+      "gateway_path": "/api/orderly/live/staff/restaurants/r-demo/menu/i-one/availability",
+      "auth": "clerk_order_staff",
+      "request": {
+        "expected_catalog_version": 1,
+        "available": true
+      },
+      "response_schema": "menu",
+      "response": {
+        "restaurant_id": "r-demo",
+        "catalog_version": 1,
+        "items": [
+          {
+            "id": "i-one",
+            "name": "Sample Pizza",
+            "description": "Synthetic catalog item",
+            "price_cents": 1200,
+            "image_emoji": "",
+            "popular": false,
+            "available": true,
+            "modifier_groups": []
+          }
+        ]
+      },
+      "expected_status": 200,
+      "idempotency_key": null
+    },
+    {
+      "id": "CON-12-1",
+      "contract": "CON-12",
+      "synthetic": true,
+      "method": "GET",
+      "path": "/v1/live/staff/restaurants/r-demo/tables",
+      "gateway_path": "/api/orderly/live/staff/restaurants/r-demo/tables",
+      "auth": "clerk_owner",
+      "request": null,
+      "response_schema": "tables_list",
+      "response": {
+        "tables": [
+          {
+            "id": "00000002-1111-4111-8111-111111111111",
+            "restaurant_id": "r-demo",
+            "label": "T1",
+            "active": true,
+            "version": 1,
+            "url": "https://example.invalid/r/r-demo?table=00000002-1111-4111-8111-111111111111"
+          }
+        ]
+      },
+      "expected_status": 200,
+      "idempotency_key": null
+    },
+    {
+      "id": "CON-12-2",
+      "contract": "CON-12",
+      "synthetic": true,
+      "method": "PUT",
+      "path": "/v1/live/staff/restaurants/r-demo/tables/00000002-1111-4111-8111-111111111111",
+      "gateway_path": "/api/orderly/live/staff/restaurants/r-demo/tables/00000002-1111-4111-8111-111111111111",
+      "auth": "clerk_owner",
+      "request": {
+        "expected_version": 1,
+        "label": "T1",
+        "active": true
+      },
+      "response_schema": "table",
+      "response": {
+        "id": "00000002-1111-4111-8111-111111111111",
+        "restaurant_id": "r-demo",
+        "label": "T1",
+        "active": true,
+        "version": 1,
+        "url": "https://example.invalid/r/r-demo?table=00000002-1111-4111-8111-111111111111"
+      },
+      "expected_status": 200,
+      "idempotency_key": null
+    },
+    {
+      "id": "CON-13-1",
+      "contract": "CON-13",
+      "synthetic": true,
+      "method": "GET",
+      "path": "/v1/live/restaurants/r-demo/menu",
+      "gateway_path": "/api/orderly/live/restaurants/r-demo/menu",
+      "auth": "public",
+      "request": null,
+      "response_schema": "catalog",
+      "response": {
+        "schema_version": 1,
+        "restaurant": {
+          "id": "r-demo",
+          "name": "Synthetic Restaurant",
+          "brand_label": "Demo Kitchen",
+          "is_open": true,
+          "ordering_enabled": false,
+          "timezone": "Asia/Kolkata"
+        },
+        "catalog_version": 1,
+        "items": [
+          {
+            "id": "i-one",
+            "name": "Sample Pizza",
+            "description": "Synthetic catalog item",
+            "price_cents": 1200,
+            "image_emoji": "",
+            "popular": false,
+            "available": true,
+            "modifier_groups": []
+          }
+        ]
+      },
+      "expected_status": 200,
+      "idempotency_key": null
+    },
+    {
+      "id": "CON-14-1",
+      "contract": "CON-14",
+      "synthetic": true,
+      "method": "PUT",
+      "path": "/v1/live/restaurants/r-demo/cart",
+      "gateway_path": "/api/orderly/live/restaurants/r-demo/cart",
+      "auth": "guest_cookie",
+      "request": {
+        "expected_revision": 0,
+        "items": [
+          {
+            "id": "line-one",
+            "restaurant_id": "r-demo",
+            "menu_item_id": "i-one",
+            "quantity": 1,
+            "modifiers": [],
+            "special_instructions": null
+          }
+        ]
+      },
+      "response_schema": "cart",
+      "response": {
+        "schema_version": 1,
+        "restaurant_id": "r-demo",
+        "revision": 1,
+        "items": [
+          {
+            "id": "line-one",
+            "restaurant_id": "r-demo",
+            "menu_item_id": "i-one",
+            "quantity": 1,
+            "modifiers": [],
+            "special_instructions": null,
+            "name": "Sample Pizza",
+            "unit_minor": 1200,
+            "line_minor": 1200
+          }
+        ]
+      },
+      "expected_status": 200,
+      "idempotency_key": null
+    },
+    {
+      "id": "CON-14-2",
+      "contract": "CON-14",
+      "synthetic": true,
+      "method": "DELETE",
+      "path": "/v1/live/restaurants/r-demo/cart",
+      "gateway_path": "/api/orderly/live/restaurants/r-demo/cart",
+      "auth": "guest_cookie",
+      "request": {
+        "expected_revision": 1
+      },
+      "response_schema": "cart",
+      "response": {
+        "schema_version": 1,
+        "restaurant_id": "r-demo",
+        "revision": 2,
+        "items": []
+      },
+      "expected_status": 200,
+      "idempotency_key": null
+    },
+    {
+      "id": "CON-15-1",
+      "contract": "CON-15",
+      "synthetic": true,
+      "method": "POST",
+      "path": "/v1/live/restaurants/r-demo/quote",
+      "gateway_path": "/api/orderly/live/restaurants/r-demo/quote",
+      "auth": "guest_cookie",
+      "request": {
+        "expected_revision": 1,
+        "fulfillment": "dine_in",
+        "table_id": "00000002-1111-4111-8111-111111111111",
+        "promotion_code": null
+      },
+      "response_schema": "quote",
+      "response": {
+        "schema_version": 1,
+        "cart_revision": 1,
+        "catalog_version": 1,
+        "pricing_version": 1,
+        "offer_version": null,
+        "quote_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "receipt_preview": {
+          "fulfillment": "dine_in",
+          "table_id": "00000002-1111-4111-8111-111111111111",
+          "restaurant_id": "r-demo",
+          "restaurant_name": "Synthetic Restaurant",
+          "table_label": "T1",
+          "items": [
+            {
+              "id": "line-one",
+              "restaurant_id": "r-demo",
+              "menu_item_id": "i-one",
+              "quantity": 1,
+              "modifiers": [],
+              "special_instructions": null,
+              "name": "Sample Pizza",
+              "unit_minor": 1200,
+              "line_minor": 1200
+            }
+          ],
+          "totals": {
+            "currency": "INR",
+            "subtotal_minor": 1200,
+            "discount_minor": 0,
+            "tax_minor": 0,
+            "charges_minor": 0,
+            "total_minor": 1200
+          },
+          "pricing_version": 1,
+          "promotion_code": null,
+          "offer_version": null,
+          "business_identity": {},
+          "synthetic": true
+        },
+        "totals": {
+          "currency": "INR",
+          "subtotal_minor": 1200,
+          "discount_minor": 0,
+          "tax_minor": 0,
+          "charges_minor": 0,
+          "total_minor": 1200
+        }
+      },
+      "expected_status": 200,
+      "idempotency_key": null
+    },
+    {
+      "id": "CON-16-1",
+      "contract": "CON-16",
+      "synthetic": true,
+      "method": "PUT",
+      "path": "/v1/live/staff/restaurants/r-demo/offers/00000005-1111-4111-8111-111111111111",
+      "gateway_path": "/api/orderly/live/staff/restaurants/r-demo/offers/00000005-1111-4111-8111-111111111111",
+      "auth": "clerk_owner",
+      "request": {
+        "expected_version": 1,
+        "code": "DEMO-10",
+        "starts_at": "2026-10-11T09:00:00+00:00",
+        "ends_at": "2026-10-11T10:00:00+00:00",
+        "min_subtotal_minor": 100,
+        "percent_bps": 1000,
+        "max_discount_minor": 200,
+        "max_redemptions": 50,
+        "active": false
+      },
+      "response_schema": "offer",
+      "response": {
+        "id": "00000005-1111-4111-8111-111111111111",
+        "restaurant_id": "r-demo",
+        "version": 1,
+        "code": "DEMO-10",
+        "starts_at": "2026-10-11T09:00:00+00:00",
+        "ends_at": "2026-10-11T10:00:00+00:00",
+        "min_subtotal_minor": 100,
+        "percent_bps": 1000,
+        "max_discount_minor": 200,
+        "max_redemptions": 50,
+        "consumed": 0,
+        "active": false
+      },
+      "expected_status": 200,
+      "idempotency_key": null
+    },
+    {
+      "id": "CON-18-1",
+      "contract": "CON-18",
+      "synthetic": true,
+      "method": "POST",
+      "path": "/v1/live/restaurants/r-demo/orders",
+      "gateway_path": "/api/orderly/live/restaurants/r-demo/orders",
+      "auth": "guest_cookie",
+      "request": {
+        "expected_revision": 1,
+        "quote_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "fulfillment": "dine_in",
+        "table_id": "00000002-1111-4111-8111-111111111111",
+        "promotion_code": null
+      },
+      "response_schema": "receipt",
+      "response": {
+        "fulfillment": "dine_in",
+        "table_id": "00000002-1111-4111-8111-111111111111",
+        "restaurant_id": "r-demo",
+        "restaurant_name": "Synthetic Restaurant",
+        "table_label": "T1",
+        "items": [
+          {
+            "id": "line-one",
+            "restaurant_id": "r-demo",
+            "menu_item_id": "i-one",
+            "quantity": 1,
+            "modifiers": [],
+            "special_instructions": null,
+            "name": "Sample Pizza",
+            "unit_minor": 1200,
+            "line_minor": 1200
+          }
+        ],
+        "totals": {
+          "currency": "INR",
+          "subtotal_minor": 1200,
+          "discount_minor": 0,
+          "tax_minor": 0,
+          "charges_minor": 0,
+          "total_minor": 1200
+        },
+        "pricing_version": 1,
+        "promotion_code": null,
+        "offer_version": null,
+        "business_identity": {},
+        "synthetic": true,
+        "schema_version": 1,
+        "kind": "live-v1",
+        "id": "00000001-1111-4111-8111-111111111111",
+        "created_at": "2026-10-11T09:00:00+00:00",
+        "payment_instruction": "Pay at restaurant"
+      },
+      "expected_status": 201,
+      "idempotency_key": "00000004-1111-4111-8111-111111111111"
+    },
+    {
+      "id": "CON-19-1",
+      "contract": "CON-19",
+      "synthetic": true,
+      "method": "GET",
+      "path": "/v1/live/restaurants/r-demo/orders/00000001-1111-4111-8111-111111111111",
+      "gateway_path": "/api/orderly/live/restaurants/r-demo/orders/00000001-1111-4111-8111-111111111111",
+      "auth": "guest_cookie",
+      "request": null,
+      "response_schema": "guest_order",
+      "response": {
+        "receipt": {
+          "fulfillment": "dine_in",
+          "table_id": "00000002-1111-4111-8111-111111111111",
+          "restaurant_id": "r-demo",
+          "restaurant_name": "Synthetic Restaurant",
+          "table_label": "T1",
+          "items": [
+            {
+              "id": "line-one",
+              "restaurant_id": "r-demo",
+              "menu_item_id": "i-one",
+              "quantity": 1,
+              "modifiers": [],
+              "special_instructions": null,
+              "name": "Sample Pizza",
+              "unit_minor": 1200,
+              "line_minor": 1200
+            }
+          ],
+          "totals": {
+            "currency": "INR",
+            "subtotal_minor": 1200,
+            "discount_minor": 0,
+            "tax_minor": 0,
+            "charges_minor": 0,
+            "total_minor": 1200
+          },
+          "pricing_version": 1,
+          "promotion_code": null,
+          "offer_version": null,
+          "business_identity": {},
+          "synthetic": true,
+          "schema_version": 1,
+          "kind": "live-v1",
+          "id": "00000001-1111-4111-8111-111111111111",
+          "created_at": "2026-10-11T09:00:00+00:00",
+          "payment_instruction": "Pay at restaurant"
+        },
+        "operation": {
+          "status": "Submitted",
+          "version": 1,
+          "reason": null,
+          "updated_at": "2026-10-11T09:00:00+00:00"
+        },
+        "payment": {
+          "status": "Unpaid",
+          "amount_minor": 1200,
+          "currency": "INR",
+          "active_payment_event_id": null,
+          "settlement_required": false
+        }
+      },
+      "expected_status": 200,
+      "idempotency_key": null
+    },
+    {
+      "id": "CON-20-1",
+      "contract": "CON-20",
+      "synthetic": true,
+      "method": "GET",
+      "path": "/v1/live/staff/restaurants/r-demo/orders/00000001-1111-4111-8111-111111111111",
+      "gateway_path": "/api/orderly/live/staff/restaurants/r-demo/orders/00000001-1111-4111-8111-111111111111",
+      "auth": "clerk_staff",
+      "request": null,
+      "response_schema": "detail",
+      "response": {
+        "receipt": {
+          "fulfillment": "dine_in",
+          "table_id": "00000002-1111-4111-8111-111111111111",
+          "restaurant_id": "r-demo",
+          "restaurant_name": "Synthetic Restaurant",
+          "table_label": "T1",
+          "items": [
+            {
+              "id": "line-one",
+              "restaurant_id": "r-demo",
+              "menu_item_id": "i-one",
+              "quantity": 1,
+              "modifiers": [],
+              "special_instructions": null,
+              "name": "Sample Pizza",
+              "unit_minor": 1200,
+              "line_minor": 1200
+            }
+          ],
+          "totals": {
+            "currency": "INR",
+            "subtotal_minor": 1200,
+            "discount_minor": 0,
+            "tax_minor": 0,
+            "charges_minor": 0,
+            "total_minor": 1200
+          },
+          "pricing_version": 1,
+          "promotion_code": null,
+          "offer_version": null,
+          "business_identity": {},
+          "synthetic": true,
+          "schema_version": 1,
+          "kind": "live-v1",
+          "id": "00000001-1111-4111-8111-111111111111",
+          "created_at": "2026-10-11T09:00:00+00:00",
+          "payment_instruction": "Pay at restaurant"
+        },
+        "operation": {
+          "status": "Submitted",
+          "version": 1,
+          "reason": null,
+          "updated_at": "2026-10-11T09:00:00+00:00"
+        },
+        "payment": {
+          "status": "Unpaid",
+          "amount_minor": 1200,
+          "currency": "INR",
+          "active_payment_event_id": null,
+          "settlement_required": false
+        },
+        "events": [
+          {
+            "id": "00000003-1111-4111-8111-111111111111",
+            "kind": "submitted",
+            "at": "2026-10-11T09:00:00+00:00",
+            "actor": "synthetic-guest",
+            "reason": null
+          }
+        ]
+      },
+      "expected_status": 200,
+      "idempotency_key": null
+    },
+    {
+      "id": "CON-20-2",
+      "contract": "CON-20",
+      "synthetic": true,
+      "method": "GET",
+      "path": "/v1/live/staff/restaurants/r-demo/orders?view=active&limit=25",
+      "gateway_path": "/api/orderly/live/staff/restaurants/r-demo/orders?view=active&limit=25",
+      "auth": "clerk_staff",
+      "request": null,
+      "response_schema": "queue",
+      "response": {
+        "orders": [
+          {
+            "id": "00000001-1111-4111-8111-111111111111",
+            "created_at": "2026-10-11T09:00:00+00:00",
+            "fulfillment": "dine_in",
+            "table_label": "T1",
+            "total_minor": 1200,
+            "currency": "INR",
+            "operation": {
+              "status": "Submitted",
+              "version": 1,
+              "reason": null,
+              "updated_at": "2026-10-11T09:00:00+00:00"
+            },
+            "payment": {
+              "status": "Unpaid",
+              "amount_minor": 1200,
+              "currency": "INR",
+              "active_payment_event_id": null,
+              "settlement_required": false
+            }
+          }
+        ],
+        "next_cursor": null,
+        "as_of": "2026-10-11T09:00:00+00:00"
+      },
+      "expected_status": 200,
+      "idempotency_key": null
+    },
+    {
+      "id": "CON-21-1",
+      "contract": "CON-21",
+      "synthetic": true,
+      "method": "POST",
+      "path": "/v1/live/staff/restaurants/r-demo/orders/00000001-1111-4111-8111-111111111111/transitions",
+      "gateway_path": "/api/orderly/live/staff/restaurants/r-demo/orders/00000001-1111-4111-8111-111111111111/transitions",
+      "auth": "clerk_order_staff",
+      "request": {
+        "expected_version": 1,
+        "target": "Accepted",
+        "reason": null
+      },
+      "response_schema": "detail",
+      "response": {
+        "receipt": {
+          "fulfillment": "dine_in",
+          "table_id": "00000002-1111-4111-8111-111111111111",
+          "restaurant_id": "r-demo",
+          "restaurant_name": "Synthetic Restaurant",
+          "table_label": "T1",
+          "items": [
+            {
+              "id": "line-one",
+              "restaurant_id": "r-demo",
+              "menu_item_id": "i-one",
+              "quantity": 1,
+              "modifiers": [],
+              "special_instructions": null,
+              "name": "Sample Pizza",
+              "unit_minor": 1200,
+              "line_minor": 1200
+            }
+          ],
+          "totals": {
+            "currency": "INR",
+            "subtotal_minor": 1200,
+            "discount_minor": 0,
+            "tax_minor": 0,
+            "charges_minor": 0,
+            "total_minor": 1200
+          },
+          "pricing_version": 1,
+          "promotion_code": null,
+          "offer_version": null,
+          "business_identity": {},
+          "synthetic": true,
+          "schema_version": 1,
+          "kind": "live-v1",
+          "id": "00000001-1111-4111-8111-111111111111",
+          "created_at": "2026-10-11T09:00:00+00:00",
+          "payment_instruction": "Pay at restaurant"
+        },
+        "operation": {
+          "status": "Accepted",
+          "version": 2,
+          "reason": null,
+          "updated_at": "2026-10-11T09:00:00+00:00"
+        },
+        "payment": {
+          "status": "Unpaid",
+          "amount_minor": 1200,
+          "currency": "INR",
+          "active_payment_event_id": null,
+          "settlement_required": false
+        },
+        "events": [
+          {
+            "id": "00000003-1111-4111-8111-111111111111",
+            "kind": "submitted",
+            "at": "2026-10-11T09:00:00+00:00",
+            "actor": "synthetic-guest",
+            "reason": null
+          }
+        ]
+      },
+      "expected_status": 200,
+      "idempotency_key": "00000004-1111-4111-8111-111111111111"
+    },
+    {
+      "id": "CON-22-1",
+      "contract": "CON-22",
+      "synthetic": true,
+      "method": "POST",
+      "path": "/v1/live/staff/restaurants/r-demo/orders/00000001-1111-4111-8111-111111111111/payments",
+      "gateway_path": "/api/orderly/live/staff/restaurants/r-demo/orders/00000001-1111-4111-8111-111111111111/payments",
+      "auth": "clerk_cashier",
+      "request": {
+        "expected_version": 2,
+        "method": "upi"
+      },
+      "response_schema": "detail",
+      "response": {
+        "receipt": {
+          "fulfillment": "dine_in",
+          "table_id": "00000002-1111-4111-8111-111111111111",
+          "restaurant_id": "r-demo",
+          "restaurant_name": "Synthetic Restaurant",
+          "table_label": "T1",
+          "items": [
+            {
+              "id": "line-one",
+              "restaurant_id": "r-demo",
+              "menu_item_id": "i-one",
+              "quantity": 1,
+              "modifiers": [],
+              "special_instructions": null,
+              "name": "Sample Pizza",
+              "unit_minor": 1200,
+              "line_minor": 1200
+            }
+          ],
+          "totals": {
+            "currency": "INR",
+            "subtotal_minor": 1200,
+            "discount_minor": 0,
+            "tax_minor": 0,
+            "charges_minor": 0,
+            "total_minor": 1200
+          },
+          "pricing_version": 1,
+          "promotion_code": null,
+          "offer_version": null,
+          "business_identity": {},
+          "synthetic": true,
+          "schema_version": 1,
+          "kind": "live-v1",
+          "id": "00000001-1111-4111-8111-111111111111",
+          "created_at": "2026-10-11T09:00:00+00:00",
+          "payment_instruction": "Pay at restaurant"
+        },
+        "operation": {
+          "status": "Accepted",
+          "version": 3,
+          "reason": null,
+          "updated_at": "2026-10-11T09:00:00+00:00"
+        },
+        "payment": {
+          "status": "Paid",
+          "amount_minor": 1200,
+          "currency": "INR",
+          "active_payment_event_id": "00000011-1111-4111-8111-111111111111",
+          "settlement_required": false
+        },
+        "events": [
+          {
+            "id": "00000003-1111-4111-8111-111111111111",
+            "kind": "submitted",
+            "at": "2026-10-11T09:00:00+00:00",
+            "actor": "synthetic-guest",
+            "reason": null
+          }
+        ]
+      },
+      "expected_status": 200,
+      "idempotency_key": "00000004-1111-4111-8111-111111111111"
+    },
+    {
+      "id": "CON-23-1",
+      "contract": "CON-23",
+      "synthetic": true,
+      "method": "POST",
+      "path": "/v1/live/staff/restaurants/r-demo/orders/00000001-1111-4111-8111-111111111111/payment-reversals",
+      "gateway_path": "/api/orderly/live/staff/restaurants/r-demo/orders/00000001-1111-4111-8111-111111111111/payment-reversals",
+      "auth": "clerk_owner",
+      "request": {
+        "expected_version": 3,
+        "payment_event_id": "00000011-1111-4111-8111-111111111111",
+        "reason": "Synthetic correction"
+      },
+      "response_schema": "detail",
+      "response": {
+        "receipt": {
+          "fulfillment": "dine_in",
+          "table_id": "00000002-1111-4111-8111-111111111111",
+          "restaurant_id": "r-demo",
+          "restaurant_name": "Synthetic Restaurant",
+          "table_label": "T1",
+          "items": [
+            {
+              "id": "line-one",
+              "restaurant_id": "r-demo",
+              "menu_item_id": "i-one",
+              "quantity": 1,
+              "modifiers": [],
+              "special_instructions": null,
+              "name": "Sample Pizza",
+              "unit_minor": 1200,
+              "line_minor": 1200
+            }
+          ],
+          "totals": {
+            "currency": "INR",
+            "subtotal_minor": 1200,
+            "discount_minor": 0,
+            "tax_minor": 0,
+            "charges_minor": 0,
+            "total_minor": 1200
+          },
+          "pricing_version": 1,
+          "promotion_code": null,
+          "offer_version": null,
+          "business_identity": {},
+          "synthetic": true,
+          "schema_version": 1,
+          "kind": "live-v1",
+          "id": "00000001-1111-4111-8111-111111111111",
+          "created_at": "2026-10-11T09:00:00+00:00",
+          "payment_instruction": "Pay at restaurant"
+        },
+        "operation": {
+          "status": "Accepted",
+          "version": 4,
+          "reason": null,
+          "updated_at": "2026-10-11T09:00:00+00:00"
+        },
+        "payment": {
+          "status": "Unpaid",
+          "amount_minor": 1200,
+          "currency": "INR",
+          "active_payment_event_id": null,
+          "settlement_required": false
+        },
+        "events": [
+          {
+            "id": "00000003-1111-4111-8111-111111111111",
+            "kind": "submitted",
+            "at": "2026-10-11T09:00:00+00:00",
+            "actor": "synthetic-guest",
+            "reason": null
+          }
+        ]
+      },
+      "expected_status": 200,
+      "idempotency_key": "00000004-1111-4111-8111-111111111111"
+    },
+    {
+      "id": "CON-25-1",
+      "contract": "CON-25",
+      "synthetic": true,
+      "method": "POST",
+      "path": "/v1/live/restaurants/r-demo/consents",
+      "gateway_path": "/api/orderly/live/restaurants/r-demo/consents",
+      "auth": "guest_cookie",
+      "request": {
+        "order_id": "00000001-1111-4111-8111-111111111111",
+        "channel": "sms",
+        "destination": "synthetic.invalid",
+        "notice_version": "fixture-v1",
+        "consent": true
+      },
+      "response_schema": "recorded",
+      "response": {
+        "recorded": true
+      },
+      "expected_status": 200,
+      "idempotency_key": null
+    },
+    {
+      "id": "CON-26-1",
+      "contract": "CON-26",
+      "synthetic": true,
+      "method": "POST",
+      "path": "/v1/live/unsubscribe/synthetic-capability",
+      "gateway_path": "/api/orderly/live/unsubscribe/synthetic-capability",
+      "auth": "capability_token",
+      "request": {},
+      "response_schema": "unsubscribe",
+      "response": {
+        "unsubscribed": true
+      },
+      "expected_status": 200,
+      "idempotency_key": null
+    },
+    {
+      "id": "CON-28-1",
+      "contract": "CON-28",
+      "synthetic": true,
+      "method": "POST",
+      "path": "/v1/live/staff/restaurants/r-demo/campaigns",
+      "gateway_path": "/api/orderly/live/staff/restaurants/r-demo/campaigns",
+      "auth": "clerk_owner",
+      "request": {
+        "channel": "sms",
+        "offer_id": "00000005-1111-4111-8111-111111111111",
+        "message": "Synthetic sample only",
+        "subject": null
+      },
+      "response_schema": "campaign",
+      "response": {
+        "id": "00000006-1111-4111-8111-111111111111",
+        "restaurant_id": "r-demo",
+        "version": 1,
+        "channel": "sms",
+        "offer_id": "00000005-1111-4111-8111-111111111111",
+        "message": "Synthetic sample only",
+        "subject": null,
+        "status": "draft",
+        "approval_id": null
+      },
+      "expected_status": 201,
+      "idempotency_key": null
+    },
+    {
+      "id": "CON-29-1",
+      "contract": "CON-29",
+      "synthetic": true,
+      "method": "POST",
+      "path": "/v1/live/staff/restaurants/r-demo/campaigns/00000006-1111-4111-8111-111111111111/preview",
+      "gateway_path": "/api/orderly/live/staff/restaurants/r-demo/campaigns/00000006-1111-4111-8111-111111111111/preview",
+      "auth": "clerk_owner",
+      "request": {
+        "expected_version": 1
+      },
+      "response_schema": "campaign_preview",
+      "response": {
+        "preview_id": "00000010-1111-4111-8111-111111111111",
+        "expires_at": "2026-10-11T10:00:00+00:00",
+        "recipient_count": 0,
+        "estimated_cost_minor": 0,
+        "currency": "INR",
+        "content_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "offer_version": 1,
+        "setup_ready": false
+      },
+      "expected_status": 200,
+      "idempotency_key": null
+    },
+    {
+      "id": "CON-29-2",
+      "contract": "CON-29",
+      "synthetic": true,
+      "method": "POST",
+      "path": "/v1/live/staff/restaurants/r-demo/campaigns/00000006-1111-4111-8111-111111111111/approve",
+      "gateway_path": "/api/orderly/live/staff/restaurants/r-demo/campaigns/00000006-1111-4111-8111-111111111111/approve",
+      "auth": "clerk_owner",
+      "request": {
+        "expected_version": 1,
+        "preview_id": "00000010-1111-4111-8111-111111111111",
+        "max_cost_minor": 0
+      },
+      "response_schema": "approval",
+      "response": {
+        "id": "00000007-1111-4111-8111-111111111111",
+        "campaign_id": "00000006-1111-4111-8111-111111111111",
+        "version": 1,
+        "recipient_count": 0,
+        "max_cost_minor": 0,
+        "currency": "INR",
+        "approved_at": "2026-10-11T09:00:00+00:00"
+      },
+      "expected_status": 201,
+      "idempotency_key": "00000004-1111-4111-8111-111111111111"
+    },
+    {
+      "id": "CON-30-1",
+      "contract": "CON-30",
+      "synthetic": true,
+      "method": "GET",
+      "path": "/v1/live/staff/restaurants/r-demo/messaging-setup",
+      "gateway_path": "/api/orderly/live/staff/restaurants/r-demo/messaging-setup",
+      "auth": "clerk_owner",
+      "request": null,
+      "response_schema": "messaging_setup",
+      "response": {
+        "sms": {
+          "configured": false,
+          "verified": false,
+          "reason_codes": [
+            "provider_unconfigured"
+          ],
+          "cost_version": null
+        },
+        "email": {
+          "configured": false,
+          "verified": false,
+          "reason_codes": [
+            "provider_unconfigured"
+          ],
+          "cost_version": null
+        }
+      },
+      "expected_status": 200,
+      "idempotency_key": null
+    },
+    {
+      "id": "CON-37-1",
+      "contract": "CON-37",
+      "synthetic": true,
+      "method": "POST",
+      "path": "/v1/live/staff/restaurants/r-demo/campaigns/00000006-1111-4111-8111-111111111111/pause",
+      "gateway_path": "/api/orderly/live/staff/restaurants/r-demo/campaigns/00000006-1111-4111-8111-111111111111/pause",
+      "auth": "clerk_owner",
+      "request": {
+        "expected_version": 1
+      },
+      "response_schema": "campaign",
+      "response": {
+        "id": "00000006-1111-4111-8111-111111111111",
+        "restaurant_id": "r-demo",
+        "version": 2,
+        "channel": "sms",
+        "offer_id": "00000005-1111-4111-8111-111111111111",
+        "message": "Synthetic sample only",
+        "subject": null,
+        "status": "paused",
+        "approval_id": null
+      },
+      "expected_status": 200,
+      "idempotency_key": "00000004-1111-4111-8111-111111111111"
+    },
+    {
+      "id": "CON-38-1",
+      "contract": "CON-38",
+      "synthetic": true,
+      "method": "GET",
+      "path": "/v1/live/staff/restaurants/r-demo/summary?from=2026-10-11&to=2026-10-11",
+      "gateway_path": "/api/orderly/live/staff/restaurants/r-demo/summary?from=2026-10-11&to=2026-10-11",
+      "auth": "clerk_owner",
+      "request": null,
+      "response_schema": "summary",
+      "response": {
+        "from": "2026-10-11",
+        "to": "2026-10-11",
+        "currency": "INR",
+        "submitted": 1,
+        "completed": 0,
+        "cancelled": 0,
+        "recorded_paid_minor": 0,
+        "reversed_minor": 0,
+        "unpaid_minor": 1200,
+        "settlement_required": 0,
+        "promotion_submissions": 0,
+        "campaigns": {
+          "accepted": 0,
+          "delivered": 0,
+          "uncertain": 0,
+          "cost_reserved_minor": 0
+        }
+      },
+      "expected_status": 200,
+      "idempotency_key": null
+    },
+    {
+      "id": "CON-58-1",
+      "contract": "CON-58",
+      "synthetic": true,
+      "method": "POST",
+      "path": "/v1/live/demo/session",
+      "gateway_path": "/api/orderly/live/demo/session",
+      "auth": "guest_cookie",
+      "request": {},
+      "response_schema": "demo_session",
+      "response": {
+        "schema_version": 1,
+        "restaurant_id": "r-demo",
+        "expires_at": "2026-10-11T10:00:00+00:00"
+      },
+      "expected_status": 201,
+      "idempotency_key": null
+    },
+    {
+      "id": "CON-60-1",
+      "contract": "CON-60",
+      "synthetic": true,
+      "method": "GET",
+      "path": "/health/live-service",
+      "gateway_path": "/health/live-service",
+      "auth": "public",
+      "request": null,
+      "response_schema": "readiness",
+      "response": {
+        "ready": false,
+        "source_sha": "synthetic-source",
+        "schema_ready": false,
+        "worker_ready": false,
+        "identity_ready": false,
+        "live_enabled": false,
+        "reason_codes": [
+          "live_disabled"
+        ]
+      },
+      "expected_status": 503,
+      "idempotency_key": null
+    }
+  ],
+  "wire_status_note": "Synthetic expected contracts only. HTTP statuses not explicitly promised by CON records require provider confirmation. No requests were sent.",
+  "protocol_negative_cases": [
+    {
+      "name": "missing_staff_identity",
+      "contract": "CON-06",
+      "expected_status": 401,
+      "code": "staff_auth_required",
+      "fields": [],
+      "no_write": true
+    },
+    {
+      "name": "wrong_staff_role",
+      "contract": "CON-21",
+      "expected_status": 403,
+      "code": "permission_denied",
+      "fields": [],
+      "no_write": true
+    },
+    {
+      "name": "foreign_restaurant_order",
+      "contract": "CON-19",
+      "expected_status": 404,
+      "code": "not_found",
+      "fields": [],
+      "no_write": true
+    },
+    {
+      "name": "stale_revision",
+      "contract": "CON-14",
+      "expected_status": 409,
+      "code": "cart_conflict",
+      "fields": [
+        "expected_revision"
+      ],
+      "no_write": true
+    },
+    {
+      "name": "changed_replay_body",
+      "contract": "CON-18",
+      "expected_status": 409,
+      "code": "idempotency_conflict",
+      "fields": [],
+      "no_write": true
+    },
+    {
+      "name": "wrong_payment_reversal_suffix",
+      "contract": "CON-23",
+      "expected_status": 404,
+      "code": "not_found",
+      "fields": [],
+      "no_write": true
+    },
+    {
+      "name": "dependency_unavailable",
+      "contract": "CON-15",
+      "expected_status": 503,
+      "code": "pricing_unconfigured",
+      "fields": [],
+      "no_write": true
+    }
+  ]
 }
