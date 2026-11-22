@@ -113,3 +113,19 @@ Both parties must approve the exit approach before onboarding real data. The res
 
 **Exit acceptance record:** end date, signed handoff manifest, export provenance, open-issue list, access revocation, reconciled invoices and approved residual retention plan, all private. Do not put customer contacts, exported files or executed terms in Git.
 
+## 8. Claims-to-evidence register
+
+Use this table before showing a demonstration or sending an offer. An architecture plan is not product acceptance.
+
+| Claim or requested capability | Evidence currently supportable | Wording allowed in sales material |
+|---|---|---|
+| Guest can browse and place a mock pizza order and reopen its receipt | Existing [README mock demo](../../README.md) and historical [stabilization record](../releases/stabilization-acceptance.md); separate hosted release gates remain unfinished | "Existing **mock-only** manual ordering demo; no payment collected." |
+| Connected restaurant guest → staff → pay-at-restaurant recording | [RF-01 walkthrough](../demo/restaurant-sales-walkthrough.md), DS and RS implementation proposed, not accepted | "**Planned** restaurant pilot capability; not yet live or verified." |
+| Owner can change live menus, hours, staff or table settings | RS-09/10/12/50/51 and DS owner proposal packets not live accepted | "**Planned**; preview/mock only where labeled." |
+| Campaign previews and reporting | DEMO-SALES marketing **simulation** defined, not built. No verified provider sends | "**Planned simulated preview**; zero real messages or sales claims." |
+| Real opted-in MSG91/SendGrid sends | U2/U3 and RS-30–37/INT03/RS-65 incomplete | "Not offered until separately approved and demonstrated." |
+| Browser voice proposal and manual typed fallback | Proposed RS-55/56/57 and test-only RF-01 design; mock parser is not accepted live voice | "**Planned** user-reviewed voice; typed entry remains available." |
+| Verified restaurant conversion, order-completion uplift or ROI | No private real pilot baseline, observation period or customer verification recorded | **Do not claim** uplift, satisfaction, conversion or return on investment |
+
+**Verification rule:** Before making any stronger claim, add a dated private build/test/participant reference and its exact observed result to the onboarding evidence ledger. Do not treat provider-accepted as delivered, a recorded payment assertion as settled funds, or an interested lead as paid work.
+
