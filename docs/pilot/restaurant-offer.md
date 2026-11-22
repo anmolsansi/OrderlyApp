@@ -79,3 +79,20 @@ Proposed operating procedure, subject to both parties' approval:
 
 **Acceptance is per feature and environment.** Record the actual deployed build, tenant, reviewer, test case and acceptance result privately. Failure/blocked work may not be represented as successfully supplied.
 
+## 6. Pilot calendar, start gate and payment conditions
+
+| Milestone | Condition | Approved date or duration |
+|---|---|---|
+| Proposal delivered | Restaurant requests review; no binding terms | **OWNER DECISION REQUIRED** |
+| Pilot accepted | Authorized provider and restaurant owners sign versioned scope and cost schedule | **OWNER DECISION REQUIRED** |
+| Pilot environment setup | Agreed U1/U2/U3 inputs, accounts, menu, staff and access, disabled initial provisioning | **OWNER DECISION REQUIRED** |
+| Staff orientation and dry-run | Named staff perform guest-to-staff-to-recorded-payment flows with documented fallback | **OWNER DECISION REQUIRED** |
+| Live pilot start | RS-INT01–04, RS-64, RS-65, RS-RELEASE and U1–U4 acceptance all pass on the approved build | **OWNER DECISION REQUIRED**, no auto-start |
+| Baseline and observation windows | Agreed before measuring; record dates, eligible denominator and sampling method | **OWNER DECISION REQUIRED** |
+| Midpoint review and final continue/revise/stop decision | Named commercial and operational owners approve outcome with observed evidence | **OWNER DECISION REQUIRED** |
+| Pilot end / renewal decision | Fixed pilot duration, renewal price and end date agreed in writing | **OWNER DECISION REQUIRED** |
+
+**No agreed start date, free trial, implied service term or auto-renewal exists in this draft.** The pilot must not go live because a synthetic demo passed. No one should promise a delivery date until engineering and external restaurant/provider/device gates are signed off.
+
+Billing follows the explicitly approved charge schedule in section 2. Any deposit, accepted-project milestone or actual paid-project event requires separate private evidence.
+
