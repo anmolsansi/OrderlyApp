@@ -233,8 +233,8 @@
         "promotion_code": null
       }
     },
-    "canonical_json": null,
-    "sha256": null,
+    "canonical_json": "{\"body\":{\"expected_revision\":1,\"fulfillment\":\"dine_in\",\"promotion_code\":null,\"quote_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"table_id\":\"00000002-1111-4111-8111-111111111111\"},\"operation\":\"live.order.submit\",\"target\":{\"order_id\":\"00000001-1111-4111-8111-111111111111\",\"restaurant_id\":\"r-demo\"}}",
+    "sha256": "899c7c822c4ded14bea117e1cb414c8086b138f80d8b6a5b683d698653d0d8d2",
     "same_key_replay": {
       "expected_status": 200,
       "requires_same_operation": true,
@@ -270,7 +270,16 @@
         "name": "foreign_restaurant",
         "expected_status": 404
       }
-    ]
+    ],
+    "strict_rules": {
+      "sorted_object_keys_recursively": true,
+      "preserve_array_order": true,
+      "compact_utf8": true,
+      "strict_integer": true,
+      "explicit_nullable": true,
+      "reject_unknown_fields": true,
+      "authorize_before_replay": true
+    }
   },
   "mock_fixture_blob_sha": {
     "c0.json": "6a20804f3c75926b22702d20529f7e4e5c2aa606",
