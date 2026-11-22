@@ -33,3 +33,26 @@ The provider's project owner makes a **separate private copy per restaurant** af
 
 **Account approvals:** named restaurant signatory + provider commercial owner for payment; restaurant data owner + provider privacy owner for personal data; restaurant marketing owner + provider operator for external sends; restaurant operations lead + provider technical lead for devices/live readiness. Every such owner is currently **OWNER DECISION REQUIRED**.
 
+## 2. Restaurant business setup and owned records
+
+Complete these items in the restaurant's controlled onboarding record; do not paste actual customer or employee details here.
+
+| Input | Minimum acceptance check | Required approver |
+|---|---|---|
+| Restaurant profile | Legal/trading name, address, supported dine-in/takeaway modes, currency INR, active operating hours and closure periods validated against owner-approved records | Restaurant owner + provider technical lead (U1) |
+| Menu items and modifiers | Category, name, variants, availability, price in INR paise, quantity limits, modifiers/options and unavailable behavior reviewed against restaurant-approved menu | Restaurant menu manager + provider pricing owner (U1) |
+| Taxes, fees and receipt wording | Item and quote totals, legal tax treatment, rounding, cancellation/refund/external settlement policy, receipt wording and examples explicitly signed off. **Never infer tax rates** | Restaurant financial approver + technical/pricing lead (U1) |
+| Dine-in tables and takeaway | Unique table labels, printed link/QR ownership, no privilege granted by table URL, correct tenant mapping and supported fallback | Restaurant floor manager + provider technical lead |
+| Staff roster and permissions | Authorized owner/manager/cashier/staff membership, minimum roles, test revocation, no shared credentials, mobile/tablet access, staff shift owner and handoff | Restaurant owner/operations lead + provider identity lead |
+| Payment recording and reconciliation | Cash or external UPI/card method **recorded as an assertion only**; only verified full amount marked recorded, reconcile separately to actual settlement | Restaurant finance/cashier lead + provider operations lead |
+| Connectivity and hardware | Restaurant phone/tablet/browser versions, staff notification/accessibility, network failover, manual ticketing path, provider support escalation | Restaurant floor manager + technical operator (U4) |
+| Marketing opt-in and suppression | Customer channel consent evidence, opt-out process, approved copy, operator spend caps, suppressed destinations, sender/domain verification | Restaurant marketing/data owners + provider U2/U3 owners |
+
+- [ ] One named owner approves menu import and every tax/fee/receipt assumption before live quote verification.
+- [ ] Restaurant staff review **unavailable** item and closed-hours behavior, table-to-tenant correctness and manual fallback.
+- [ ] Permission owner demonstrates that a removed staff account cannot read/act on another restaurant's orders.
+- [ ] Cashier and operations owners reconcile one test order's status separately from its recorded-payment status, and document an uncertain-response retry using the **original** request key.
+- [ ] Operator records who updates menus, who can deploy changes, who owns inventory or scope exclusions, and who can sign a change order.
+
+**No real tenant, production menu, device test or settlement is claimed by checking this template.** The deployed restaurant service and corresponding tests are still future RS/integration gates.
+
