@@ -51,3 +51,24 @@ The following routes are **planned** under the frozen draft contract. Browser ca
 
 **Minimum fixture consumers:** `r-demo` restaurant/menu/table (DB-A), `g-one` guest nonce scope (DB-B), item `i-one` and modifier prices, 0→1 cart revision, deterministic INR-paise quote/receipt/order, synthetic contacts including one suppressed channel, one transferable offer, draft campaign with version/preview ID, and stable test timestamps. All demo records are copied into a distinct scope per guest. Do not reuse a shared fixture row as the writable authority.
 
+## 4. Synthetic authority and exact route boundary
+
+**Proposed server-side demo capability:** `POST /v1/live/demo/session` requires the same verified active HttpOnly guest cookie and exact Origin rules as existing guest actions, responds `201 {schema_version:1,restaurant_id,expires_at}`, and creates a new synthetic restaurant copy with `demo_owner_id` bound to that guest. Demo scope is looked up from the session and database. A caller-supplied `role`, `synthetic`, `demo`, `restaurant_id`, request header or URL alone has **no** authority. Separate browsers have separate restaurant copies. Unauthenticated demo access returns 401, another owner's tenant/order returns 404, and an attempted live staff action returns 401/403 even from a demo role screen.
+
+**Approved demo staff command methods only:** `GET orders`, `GET orders/{oid}`, `POST orders/{oid}/transitions`, `POST orders/{oid}/payments`. A later full RS-58 can add `POST orders/{oid}/payment-reversals` behind its reviewed acceptance. The five-minute script does not require a reversal. Command keys follow C-A canonical `{operation,target,body}` fingerprinting and authorization-before-replay; uncertain writes reuse the **same key**, not a new one.
+
+**Proposed owner read/edit expansion, subject to DS-02 review:**
+
+| Method and demo-only suffix | Input | Output / failure |
+|---|---|---|
+| `GET settings` | None | CON-09 Settings snapshot. 404 wrong owner |
+| `GET menu` | None | CON-10 Menu and catalog_version |
+| `PUT menu/{item_id}/availability` | `{expected_catalog_version:int,available:boolean}` | Updated CON-10 Menu; 409 stale; 404 foreign item; 422 wrong types |
+| `GET offers` | `limit=1..100` optional | CON-16 `{offers,next_cursor}`; no private marketing contacts |
+| `GET setup` | None | `{schema_version:1,synthetic:true,provider_mode:"disabled",sms_ready:false,email_ready:false,reason_codes:["DEMO_ONLY"]}` |
+| `GET simulation-summary` | None | `{schema_version:1,synthetic:true,submitted:int,completed:int,simulated_recorded_payment_minor:int,campaign_previews:int,actual_messages_sent:0,actual_revenue_minor:0}` |
+
+All routes have the explicit prefix `/v1/live/demo/restaurants/{rid}/`, exact method/path allowlist in both server and gateway, and per-request demo-owner check. These are **additive proposals** for DS-02, not changes to the established real owner-staff routes. The same-owned UI controls receive a typed `demo` data adapter; they never call the live staff endpoint with a guest cookie. No query string may switch into demo authority.
+
+**Reset:** a fresh `POST /v1/live/demo/session` creates a fresh scoped fixture. Old scope must no longer authorize the initiating guest, and resetting guest A cannot change B or a real tenant. An interrupted reset or uncertain POST remains an error/reconciliation state, not a silent fallback to the shared fixture. Historical real business records are never cascaded by demo reset.
+
