@@ -1,6 +1,6 @@
 # OrderlyApp intern development guide
 
-**First assignment:** [RS-01 · Freeze the restaurant-service contracts](docs/tickets/restaurant-service/RS-01.md). The deliverables are one contract document, one synthetic fixture bundle and two readers that agree on valid and invalid examples. Run both readers and give their results to the reviewer. A reviewed fixture unlocks consumer preparation. Implemented providers each need their own conformance test.
+**Completed foundation (synthetic only):** [RS-01 · Freeze the restaurant-service contracts](docs/tickets/restaurant-service/RS-01.md) was merged in [PR #61](https://github.com/anmolsansi/OrderlyApp/pull/61) at `ed738ada2cdf9610a780a09e7bb24f690b7d80ba`, with 7/7 required CI checks. Its contract document, synthetic fixture bundle and two readers agree on valid and invalid examples. This does **not** implement or accept any restaurant-service provider, live messaging or real payment.
 
 **After RS-01:** open [RF-01 · Plan the early sales demo](docs/tickets/restaurant-service/RF-01.md). Use the [numbered assignments](docs/ticket-execution-flow.md#72-numbered-ticket-index) for the full route through release. RS-67 provisions the disabled restaurant before RS-04 bootstraps its owner, so working through IDs in numerical order would leave the intern without a tenant.
 
@@ -7973,7 +7973,7 @@ All modifications to `development.md` status and `docs/repo_context.md` during f
 
 Review follow-ups [RF-01–RF-05](#1817-review-amendments-and-follow-up-tickets) are additional planning/delivery work. They are Not completed and are not included in the original 67-packet count. Apply the contract corrections in section18.17.1 when extracting any affected packet.
 
-All are **Not completed**. A planned contract is not a merged provider. Readiness at execution is checked per packet: READY only when required inputs/fixture freeze and shared-file gates pass; otherwise WAITING_DEPENDENCY or BLOCKED_EXTERNAL. No implementation ticket is checked off by this planning work.
+**RS-01's synthetic contract freeze is merged in PR #61.** The remaining RS-02–RS-67 implementation packets are **Not completed** unless subsequently verified against merged evidence. A planned contract is not a merged provider. Readiness at execution is checked per packet: READY only when required inputs/fixture freeze and shared-file gates pass; otherwise WAITING_DEPENDENCY or BLOCKED_EXTERNAL. RF-01's documentation proposal does not complete any DS implementation, live acceptance or release gate.
 
 | ID / status | Outcome | Workstream / merge wave | Direct dependencies | Output contract | Effort | Critical-path relevance |
 |---|---|---|---|---|---|---|
@@ -8054,7 +8054,7 @@ Each linked assignment includes the relevant draft DTO and schema excerpts so a 
 Builder boundary: implement one ready packet only. Read its copied contracts, docs/repo_context.md and listed source. Do not choose new API fields, dependencies, auth rules, business policy or UI flows. If current source contradicts the packet, return Needs Architect Decision with evidence and continue only independent parts. Never skip a failing test or use production credentials/data. One logical micro-commit after relevant validation during an authorized implementation task; publication/merge needs that task's authorization. Documentation status is Not completed until code, tests and recorded acceptance pass.
 
 <a id="rs-01"></a>
-#### RS-01 — Freeze live-v1 envelopes and synthetic consumer fixtures — Not completed
+#### RS-01 — Freeze live-v1 envelopes and synthetic consumer fixtures — Completed synthetic freeze (PR #61; provider work separate)
 
 [Open the RS-01 assignment](docs/tickets/restaurant-service/RS-01.md).
 
@@ -8524,9 +8524,12 @@ These five bounded follow-ups are **Not completed**. Documentation edits are int
 The table defines additive gates, not new runtime APIs. Original dependencies remain effective until RF-01 updates the canonical DAG, waves, consumers and milestone records together. No follow-up can waive U1–U4, tenant isolation or live release proof. RF-03 follows RS-48 because both can touch queue layout; it must not run concurrently with that owner. RF-04 follows RF-02 if both edit onboarding/support wording. RF-05 runs last among concurrent documentation edits and republishes every status/link without changing completion evidence.
 
 <a id="rf-01"></a>
-#### RF-01 — Define an earlier complete synthetic sales demo — Not completed
+#### RF-01 — Define an earlier complete synthetic sales demo — Planning proposal in unmerged review branch
 
 [Open the RF-01 assignment](docs/tickets/restaurant-service/RF-01.md).
+
+**RF-01 planning artifact:** [Five-minute demonstration, bounded DS child packets, route/security matrix, negative tests, and proof rules](docs/demo/restaurant-sales-walkthrough.md). Issue [#62](https://github.com/anmolsansi/OrderlyApp/issues/62) tracks the micro-commit plan. The graph and wave revisions below are **proposed** on a review branch, not merged runtime behavior. This RF-01 task concerns planning, not building a demonstration.
+
 
 <a id="rf-02"></a>
 #### RF-02 — Prepare the paid-pilot offer and evidence checklist — Not completed
@@ -8547,3 +8550,30 @@ The table defines additive gates, not new runtime APIs. Original dependencies re
 #### RF-05 — Split the master guide without losing executable ticket context — Not completed
 
 [Open the RF-05 assignment](docs/tickets/restaurant-service/RF-05.md).
+
+
+#### 18.17.3 RF-01 provider-independent DEMO-SALES overlay (proposed, not implemented)
+
+**Source evidence:** RS-01 frozen synthetic registry/fixture files and tests merged on `main` at `ed738ada2cdf9610a780a09e7bb24f690b7d80ba` (PR #61). The existing RS-20 staff read queue contract contains no provider readiness response, while its RS-30 predecessor is a shared `backend/app/staff_routes.py` ownership gate. RS-58's original RS-37 dependence and RS-59's original RS-INT02/03 merge gates remain binding for the **full-service** milestone.
+
+**Architecture decision:** the early synthetic demonstration is an additional milestone `DEMO-SALES`, with one guest-owned synthetic restaurant/session and reused live business logic. Preserve the full RS-58/59 conformance responsibilities and real provider, feedback, budget, recovery and release tests. Split an earlier provider-free slice into six bounded child packets. Their contracts, ownership, route tests and acceptance are defined in the [RF-01 handoff](docs/demo/restaurant-sales-walkthrough.md#6-implementation-handoff-six-bounded-child-packets).
+
+| New packet | Direct providers / prerequisite | Output and exact ownership |
+|---|---|---|
+| **DS-01** | RS-01, RS-07, RS-19, RS-22, RS-29, RS-41 | Guest-owned demo copy, synthetic staff order/payment/campaign endpoints; `backend/app/live_demo.py`, `backend/app/live_routes.py`, `backend/tests/test_live_demo_isolation.py` |
+| **DS-02** | DS-01, RS-09, RS-10, RS-16, RS-29 | Demo-only owner settings/menu/availability/offer/setup reads and strictly hypothetical campaign results; `backend/app/live_demo_views.py` plus explicit DS-01 extension/tests |
+| **DS-03** | DS-02, RS-07, RS-41 | Allowlisted demo gateway and typed browser client, `app/api/orderly/[...path]/route.ts`, `lib/live-api.ts`, `tests/live-api.test.ts` |
+| **DS-04** | DS-03, RS-47, RS-48, RS-49 | Demo staff UI reusing StaffQueue, StaffOrderDetail, StaffPaymentForm and guest-owned demo API adapter |
+| **DS-05** | DS-03, RS-51, RS-52, RS-53 | Demo owner UI reusing menu, campaign draft and campaign review controls with simulated-only results |
+| **DS-06** | DS-04, DS-05, RS-44, RS-45, RS-46, RS-57 | `/demo` role-switch, existing customer ordering/voice UI, reset, full browser and zero-side-effect proof |
+
+**One schedule correction:** replace the draft `RS-30 → RS-20` dependency with `RS-20 → RS-30` for `backend/app/staff_routes.py` serialization. RS-20 is a role-scoped read of orders and does not require live provider setup. RS-30 remains required for RS-31/32 and full release; any unrecognized runtime config dependency in RS-20 must block this correction rather than be bypassed. **No other provider-only dependency is removed from the full-release DAG.**
+
+**New merge edges:** the machine-readable §18.7 graph adds RS01/07/19/22/29/41 → DS-01; DS-01 + RS09/10/16/29 → DS-02; DS-02 + RS07/41 → DS-03; DS-03 + RS47/48/49 → DS-04; DS-03 + RS51/52/53 → DS-05; DS-04/05 + RS44/45/46/57 → DS-06; DS-06 → DEMO-SALES. Add DS-01/02/03 → RS-58 and DS-06 → RS-59 for serialized ownership and later full-conformance tests. All original RS-INT01–04 and RS-RELEASE edges remain.
+
+**Change control:** the original standalone RS-20/30/58/59 packet copies still describe their old ordering/CREATE paths. **RF-05 must update those source packet copies and the RS-INT02/03/04 consumer descriptions before any DS implementer uses them.** This planning PR must not masquerade as the implementation or as a frozen replacement for an RS-01 fixture. Treat DS execution as `WAITING_DEPENDENCY` until packet sync, merge prerequisites, and named conformance pass.
+
+**Five-minute run:** [full click-by-click script and recovery case](docs/demo/restaurant-sales-walkthrough.md#9-five-minute-operator-walkthrough-one-synthetic-restaurant): guest orders using reviewed voice or text → staff advances state → cashier records a synthetic full payment assertion → owner changes availability and previews hypothetical marketing results → reset to a clean private scope.
+
+**Acceptance:** validated acyclic graph, no concurrent same-file owners, explicit authorized screen/route mapping, and concrete A1–A9 runtime test owners. DEMO-SALES cannot be claimed passed until all DS files, PostgreSQL/Chromium E2E, two-guest separation, transport-spy zero-send/zero-money checks and full relevant CI prove it. No real send, delivery, collection, Clerk membership, U1–U4 signoff or live release acceptance is implied. Rollback only this documentation/scheduling overlay if the proposed serialization cannot be justified, preserving all old release providers.
+
