@@ -136,3 +136,38 @@ Follow the **[79-node/258-edge RF-01 graph and 30-wave schedule](docs/contracts/
 ### 18.10 Full implementation packets
 
 Every ticket above is an independently readable assignment. The [old inlined master packet copy](docs/plans/orderly-history.md#1810-full-implementation-packets) is historical only. A builder packet must still contain the exact CON/DTO/SQL/schema definitions, security boundary, request/response examples, failure behavior, owned files, negative tests and rollback for its dependency slice. Do not hand off a bare contract ID or treat a draft as an implemented API.
+
+### 18.11 Integration checkpoints and release
+
+| ID | Exact assignment | State |
+|---|---|---|
+| RS-INT01 | [Identity, catalog, live checkout](docs/tickets/restaurant-service/RS-INT01.md) | Not completed |
+| RS-INT02 | [Customer/staff/pay-at-restaurant](docs/tickets/restaurant-service/RS-INT02.md) | Not completed |
+| RS-INT03 | [Approved campaign/worker/feedback](docs/tickets/restaurant-service/RS-INT03.md) | Not completed |
+| RS-INT04 | [Whole synthetic service/compatibility](docs/tickets/restaurant-service/RS-INT04.md) | Not completed |
+| RS-RELEASE | [Controlled activation](docs/tickets/restaurant-service/RS-RELEASE.md) | Not completed |
+
+### 18.17 Review amendments and follow-up tickets
+
+The [C-A command fingerprint](docs/contracts/restaurant-service-v1.md), [C-B durable daily budgets](docs/contracts/restaurant-service-v1.md), and [C-C canonical payment-reversals suffix](docs/contracts/restaurant-service-v1.md) belong to the frozen proposal registry plus explicit [historical amendment](docs/plans/orderly-history.md#18171-contract-corrections-required-before-fixture-freeze). All provider and consumer conformance remains unimplemented unless independently verified.
+
+| Follow-up | Assignment | Evidence status |
+|---|---|---|
+| <a id="rf-01"></a>RF-01 | [Define earlier synthetic sales-demo planning](docs/tickets/restaurant-service/RF-01.md) | Merged planning in PR #63, not a built demo |
+| <a id="rf-02"></a>RF-02 | [Prepare the paid pilot offer and evidence checklist](docs/tickets/restaurant-service/RF-02.md) | Not completed |
+| <a id="rf-03"></a>RF-03 | [Make waiting orders noticeable to staff](docs/tickets/restaurant-service/RF-03.md) | Not completed |
+| <a id="rf-04"></a>RF-04 | [Rehearse manual outage recovery](docs/tickets/restaurant-service/RF-04.md) | Not completed |
+| <a id="rf-05"></a>RF-05 | [Split the guide and synchronize packets](docs/tickets/restaurant-service/RF-05.md) | Review branch unmerged |
+
+**Six proposed DEMO-SALES child packets** preserve RF-01's earlier provider-independent contract and do not replace RS-58/59 full-release conformance.
+
+| Child | Role and implementation handoff | State |
+|---|---|---|
+| DS-01 | [Private demo session and staff action kernel](docs/tickets/restaurant-service/DS-01.md) | Proposed, not implemented |
+| DS-02 | [Owner settings and hypothetical campaign outcomes](docs/tickets/restaurant-service/DS-02.md) | Proposed, not implemented |
+| DS-03 | [Exact same-origin demo gateway and typed client](docs/tickets/restaurant-service/DS-03.md) | Proposed, not implemented |
+| DS-04 | [Demo staff role and shared component adaptation](docs/tickets/restaurant-service/DS-04.md) | Proposed, not implemented |
+| DS-05 | [Demo owner role and simulated preview](docs/tickets/restaurant-service/DS-05.md) | Proposed, not implemented |
+| DS-06 | [Connected demo launcher, reset and real-browser A1–A9](docs/tickets/restaurant-service/DS-06.md) | Proposed, not implemented |
+
+[Full demo route/permission/side-effect matrix](docs/demo/restaurant-sales-walkthrough.md) · [Source and consumer handoff map](docs/contracts/restaurant-service-plan.md) · [RF-05 issue checklist](https://github.com/anmolsansi/OrderlyApp/issues/64)
