@@ -388,6 +388,11 @@ def test_all_negative_mutations_fail_independent_strict_schema() -> None:
             errors = validate(SCHEMAS[case["kind"]], bad)
             assert change["expected_field"] in errors, (contract_id, change["name"], errors)
             assert change["code"] in {"invalid_input", "not_found"}
+            assert validate(SCHEMAS["error"], {"error": change["error"]}) == []
+            assert change["error"]["code"] == change["code"]
+            assert change["error"]["fields"] == ([] if change["code"] == "not_found" else [change["expected_field"]])
+            assert change["expected_status"] == (404 if change["code"] == "not_found" else 422)
+            assert change["error"]["request_id"].startswith("synthetic-request-")
             count += 1
     assert count > 200
 
@@ -481,8 +486,13 @@ def test_malformed_wire_requests_and_protocol_negatives_fail_closed() -> None:
     assert [item["expected_status"] for item in protocol] == [401, 403, 404, 409, 409, 404, 503]
     for item in protocol:
         assert item["no_write"] is True
+        assert item["synthetic"] is True
         assert item["contract"] in fixture["contracts"]
         assert item["code"]
+        assert validate(SCHEMAS["error"], {"error": item["error"]}) == []
+        assert item["error"]["code"] == item["code"]
+        assert item["error"]["fields"] == item["fields"]
+        assert item["error"]["request_id"].startswith("synthetic-request-")
 
 def test_old_mock_fixture_blobs_are_byte_identical_to_base() -> None:
     expected = read_bundle()["mock_fixture_blob_sha"]
