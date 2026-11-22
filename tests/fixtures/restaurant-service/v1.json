@@ -279,7 +279,45 @@
       "explicit_nullable": true,
       "reject_unknown_fields": true,
       "authorize_before_replay": true
-    }
+    },
+    "canonicalization_vectors": [
+      {
+        "name": "nested_utf8_and_null",
+        "input": {
+          "z": [
+            {
+              "label": "नमस्ते",
+              "qty": 1
+            },
+            {
+              "label": "pizza",
+              "qty": 2
+            }
+          ],
+          "a": null
+        },
+        "canonical_json": "{\"a\":null,\"z\":[{\"label\":\"नमस्ते\",\"qty\":1},{\"label\":\"pizza\",\"qty\":2}]}",
+        "sha256": "320ea9aad7ac88dc8ab68e1e6042bac051c4ad069717bb081b0341f270e5a7e6"
+      },
+      {
+        "name": "array_order_changes_digest",
+        "input": {
+          "a": null,
+          "z": [
+            {
+              "qty": 2,
+              "label": "pizza"
+            },
+            {
+              "qty": 1,
+              "label": "नमस्ते"
+            }
+          ]
+        },
+        "canonical_json": "{\"a\":null,\"z\":[{\"label\":\"pizza\",\"qty\":2},{\"label\":\"नमस्ते\",\"qty\":1}]}",
+        "sha256": "9dfe52aed7fc8731192b0d9582a188fa1b86fde924471979ba76842b4fd2ac3f"
+      }
+    ]
   },
   "mock_fixture_blob_sha": {
     "c0.json": "6a20804f3c75926b22702d20529f7e4e5c2aa606",
