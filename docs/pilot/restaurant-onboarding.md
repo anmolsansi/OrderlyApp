@@ -136,3 +136,42 @@ Negative examples: "Owner liked the preview" cannot satisfy proposal_requested; 
 
 **No sales-uplift inference:** order count, payment recording, simulated results, SMS accepted by a provider and email delivered are not evidence of increased restaurant revenue or marketing ROI. Revenue attribution and financial success claims require a separately agreed, independently verifiable methodology and transaction evidence, outside this ticket.
 
+## 6. Decision checkpoint, U1–U4 and RS-65 handoff
+
+**Checkpoint:** restaurant authorized signatory + operations lead and provider commercial owner + technical lead review the private acceptance register at the **OWNER DECISION REQUIRED** date. Do not call the pilot successful from this template or the synthetic walkthrough.
+
+| Decision | Minimum condition | Required record |
+|---|---|---|
+| **CONTINUE** | All agreed required technical, support, safety and commercial gates passed on a named build and the agreed measures met, with no unresolved critical safety issue | Each metric's baseline/target/observed sample, accepted risks, next term and signatories |
+| **REVISE** | Owner accepts documented changes to scope, training, device setup, price or targets without bypassing safety gates | Failed/blocked criteria, approved change request, re-test owner and new checkpoint |
+| **STOP** | Owner declines, important privacy/provider/security gate fails, or continued operation cannot be made safe within approved obligations | Reason, stop date/owner, rollback/manual service, pending order/send/payment reconciliation, export and cost closeout |
+
+### External U1–U4 input gate
+
+| Input | Acceptance evidence and owner | Current disposition |
+|---|---|---|
+| **U1 restaurant pricing** | Signed real menu, correct tax/fees/receipt wording, live INR-paise quote examples and financial approval | **BLOCKED**; no real pricing/tax approvals |
+| **U2 privacy/consent/retention** | Restaurant and provider approved policy for marketing permission, restricted records, export, deletion and legal retention | **BLOCKED**; no approved policy |
+| **U3 provider/budgets** | Named MSG91/SendGrid accounts/sender/templates, consent-safe tests, written cost ceilings, provider callbacks and no uncertain-send duplication | **BLOCKED**; no accepted real provider evidence |
+| **U4 real restaurant/devices** | Restaurant/site/staff approvers, supported actual phone/browser/network and speech or typed fallback, observed service workflow and signed pilot acceptance | **BLOCKED**; no real-device/pilot evidence |
+
+### RS-65 consumer handoff
+
+The [RS-65 pilot acceptance packet](../tickets/restaurant-service/RS-65.md) consumes **commercial evidence** from this document **in addition to**, never instead of, its G1–G8/E1–E5 test matrix, U1–U4 provider/policy decisions, actual device/locale evidence and release signoffs.
+
+- [ ] Offer revision approved by both authorized parties; provider/restaurant contacts, costs and billing responsibility explicit.
+- [ ] Commercial stage supported by dated restricted evidence. **paid_project** requires matched actual receipt, not a mock order.
+- [ ] Baseline and observation method agreed before activation; targets, windows and continuation rules signed.
+- [ ] Restaurant menu, tables, staff membership, devices and support/manual outage owner individually approved.
+- [ ] All U1–U4 and applicable RS-INT01–04, RS-64, RS-65 and RS-RELEASE gates verified on named source/build/environment; missing evidence = BLOCKED.
+- [ ] Any claimed demo feature has actual build/test proof; simulated marketing and recorded payment explicitly labeled non-real.
+- [ ] Signed exit, restricted export delivery, access revocation, retention and provider cost reconciliation procedures approved.
+
+**Current RS-65 commercial disposition: BLOCKED / NOT YET REVIEWED BY A REAL RESTAURANT.** This is a document template, not a passing pilot metric or device proof. If the restaurant declines or a term remains unresolved, preserve the reason and return to the offer decision owner. No provider activation, marketing send, production migration or invoicing is authorized by RF-02.
+
+### Evidence review and document rollback
+
+A reviewer may perform a **desk test** using fictional roles: ask who pays one SMS, who answers support, how exit works, who sets pilot targets, what counts as a paid project and who approves privacy. The documents point to the right accountable roles and explicit unresolved decisions, not fabricated individuals. A real owner review and real metrics remain pending.
+
+Rollback for this RF-02 documentation task is to revert the RF-02 docs and roadmap linkage. Do not touch mock checkout, production records, staff identities or provider settings; there are no RF-02 runtime, API or migration changes.
+
