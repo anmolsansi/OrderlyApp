@@ -43,6 +43,16 @@ type Bundle = {
   };
   mock_fixture_blob_sha: Record<string, string>;
   external_evidence_gates: Record<string, string>;
+  wire_cases: Array<{
+    id: string; contract: string; synthetic: boolean; method: string; path: string;
+    gateway_path: string; auth: string; request: unknown; request_schema: string | null;
+    response_schema: string; response: unknown; expected_status: number | null;
+    idempotency_key: string | null;
+  }>;
+  protocol_negative_cases: Array<{
+    name: string; contract: string; expected_status: number; code: string;
+    fields: string[]; no_write: boolean;
+  }>;
 };
 const root = process.cwd();
 function readBundle(): Bundle {
@@ -190,6 +200,45 @@ const schemas: Record<string, Spec> = {
   worker: { command: 'str', live_enabled: 'bool', marketing_send_enabled: 'bool' },
   error_payload: { code: 'str', message: 'str', fields: ['str'], request_id: 'str' },
   error: { error: '@error_payload' },
+  memberships_list: { memberships: ['@membership'] },
+  tables_list: { tables: ['@table'] },
+  guest_order: { receipt: '@receipt', operation: '@operation', payment: '@payment' },
+  recorded: { recorded: 'bool' },
+  messaging_setup: { sms: '@setup', email: '@setup' },
+  cart_item_input: {
+    id: 'str', restaurant_id: 'rid', menu_item_id: 'str', quantity: 'quantity',
+    modifiers: ['@modifier_selection'], special_instructions: 'str?',
+  },
+  member_update: { expected_version: 'revision', role: 'enum:owner|order_staff|cashier', active: 'bool' },
+  settings_update: {
+    expected_version: 'revision', name: 'str', timezone: 'enum:Asia/Kolkata',
+    hours: ['@hour'], is_open: 'bool', brand_label: 'str',
+  },
+  availability_update: { expected_catalog_version: 'positive_int', available: 'bool' },
+  table_update: { expected_version: 'revision', label: 'str', active: 'bool' },
+  cart_put: { expected_revision: 'revision', items: ['@cart_item_input'] },
+  cart_delete: { expected_revision: 'revision' },
+  quote_request: {
+    expected_revision: 'revision', fulfillment: 'enum:dine_in|takeaway',
+    table_id: 'uuid?', promotion_code: 'str?',
+  },
+  offer_update: {
+    expected_version: 'revision', code: 'str', starts_at: 'utc', ends_at: 'utc',
+    min_subtotal_minor: 'money', percent_bps: 'positive_int',
+    max_discount_minor: 'money', max_redemptions: 'positive_int', active: 'bool',
+  },
+  order_request: {
+    expected_revision: 'revision', quote_digest: 'digest', fulfillment: 'enum:dine_in|takeaway',
+    table_id: 'uuid?', promotion_code: 'str?',
+  },
+  transition_request: { expected_version: 'revision', target: 'enum:Accepted|Rejected|Preparing|Ready|Completed|Cancelled', reason: 'str?' },
+  payment_request: { expected_version: 'revision', method: 'enum:cash|upi|card|other' },
+  reversal_request: { expected_version: 'revision', payment_event_id: 'uuid', reason: 'str' },
+  empty_request: {},
+  campaign_create: { channel: 'enum:sms|email', offer_id: 'uuid', message: 'str', subject: 'str?' },
+  preview_request: { expected_version: 'revision' },
+  approve_request: { expected_version: 'revision', preview_id: 'uuid', max_cost_minor: 'money' },
+  pause_request: { expected_version: 'revision' },
 };
 
 function scalarValid(type: string, value: unknown): boolean {
@@ -355,6 +404,70 @@ describe('RS-01 live-v1 synthetic contract readers', () => {
       expect(conflict.expected_status).toBe(409);
     }
     expect(record.security_cases.map(c => c.expected_status)).toEqual([403, 404]);
+  });
+
+
+  it('validates the documented live request and response shapes across route groups', () => {
+    expect(bundle.wire_cases.length).toBeGreaterThanOrEqual(25);
+    const unique = new Set<string>();
+    for (const wire of bundle.wire_cases) {
+      expect(unique.has(wire.id), wire.id).toBe(false);
+      unique.add(wire.id);
+      expect(wire.synthetic).toBe(true);
+      expect(bundle.contracts[wire.contract], wire.id).toBeDefined();
+      expect(['GET', 'POST', 'PUT', 'DELETE']).toContain(wire.method);
+      expect(['public', 'guest_cookie', 'capability_token', 'clerk_staff',
+        'clerk_owner', 'clerk_order_staff', 'clerk_cashier']).toContain(wire.auth);
+      const expectedGateway = wire.path.replace('/v1/live/', '/api/orderly/live/');
+      expect(wire.gateway_path).toBe(expectedGateway);
+      expect(wire.path).not.toContain('r-other');
+      expect(schemas[wire.response_schema], wire.id).toBeDefined();
+      expect(validate(schemas[wire.response_schema], wire.response), wire.id + '/response').toEqual([]);
+      if (wire.method === 'GET') {
+        expect(wire.request).toBeNull();
+        expect(wire.request_schema).toBeNull();
+      } else {
+        expect(wire.request_schema, wire.id).not.toBeNull();
+        const requestSchema = schemas[wire.request_schema as string];
+        expect(requestSchema, wire.id).toBeDefined();
+        expect(validate(requestSchema, wire.request), wire.id + '/request').toEqual([]);
+      }
+      if (wire.idempotency_key !== null) {
+        expect(wire.method).toBe('POST');
+        expect(wire.idempotency_key).toBe(bundle.canonical_command.key);
+      }
+      if (wire.expected_status !== null) {
+        expect([200, 201, 503]).toContain(wire.expected_status);
+      }
+    }
+    expect(bundle.wire_cases.some(w => w.path.endsWith('/payment-reversals'))).toBe(true);
+    expect(bundle.wire_cases.every(w => !w.path.endsWith('/reversals'))).toBe(true);
+  });
+
+  it('rejects malformed wire requests without coercion or silently invented fields', () => {
+    const byId = (id: string) => {
+      const entry = bundle.wire_cases.find(c => c.id === id);
+      if (!entry || !entry.request_schema) throw new Error('Missing request ' + id);
+      return entry;
+    };
+    const vectors: Array<[string, Mutation]> = [
+      ['CON-14-1', { name: 'wrong_cart_tenant', action: 'replace', path: 'items.0.restaurant_id', value: 'r-other', expected_field: 'items.0.restaurant_id', code: 'not_found' }],
+      ['CON-14-1', { name: 'bool_revision', action: 'replace', path: 'expected_revision', value: true, expected_field: 'expected_revision', code: 'invalid_input' }],
+      ['CON-15-1', { name: 'missing_required_null', action: 'remove', path: 'promotion_code', expected_field: 'promotion_code', code: 'invalid_input' }],
+      ['CON-16-1', { name: 'money_as_string', action: 'replace', path: 'max_discount_minor', value: '200', expected_field: 'max_discount_minor', code: 'invalid_input' }],
+      ['CON-18-1', { name: 'unknown_body_field', action: 'add', path: 'payment_token', value: 'forbidden', expected_field: 'payment_token', code: 'invalid_input' }],
+      ['CON-28-1', { name: 'unknown_channel', action: 'replace', path: 'channel', value: 'whatsapp', expected_field: 'channel', code: 'invalid_input' }],
+    ];
+    for (const [id, change] of vectors) {
+      const wire = byId(id);
+      expect(validate(schemas[wire.request_schema as string], mutated(wire.request, change)), id + '/' + change.name).toContain(change.expected_field);
+    }
+    expect(bundle.protocol_negative_cases.map(c => c.expected_status)).toEqual([401, 403, 404, 409, 409, 404, 503]);
+    for (const caseRecord of bundle.protocol_negative_cases) {
+      expect(caseRecord.no_write).toBe(true);
+      expect(bundle.contracts[caseRecord.contract]).toBeDefined();
+      expect(caseRecord.code.length).toBeGreaterThan(0);
+    }
   });
 
   it('keeps C0–C8 exactly byte-identical to the recorded base commit blobs', () => {
