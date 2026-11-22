@@ -46,6 +46,13 @@ type Bundle = {
   };
   mock_fixture_blob_sha: Record<string, string>;
   external_evidence_gates: Record<string, string>;
+  daily_send_budget_fixture: {
+    synthetic: boolean; live_provider_verified: boolean; time_zone: string;
+    current: JsonRecord; following_day: JsonRecord; delivery_reference: JsonRecord;
+    lock_order: string[];
+    rules: Record<string, boolean>;
+    negative: Mutation[];
+  };
   wire_cases: Array<{
     id: string; contract: string; synthetic: boolean; method: string; path: string;
     gateway_path: string; auth: string; request: unknown; request_schema: string | null;
@@ -209,6 +216,8 @@ const schemas: Record<string, Spec> = {
   guest_order: { receipt: '@receipt', operation: '@operation', payment: '@payment' },
   recorded: { recorded: 'bool' },
   messaging_setup: { sms: '@setup', email: '@setup' },
+  daily_budget: { restaurant_id: 'rid', channel: 'enum:sms|email', budget_day: 'date', cap_minor: 'money', reserved_minor: 'money' },
+  delivery_budget_ref: { restaurant_id: 'rid', budget_channel: 'enum:sms|email', budget_day: 'date', reserved_minor: 'money' },
   cart_item_input: {
     id: 'str', restaurant_id: 'rid', menu_item_id: 'str', quantity: 'quantity',
     modifiers: ['@modifier_selection'], special_instructions: 'str?',
@@ -490,6 +499,49 @@ describe('RS-01 live-v1 synthetic contract readers', () => {
       expect(caseRecord.error.code).toBe(caseRecord.code);
       expect(caseRecord.error.fields).toEqual(caseRecord.fields);
       expect(caseRecord.error.request_id).toMatch(/^synthetic-request-/);
+    }
+  });
+
+
+  it('validates C-B daily budget isolation and durable reservation identity', () => {
+    const f = bundle.daily_send_budget_fixture;
+    expect(f.synthetic).toBe(true);
+    expect(f.live_provider_verified).toBe(false);
+    expect(f.time_zone).toBe('Asia/Kolkata');
+    expect(f.lock_order).toEqual([
+      'live_restaurants', 'live_daily_send_budgets', 'live_campaigns_and_approvals',
+      'live_contacts', 'live_deliveries',
+    ]);
+    expect(Object.values(f.rules).every(Boolean)).toBe(true);
+    const issues = (value: typeof f): string[] => {
+      const errors = [
+        ...validate(schemas.daily_budget, value.current, 'current'),
+        ...validate(schemas.daily_budget, value.following_day, 'following_day'),
+        ...validate(schemas.delivery_budget_ref, value.delivery_reference, 'delivery_reference'),
+      ];
+      const cap = value.current.cap_minor;
+      const reserved = value.current.reserved_minor;
+      if (typeof cap === 'number' && typeof reserved === 'number' && reserved > cap) {
+        errors.push('current.reserved_minor');
+      }
+      if (value.delivery_reference.budget_channel !== value.current.channel) {
+        errors.push('delivery_reference.budget_channel');
+      }
+      if (value.delivery_reference.budget_day !== value.current.budget_day) {
+        errors.push('delivery_reference.budget_day');
+      }
+      if (value.delivery_reference.reserved_minor !== value.current.reserved_minor) {
+        errors.push('delivery_reference.reserved_minor');
+      }
+      if (value.following_day.budget_day === value.current.budget_day) {
+        errors.push('following_day.budget_day');
+      }
+      return errors;
+    };
+    expect(issues(f)).toEqual([]);
+    for (const change of f.negative) {
+      const invalid = mutated(f, change) as typeof f;
+      expect(issues(invalid), change.name).toContain(change.expected_field);
     }
   });
 
