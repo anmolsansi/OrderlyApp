@@ -96,3 +96,20 @@ Proposed operating procedure, subject to both parties' approval:
 
 Billing follows the explicitly approved charge schedule in section 2. Any deposit, accepted-project milestone or actual paid-project event requires separate private evidence.
 
+## 7. Exit, outage and data handoff
+
+Both parties must approve the exit approach before onboarding real data. The restaurant owner controls the business decision to stop accepting live orders. The technical operator must disable new live/marketing work, preserve already accepted immutable orders and unresolved external effects, and provide a clear manual handoff.
+
+| Exit topic | Required documented decision |
+|---|---|
+| End notice, early termination and termination fees | **OWNER DECISION REQUIRED**: timing, triggers, refunds/credits and both approvers |
+| Shutdown owner, scheduled maintenance, manual fallback | **OWNER DECISION REQUIRED**: named operator and restaurant lead; recorded communication channel |
+| Open orders and recorded on-site payments | Restaurant reconciles outstanding service and actual cash/UPI settlement externally; provider supplies safe event references. No implied refund processor |
+| Marketing and provider shutdown | Disable scheduling/worker before revoking provider access; settle known or uncertain provider charges; retain consent/suppression evidence under approved U2 policy |
+| Restaurant-owned export scope and format | **OWNER DECISION REQUIRED**: menu/tables/orders/receipts/staff business records, permitted customer data, output format and secure delivery |
+| Export delivery timing, recipient and proof of receipt | **OWNER DECISION REQUIRED**: authorized recipient, deadline, transport, checksum or acknowledgement |
+| Data retention, deletion and legal exceptions | **OWNER DECISION REQUIRED** under U2. Never promise immediate deletion contrary to lawful retention/settlement evidence |
+| Provider account closure/transfer and backup policy | **OWNER DECISION REQUIRED**: who disables keys, hands over domains/data, and retains verified backup/restore evidence |
+
+**Exit acceptance record:** end date, signed handoff manifest, export provenance, open-issue list, access revocation, reconciled invoices and approved residual retention plan, all private. Do not put customer contacts, exported files or executed terms in Git.
+
