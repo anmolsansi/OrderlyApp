@@ -1,6 +1,6 @@
 # OrderlyApp intern development guide
 
-**First assignment:** [RS-01 · Freeze the restaurant-service contracts](docs/tickets/restaurant-service/RS-01.md). The deliverables are one contract document, one synthetic fixture bundle and two readers that agree on valid and invalid examples. Run both readers and give their results to the reviewer. A reviewed fixture unlocks consumer preparation. Implemented providers each need their own conformance test.
+**Completed foundation (synthetic only):** [RS-01 · Freeze the restaurant-service contracts](docs/tickets/restaurant-service/RS-01.md) was merged in [PR #61](https://github.com/anmolsansi/OrderlyApp/pull/61) at `ed738ada2cdf9610a780a09e7bb24f690b7d80ba`, with 7/7 required CI checks. Its contract document, synthetic fixture bundle and two readers agree on valid and invalid examples. This does **not** implement or accept any restaurant-service provider, live messaging or real payment.
 
 **After RS-01:** open [RF-01 · Plan the early sales demo](docs/tickets/restaurant-service/RF-01.md). Use the [numbered assignments](docs/ticket-execution-flow.md#72-numbered-ticket-index) for the full route through release. RS-67 provisions the disabled restaurant before RS-04 bootstraps its owner, so working through IDs in numerical order would leave the intern without a tenant.
 
@@ -4988,7 +4988,7 @@ Snapshot JSON is strictly validated, containing campaign version/channel/content
 
 ### 18.7 Dependency DAG
 
-The machine-readable edge list is authoritative. CON labels are provider outputs, not free-form arrows. Ordering IDs need not increase: RS-67 provisions the tenant needed before RS-04 bootstrap. No parallel agent/worktree is launched by this plan.
+The machine-readable edge list is authoritative **for this RF-01 review-branch proposal**. It includes six planned DS packets and DEMO-SALES, not implemented providers. The full-service release edges and their external acceptance gates are preserved. CON labels are provider outputs, not free-form arrows. Ordering IDs need not increase: RS-67 provisions the tenant needed before RS-04 bootstrap. No parallel agent/worktree is launched by this plan.
 
 ```mermaid
 flowchart TD
@@ -5038,7 +5038,6 @@ flowchart TD
  RS01 -->|CON-01| RS20
  RS06 -->|CON-06| RS20
  RS18 -->|CON-18| RS20
- RS30 -->|CON-30| RS20
  RS01 -->|CON-01| RS21
  RS20 -->|CON-20| RS21
  RS01 -->|CON-01| RS22
@@ -5217,6 +5216,40 @@ flowchart TD
  RSINT04 -->|gate| RSRELEASE
  RS65 -->|CON-65| RSRELEASE
  RS66 -->|CON-66| RSRELEASE
+ RS20 -->|file| RS30
+ RS01 -->|CON-01| DS01
+ RS07 -->|CON-07| DS01
+ RS19 -->|CON-19| DS01
+ RS22 -->|CON-22| DS01
+ RS29 -->|CON-29| DS01
+ RS41 -->|CON-41| DS01
+ DS01 -->|demo| DS02
+ RS09 -->|CON-09| DS02
+ RS10 -->|CON-10| DS02
+ RS16 -->|CON-16| DS02
+ RS29 -->|CON-29| DS02
+ DS02 -->|demo| DS03
+ RS07 -->|CON-07| DS03
+ RS41 -->|CON-41| DS03
+ DS03 -->|demo| DS04
+ RS47 -->|CON-47| DS04
+ RS48 -->|CON-48| DS04
+ RS49 -->|CON-49| DS04
+ DS03 -->|demo| DS05
+ RS51 -->|CON-51| DS05
+ RS52 -->|CON-52| DS05
+ RS53 -->|CON-53| DS05
+ DS04 -->|demo| DS06
+ DS05 -->|demo| DS06
+ RS44 -->|CON-44| DS06
+ RS45 -->|CON-45| DS06
+ RS46 -->|CON-46| DS06
+ RS57 -->|CON-57| DS06
+ DS06 -->|demo gate| DEMOSALES
+ DS01 -->|demo| RS58
+ DS02 -->|demo| RS58
+ DS03 -->|demo| RS58
+ DS06 -->|demo| RS59
 ```
 
 ```json
@@ -5772,18 +5805,6 @@ flowchart TD
     "merge_dependency": "RS-18 conformance and acceptance pass; shared-file provider merged first",
     "runtime_dependency": "implemented provider/config available when this capability is enabled; fixture contracts are build-time only",
     "verification": "Consumer asserts CON-18 positive and negative fixtures; python -m pytest backend/tests/test_live_staff_queue.py"
-  },
-  {
-    "from_task": "RS-30",
-    "to_task": "RS-20",
-    "contract_ids": [
-      "CON-30"
-    ],
-    "gate": "serialized edits: backend/app/staff_routes.py",
-    "start_dependency": "CON-01 fixtures plus CON-30 reviewed shape; existing-file read snapshot required",
-    "merge_dependency": "RS-30 conformance and acceptance pass; shared-file provider merged first",
-    "runtime_dependency": "implemented provider/config available when this capability is enabled; fixture contracts are build-time only",
-    "verification": "Consumer asserts CON-30 positive and negative fixtures; python -m pytest backend/tests/test_live_staff_queue.py"
   },
   {
     "from_task": "RS-01",
@@ -7904,11 +7925,421 @@ flowchart TD
     "merge_dependency": "criteria pass",
     "runtime_dependency": "named restaurant acceptance",
     "verification": "docs/qa/restaurant-service-pilot.md"
+  },
+  {
+    "from_task": "RS-20",
+    "to_task": "RS-30",
+    "contract_ids": [
+      "CON-20"
+    ],
+    "gate": "serialized edits: backend/app/staff_routes.py",
+    "start_dependency": "Verified source fixture and actual merged upstream provider; prospective demo split",
+    "merge_dependency": "Actual upstream conformance and acceptance pass; shared files serialized; no skipped integration gate",
+    "runtime_dependency": "Full live-service provider and checkpoint gates remain required",
+    "verification": "docs/demo/restaurant-sales-walkthrough.md#10-uncertain-request-negative-paths-and-acceptance-evidence"
+  },
+  {
+    "from_task": "RS-01",
+    "to_task": "DS-01",
+    "contract_ids": [
+      "CON-01"
+    ],
+    "gate": "RF-01 synthetic DEMO-SALES prerequisite; planning only",
+    "start_dependency": "Verified source fixture and actual merged upstream provider; prospective demo split",
+    "merge_dependency": "Actual upstream conformance and acceptance pass; shared files serialized; no skipped integration gate",
+    "runtime_dependency": "Synthetic guest-owned demo only; no external provider transport or real money movement",
+    "verification": "docs/demo/restaurant-sales-walkthrough.md#10-uncertain-request-negative-paths-and-acceptance-evidence"
+  },
+  {
+    "from_task": "RS-07",
+    "to_task": "DS-01",
+    "contract_ids": [
+      "CON-07"
+    ],
+    "gate": "RF-01 synthetic DEMO-SALES prerequisite; planning only",
+    "start_dependency": "Verified source fixture and actual merged upstream provider; prospective demo split",
+    "merge_dependency": "Actual upstream conformance and acceptance pass; shared files serialized; no skipped integration gate",
+    "runtime_dependency": "Synthetic guest-owned demo only; no external provider transport or real money movement",
+    "verification": "docs/demo/restaurant-sales-walkthrough.md#10-uncertain-request-negative-paths-and-acceptance-evidence"
+  },
+  {
+    "from_task": "RS-19",
+    "to_task": "DS-01",
+    "contract_ids": [
+      "CON-19"
+    ],
+    "gate": "RF-01 synthetic DEMO-SALES prerequisite; planning only",
+    "start_dependency": "Verified source fixture and actual merged upstream provider; prospective demo split",
+    "merge_dependency": "Actual upstream conformance and acceptance pass; shared files serialized; no skipped integration gate",
+    "runtime_dependency": "Synthetic guest-owned demo only; no external provider transport or real money movement",
+    "verification": "docs/demo/restaurant-sales-walkthrough.md#10-uncertain-request-negative-paths-and-acceptance-evidence"
+  },
+  {
+    "from_task": "RS-22",
+    "to_task": "DS-01",
+    "contract_ids": [
+      "CON-22"
+    ],
+    "gate": "RF-01 synthetic DEMO-SALES prerequisite; planning only",
+    "start_dependency": "Verified source fixture and actual merged upstream provider; prospective demo split",
+    "merge_dependency": "Actual upstream conformance and acceptance pass; shared files serialized; no skipped integration gate",
+    "runtime_dependency": "Synthetic guest-owned demo only; no external provider transport or real money movement",
+    "verification": "docs/demo/restaurant-sales-walkthrough.md#10-uncertain-request-negative-paths-and-acceptance-evidence"
+  },
+  {
+    "from_task": "RS-29",
+    "to_task": "DS-01",
+    "contract_ids": [
+      "CON-29"
+    ],
+    "gate": "RF-01 synthetic DEMO-SALES prerequisite; planning only",
+    "start_dependency": "Verified source fixture and actual merged upstream provider; prospective demo split",
+    "merge_dependency": "Actual upstream conformance and acceptance pass; shared files serialized; no skipped integration gate",
+    "runtime_dependency": "Synthetic guest-owned demo only; no external provider transport or real money movement",
+    "verification": "docs/demo/restaurant-sales-walkthrough.md#10-uncertain-request-negative-paths-and-acceptance-evidence"
+  },
+  {
+    "from_task": "RS-41",
+    "to_task": "DS-01",
+    "contract_ids": [
+      "CON-41"
+    ],
+    "gate": "RF-01 synthetic DEMO-SALES prerequisite; planning only",
+    "start_dependency": "Verified source fixture and actual merged upstream provider; prospective demo split",
+    "merge_dependency": "Actual upstream conformance and acceptance pass; shared files serialized; no skipped integration gate",
+    "runtime_dependency": "Synthetic guest-owned demo only; no external provider transport or real money movement",
+    "verification": "docs/demo/restaurant-sales-walkthrough.md#10-uncertain-request-negative-paths-and-acceptance-evidence"
+  },
+  {
+    "from_task": "DS-01",
+    "to_task": "DS-02",
+    "contract_ids": [
+      "CON-DS-01"
+    ],
+    "gate": "RF-01 synthetic DEMO-SALES prerequisite; planning only",
+    "start_dependency": "Verified source fixture and actual merged upstream provider; prospective demo split",
+    "merge_dependency": "Actual upstream conformance and acceptance pass; shared files serialized; no skipped integration gate",
+    "runtime_dependency": "Synthetic guest-owned demo only; no external provider transport or real money movement",
+    "verification": "docs/demo/restaurant-sales-walkthrough.md#10-uncertain-request-negative-paths-and-acceptance-evidence"
+  },
+  {
+    "from_task": "RS-09",
+    "to_task": "DS-02",
+    "contract_ids": [
+      "CON-09"
+    ],
+    "gate": "RF-01 synthetic DEMO-SALES prerequisite; planning only",
+    "start_dependency": "Verified source fixture and actual merged upstream provider; prospective demo split",
+    "merge_dependency": "Actual upstream conformance and acceptance pass; shared files serialized; no skipped integration gate",
+    "runtime_dependency": "Synthetic guest-owned demo only; no external provider transport or real money movement",
+    "verification": "docs/demo/restaurant-sales-walkthrough.md#10-uncertain-request-negative-paths-and-acceptance-evidence"
+  },
+  {
+    "from_task": "RS-10",
+    "to_task": "DS-02",
+    "contract_ids": [
+      "CON-10"
+    ],
+    "gate": "RF-01 synthetic DEMO-SALES prerequisite; planning only",
+    "start_dependency": "Verified source fixture and actual merged upstream provider; prospective demo split",
+    "merge_dependency": "Actual upstream conformance and acceptance pass; shared files serialized; no skipped integration gate",
+    "runtime_dependency": "Synthetic guest-owned demo only; no external provider transport or real money movement",
+    "verification": "docs/demo/restaurant-sales-walkthrough.md#10-uncertain-request-negative-paths-and-acceptance-evidence"
+  },
+  {
+    "from_task": "RS-16",
+    "to_task": "DS-02",
+    "contract_ids": [
+      "CON-16"
+    ],
+    "gate": "RF-01 synthetic DEMO-SALES prerequisite; planning only",
+    "start_dependency": "Verified source fixture and actual merged upstream provider; prospective demo split",
+    "merge_dependency": "Actual upstream conformance and acceptance pass; shared files serialized; no skipped integration gate",
+    "runtime_dependency": "Synthetic guest-owned demo only; no external provider transport or real money movement",
+    "verification": "docs/demo/restaurant-sales-walkthrough.md#10-uncertain-request-negative-paths-and-acceptance-evidence"
+  },
+  {
+    "from_task": "RS-29",
+    "to_task": "DS-02",
+    "contract_ids": [
+      "CON-29"
+    ],
+    "gate": "RF-01 synthetic DEMO-SALES prerequisite; planning only",
+    "start_dependency": "Verified source fixture and actual merged upstream provider; prospective demo split",
+    "merge_dependency": "Actual upstream conformance and acceptance pass; shared files serialized; no skipped integration gate",
+    "runtime_dependency": "Synthetic guest-owned demo only; no external provider transport or real money movement",
+    "verification": "docs/demo/restaurant-sales-walkthrough.md#10-uncertain-request-negative-paths-and-acceptance-evidence"
+  },
+  {
+    "from_task": "DS-02",
+    "to_task": "DS-03",
+    "contract_ids": [
+      "CON-DS-02"
+    ],
+    "gate": "RF-01 synthetic DEMO-SALES prerequisite; planning only",
+    "start_dependency": "Verified source fixture and actual merged upstream provider; prospective demo split",
+    "merge_dependency": "Actual upstream conformance and acceptance pass; shared files serialized; no skipped integration gate",
+    "runtime_dependency": "Synthetic guest-owned demo only; no external provider transport or real money movement",
+    "verification": "docs/demo/restaurant-sales-walkthrough.md#10-uncertain-request-negative-paths-and-acceptance-evidence"
+  },
+  {
+    "from_task": "RS-07",
+    "to_task": "DS-03",
+    "contract_ids": [
+      "CON-07"
+    ],
+    "gate": "RF-01 synthetic DEMO-SALES prerequisite; planning only",
+    "start_dependency": "Verified source fixture and actual merged upstream provider; prospective demo split",
+    "merge_dependency": "Actual upstream conformance and acceptance pass; shared files serialized; no skipped integration gate",
+    "runtime_dependency": "Synthetic guest-owned demo only; no external provider transport or real money movement",
+    "verification": "docs/demo/restaurant-sales-walkthrough.md#10-uncertain-request-negative-paths-and-acceptance-evidence"
+  },
+  {
+    "from_task": "RS-41",
+    "to_task": "DS-03",
+    "contract_ids": [
+      "CON-41"
+    ],
+    "gate": "RF-01 synthetic DEMO-SALES prerequisite; planning only",
+    "start_dependency": "Verified source fixture and actual merged upstream provider; prospective demo split",
+    "merge_dependency": "Actual upstream conformance and acceptance pass; shared files serialized; no skipped integration gate",
+    "runtime_dependency": "Synthetic guest-owned demo only; no external provider transport or real money movement",
+    "verification": "docs/demo/restaurant-sales-walkthrough.md#10-uncertain-request-negative-paths-and-acceptance-evidence"
+  },
+  {
+    "from_task": "DS-03",
+    "to_task": "DS-04",
+    "contract_ids": [
+      "CON-DS-03"
+    ],
+    "gate": "RF-01 synthetic DEMO-SALES prerequisite; planning only",
+    "start_dependency": "Verified source fixture and actual merged upstream provider; prospective demo split",
+    "merge_dependency": "Actual upstream conformance and acceptance pass; shared files serialized; no skipped integration gate",
+    "runtime_dependency": "Synthetic guest-owned demo only; no external provider transport or real money movement",
+    "verification": "docs/demo/restaurant-sales-walkthrough.md#10-uncertain-request-negative-paths-and-acceptance-evidence"
+  },
+  {
+    "from_task": "RS-47",
+    "to_task": "DS-04",
+    "contract_ids": [
+      "CON-47"
+    ],
+    "gate": "RF-01 synthetic DEMO-SALES prerequisite; planning only",
+    "start_dependency": "Verified source fixture and actual merged upstream provider; prospective demo split",
+    "merge_dependency": "Actual upstream conformance and acceptance pass; shared files serialized; no skipped integration gate",
+    "runtime_dependency": "Synthetic guest-owned demo only; no external provider transport or real money movement",
+    "verification": "docs/demo/restaurant-sales-walkthrough.md#10-uncertain-request-negative-paths-and-acceptance-evidence"
+  },
+  {
+    "from_task": "RS-48",
+    "to_task": "DS-04",
+    "contract_ids": [
+      "CON-48"
+    ],
+    "gate": "RF-01 synthetic DEMO-SALES prerequisite; planning only",
+    "start_dependency": "Verified source fixture and actual merged upstream provider; prospective demo split",
+    "merge_dependency": "Actual upstream conformance and acceptance pass; shared files serialized; no skipped integration gate",
+    "runtime_dependency": "Synthetic guest-owned demo only; no external provider transport or real money movement",
+    "verification": "docs/demo/restaurant-sales-walkthrough.md#10-uncertain-request-negative-paths-and-acceptance-evidence"
+  },
+  {
+    "from_task": "RS-49",
+    "to_task": "DS-04",
+    "contract_ids": [
+      "CON-49"
+    ],
+    "gate": "RF-01 synthetic DEMO-SALES prerequisite; planning only",
+    "start_dependency": "Verified source fixture and actual merged upstream provider; prospective demo split",
+    "merge_dependency": "Actual upstream conformance and acceptance pass; shared files serialized; no skipped integration gate",
+    "runtime_dependency": "Synthetic guest-owned demo only; no external provider transport or real money movement",
+    "verification": "docs/demo/restaurant-sales-walkthrough.md#10-uncertain-request-negative-paths-and-acceptance-evidence"
+  },
+  {
+    "from_task": "DS-03",
+    "to_task": "DS-05",
+    "contract_ids": [
+      "CON-DS-03"
+    ],
+    "gate": "RF-01 synthetic DEMO-SALES prerequisite; planning only",
+    "start_dependency": "Verified source fixture and actual merged upstream provider; prospective demo split",
+    "merge_dependency": "Actual upstream conformance and acceptance pass; shared files serialized; no skipped integration gate",
+    "runtime_dependency": "Synthetic guest-owned demo only; no external provider transport or real money movement",
+    "verification": "docs/demo/restaurant-sales-walkthrough.md#10-uncertain-request-negative-paths-and-acceptance-evidence"
+  },
+  {
+    "from_task": "RS-51",
+    "to_task": "DS-05",
+    "contract_ids": [
+      "CON-51"
+    ],
+    "gate": "RF-01 synthetic DEMO-SALES prerequisite; planning only",
+    "start_dependency": "Verified source fixture and actual merged upstream provider; prospective demo split",
+    "merge_dependency": "Actual upstream conformance and acceptance pass; shared files serialized; no skipped integration gate",
+    "runtime_dependency": "Synthetic guest-owned demo only; no external provider transport or real money movement",
+    "verification": "docs/demo/restaurant-sales-walkthrough.md#10-uncertain-request-negative-paths-and-acceptance-evidence"
+  },
+  {
+    "from_task": "RS-52",
+    "to_task": "DS-05",
+    "contract_ids": [
+      "CON-52"
+    ],
+    "gate": "RF-01 synthetic DEMO-SALES prerequisite; planning only",
+    "start_dependency": "Verified source fixture and actual merged upstream provider; prospective demo split",
+    "merge_dependency": "Actual upstream conformance and acceptance pass; shared files serialized; no skipped integration gate",
+    "runtime_dependency": "Synthetic guest-owned demo only; no external provider transport or real money movement",
+    "verification": "docs/demo/restaurant-sales-walkthrough.md#10-uncertain-request-negative-paths-and-acceptance-evidence"
+  },
+  {
+    "from_task": "RS-53",
+    "to_task": "DS-05",
+    "contract_ids": [
+      "CON-53"
+    ],
+    "gate": "RF-01 synthetic DEMO-SALES prerequisite; planning only",
+    "start_dependency": "Verified source fixture and actual merged upstream provider; prospective demo split",
+    "merge_dependency": "Actual upstream conformance and acceptance pass; shared files serialized; no skipped integration gate",
+    "runtime_dependency": "Synthetic guest-owned demo only; no external provider transport or real money movement",
+    "verification": "docs/demo/restaurant-sales-walkthrough.md#10-uncertain-request-negative-paths-and-acceptance-evidence"
+  },
+  {
+    "from_task": "DS-04",
+    "to_task": "DS-06",
+    "contract_ids": [
+      "CON-DS-04"
+    ],
+    "gate": "RF-01 synthetic DEMO-SALES prerequisite; planning only",
+    "start_dependency": "Verified source fixture and actual merged upstream provider; prospective demo split",
+    "merge_dependency": "Actual upstream conformance and acceptance pass; shared files serialized; no skipped integration gate",
+    "runtime_dependency": "Synthetic guest-owned demo only; no external provider transport or real money movement",
+    "verification": "docs/demo/restaurant-sales-walkthrough.md#10-uncertain-request-negative-paths-and-acceptance-evidence"
+  },
+  {
+    "from_task": "DS-05",
+    "to_task": "DS-06",
+    "contract_ids": [
+      "CON-DS-05"
+    ],
+    "gate": "RF-01 synthetic DEMO-SALES prerequisite; planning only",
+    "start_dependency": "Verified source fixture and actual merged upstream provider; prospective demo split",
+    "merge_dependency": "Actual upstream conformance and acceptance pass; shared files serialized; no skipped integration gate",
+    "runtime_dependency": "Synthetic guest-owned demo only; no external provider transport or real money movement",
+    "verification": "docs/demo/restaurant-sales-walkthrough.md#10-uncertain-request-negative-paths-and-acceptance-evidence"
+  },
+  {
+    "from_task": "RS-44",
+    "to_task": "DS-06",
+    "contract_ids": [
+      "CON-44"
+    ],
+    "gate": "RF-01 synthetic DEMO-SALES prerequisite; planning only",
+    "start_dependency": "Verified source fixture and actual merged upstream provider; prospective demo split",
+    "merge_dependency": "Actual upstream conformance and acceptance pass; shared files serialized; no skipped integration gate",
+    "runtime_dependency": "Synthetic guest-owned demo only; no external provider transport or real money movement",
+    "verification": "docs/demo/restaurant-sales-walkthrough.md#10-uncertain-request-negative-paths-and-acceptance-evidence"
+  },
+  {
+    "from_task": "RS-45",
+    "to_task": "DS-06",
+    "contract_ids": [
+      "CON-45"
+    ],
+    "gate": "RF-01 synthetic DEMO-SALES prerequisite; planning only",
+    "start_dependency": "Verified source fixture and actual merged upstream provider; prospective demo split",
+    "merge_dependency": "Actual upstream conformance and acceptance pass; shared files serialized; no skipped integration gate",
+    "runtime_dependency": "Synthetic guest-owned demo only; no external provider transport or real money movement",
+    "verification": "docs/demo/restaurant-sales-walkthrough.md#10-uncertain-request-negative-paths-and-acceptance-evidence"
+  },
+  {
+    "from_task": "RS-46",
+    "to_task": "DS-06",
+    "contract_ids": [
+      "CON-46"
+    ],
+    "gate": "RF-01 synthetic DEMO-SALES prerequisite; planning only",
+    "start_dependency": "Verified source fixture and actual merged upstream provider; prospective demo split",
+    "merge_dependency": "Actual upstream conformance and acceptance pass; shared files serialized; no skipped integration gate",
+    "runtime_dependency": "Synthetic guest-owned demo only; no external provider transport or real money movement",
+    "verification": "docs/demo/restaurant-sales-walkthrough.md#10-uncertain-request-negative-paths-and-acceptance-evidence"
+  },
+  {
+    "from_task": "RS-57",
+    "to_task": "DS-06",
+    "contract_ids": [
+      "CON-57"
+    ],
+    "gate": "RF-01 synthetic DEMO-SALES prerequisite; planning only",
+    "start_dependency": "Verified source fixture and actual merged upstream provider; prospective demo split",
+    "merge_dependency": "Actual upstream conformance and acceptance pass; shared files serialized; no skipped integration gate",
+    "runtime_dependency": "Synthetic guest-owned demo only; no external provider transport or real money movement",
+    "verification": "docs/demo/restaurant-sales-walkthrough.md#10-uncertain-request-negative-paths-and-acceptance-evidence"
+  },
+  {
+    "from_task": "DS-06",
+    "to_task": "DEMO-SALES",
+    "contract_ids": [
+      "CON-DS-06"
+    ],
+    "gate": "RF-01 synthetic DEMO-SALES prerequisite; planning only",
+    "start_dependency": "Verified source fixture and actual merged upstream provider; prospective demo split",
+    "merge_dependency": "Actual upstream conformance and acceptance pass; shared files serialized; no skipped integration gate",
+    "runtime_dependency": "Synthetic guest-owned demo only; no external provider transport or real money movement",
+    "verification": "docs/demo/restaurant-sales-walkthrough.md#10-uncertain-request-negative-paths-and-acceptance-evidence"
+  },
+  {
+    "from_task": "DS-01",
+    "to_task": "RS-58",
+    "contract_ids": [
+      "CON-DS-01"
+    ],
+    "gate": "serialized shared file + full conformance remains",
+    "start_dependency": "Verified source fixture and actual merged upstream provider; prospective demo split",
+    "merge_dependency": "Actual upstream conformance and acceptance pass; shared files serialized; no skipped integration gate",
+    "runtime_dependency": "Full live-service provider and checkpoint gates remain required",
+    "verification": "docs/demo/restaurant-sales-walkthrough.md#10-uncertain-request-negative-paths-and-acceptance-evidence"
+  },
+  {
+    "from_task": "DS-02",
+    "to_task": "RS-58",
+    "contract_ids": [
+      "CON-DS-02"
+    ],
+    "gate": "serialized shared file + full conformance remains",
+    "start_dependency": "Verified source fixture and actual merged upstream provider; prospective demo split",
+    "merge_dependency": "Actual upstream conformance and acceptance pass; shared files serialized; no skipped integration gate",
+    "runtime_dependency": "Full live-service provider and checkpoint gates remain required",
+    "verification": "docs/demo/restaurant-sales-walkthrough.md#10-uncertain-request-negative-paths-and-acceptance-evidence"
+  },
+  {
+    "from_task": "DS-03",
+    "to_task": "RS-58",
+    "contract_ids": [
+      "CON-DS-03"
+    ],
+    "gate": "serialized shared file + full conformance remains",
+    "start_dependency": "Verified source fixture and actual merged upstream provider; prospective demo split",
+    "merge_dependency": "Actual upstream conformance and acceptance pass; shared files serialized; no skipped integration gate",
+    "runtime_dependency": "Full live-service provider and checkpoint gates remain required",
+    "verification": "docs/demo/restaurant-sales-walkthrough.md#10-uncertain-request-negative-paths-and-acceptance-evidence"
+  },
+  {
+    "from_task": "DS-06",
+    "to_task": "RS-59",
+    "contract_ids": [
+      "CON-DS-06"
+    ],
+    "gate": "serialized shared file + full conformance remains",
+    "start_dependency": "Verified source fixture and actual merged upstream provider; prospective demo split",
+    "merge_dependency": "Actual upstream conformance and acceptance pass; shared files serialized; no skipped integration gate",
+    "runtime_dependency": "Full live-service provider and checkpoint gates remain required",
+    "verification": "docs/demo/restaurant-sales-walkthrough.md#10-uncertain-request-negative-paths-and-acceptance-evidence"
   }
 ]
 ```
 
 ### 18.8 Workstreams and execution waves
+
+**RF-01 proposed graph revision (review branch, not merged):** 79 nodes and 258 directed edges, acyclic, DEMO-SALES W22, full RS-RELEASE W29. No external SMS/email send, feedback/reconciliation or live-only INT gate is a DEMO-SALES ancestor. Levels are topological dependencies, not delivery estimates. Six DS child packets and the DEMO-SALES evidence gate are unimplemented. The RS-20 → RS-30 edge now serializes the shared staff route file and removes the unnecessary provider dependency from the read-only staff queue.
 
 **Start order:** reviewed frozen shared fixtures allow UI/transport consumer preparation without a live service. A fixture with unresolved U1/U3 schema is not frozen; that dependent portion cannot start. No consumer may claim runtime proof from mocks. **Merge order:** use the wave table and all dependency edges; a later provider and consumer may be developed independently only in their owned files after fixture freeze. Integration checkpoints control release of combined behavior.
 
@@ -7916,37 +8347,40 @@ All modifications to `development.md` status and `docs/repo_context.md` during f
 
 | Merge wave | Packet/checkpoint IDs | Exit |
 |---|---|---|
-| W0 | RS-01 | Upstream handoff/convergence evidence passed; exact-file ownership disjoint |
-| W1 | RS-02, RS-11, RS-39 | Upstream handoff/convergence evidence passed; exact-file ownership disjoint |
-| W2 | RS-03, RS-67 | Upstream handoff/convergence evidence passed; exact-file ownership disjoint |
-| W3 | RS-04 | Upstream handoff/convergence evidence passed; exact-file ownership disjoint |
-| W4 | RS-05 | Upstream handoff/convergence evidence passed; exact-file ownership disjoint |
-| W5 | RS-06 | Upstream handoff/convergence evidence passed; exact-file ownership disjoint |
-| W6 | RS-07, RS-09 | Upstream handoff/convergence evidence passed; exact-file ownership disjoint |
-| W7 | RS-08, RS-10, RS-41 | Upstream handoff/convergence evidence passed; exact-file ownership disjoint |
-| W8 | RS-12, RS-40 | Upstream handoff/convergence evidence passed; exact-file ownership disjoint |
-| W9 | RS-13, RS-16, RS-50, RS-51 | Upstream handoff/convergence evidence passed; exact-file ownership disjoint |
-| W10 | RS-14, RS-24, RS-42, RS-66 | Upstream handoff/convergence evidence passed; exact-file ownership disjoint |
-| W11 | RS-15, RS-26, RS-27, RS-43, RS-55 | Upstream handoff/convergence evidence passed; exact-file ownership disjoint |
-| W12 | RS-17, RS-28, RS-56, RS-63 | Upstream handoff/convergence evidence passed; exact-file ownership disjoint |
-| W13 | RS-18, RS-29, RS-52, RS-57 | Upstream handoff/convergence evidence passed; exact-file ownership disjoint |
-| W14 | RS-19, RS-30, RS-53 | Upstream handoff/convergence evidence passed; exact-file ownership disjoint |
-| W15 | RS-20, RS-25, RS-31, RS-32, RS-INT01 | Upstream handoff/convergence evidence passed; exact-file ownership disjoint |
-| W16 | RS-21, RS-33, RS-44, RS-47 | Upstream handoff/convergence evidence passed; exact-file ownership disjoint |
-| W17 | RS-22, RS-34, RS-45, RS-48 | Upstream handoff/convergence evidence passed; exact-file ownership disjoint |
-| W18 | RS-23, RS-35, RS-36, RS-46 | Upstream handoff/convergence evidence passed; exact-file ownership disjoint |
-| W19 | RS-37, RS-49 | Upstream handoff/convergence evidence passed; exact-file ownership disjoint |
-| W20 | RS-38, RS-58, RS-INT02 | Upstream handoff/convergence evidence passed; exact-file ownership disjoint |
-| W21 | RS-54, RS-60 | Upstream handoff/convergence evidence passed; exact-file ownership disjoint |
-| W22 | RS-61, RS-INT03 | Upstream handoff/convergence evidence passed; exact-file ownership disjoint |
-| W23 | RS-59 | Upstream handoff/convergence evidence passed; exact-file ownership disjoint |
-| W24 | RS-62 | Upstream handoff/convergence evidence passed; exact-file ownership disjoint |
-| W25 | RS-INT04 | Upstream handoff/convergence evidence passed; exact-file ownership disjoint |
-| W26 | RS-64 | Upstream handoff/convergence evidence passed; exact-file ownership disjoint |
-| W27 | RS-65 | Upstream handoff/convergence evidence passed; exact-file ownership disjoint |
-| W28 | RS-RELEASE | Upstream handoff/convergence evidence passed; exact-file ownership disjoint |
+| W0 | RS-01 | All direct providers merge and pass relevant conformance; same-wave shared-file owners must not overlap |
+| W1 | RS-02, RS-11, RS-39 | All direct providers merge and pass relevant conformance; same-wave shared-file owners must not overlap |
+| W2 | RS-03, RS-67 | All direct providers merge and pass relevant conformance; same-wave shared-file owners must not overlap |
+| W3 | RS-04 | All direct providers merge and pass relevant conformance; same-wave shared-file owners must not overlap |
+| W4 | RS-05 | All direct providers merge and pass relevant conformance; same-wave shared-file owners must not overlap |
+| W5 | RS-06 | All direct providers merge and pass relevant conformance; same-wave shared-file owners must not overlap |
+| W6 | RS-07, RS-09 | All direct providers merge and pass relevant conformance; same-wave shared-file owners must not overlap |
+| W7 | RS-08, RS-10, RS-41 | All direct providers merge and pass relevant conformance; same-wave shared-file owners must not overlap |
+| W8 | RS-12, RS-40 | All direct providers merge and pass relevant conformance; same-wave shared-file owners must not overlap |
+| W9 | RS-13, RS-16, RS-50, RS-51 | All direct providers merge and pass relevant conformance; same-wave shared-file owners must not overlap |
+| W10 | RS-14, RS-24, RS-42, RS-66 | All direct providers merge and pass relevant conformance; same-wave shared-file owners must not overlap |
+| W11 | RS-15, RS-26, RS-27, RS-43, RS-55 | All direct providers merge and pass relevant conformance; same-wave shared-file owners must not overlap |
+| W12 | RS-17, RS-28, RS-56, RS-63 | All direct providers merge and pass relevant conformance; same-wave shared-file owners must not overlap |
+| W13 | RS-18, RS-29, RS-52, RS-57 | All direct providers merge and pass relevant conformance; same-wave shared-file owners must not overlap |
+| W14 | RS-19, RS-20, RS-53 | All direct providers merge and pass relevant conformance; same-wave shared-file owners must not overlap |
+| W15 | RS-21, RS-25, RS-30, RS-47, RS-INT01 | All direct providers merge and pass relevant conformance; same-wave shared-file owners must not overlap |
+| W16 | RS-22, RS-31, RS-32, RS-44, RS-48 | All direct providers merge and pass relevant conformance; same-wave shared-file owners must not overlap |
+| W17 | DS-01 (planned child), RS-23, RS-33, RS-45 | All direct providers merge and pass relevant conformance; same-wave shared-file owners must not overlap |
+| W18 | DS-02 (planned child), RS-34, RS-46, RS-49 | All direct providers merge and pass relevant conformance; same-wave shared-file owners must not overlap |
+| W19 | DS-03 (planned child), RS-35, RS-36, RS-INT02 | All direct providers merge and pass relevant conformance; same-wave shared-file owners must not overlap |
+| W20 | DS-04 (planned child), DS-05 (planned child), RS-37 | All direct providers merge and pass relevant conformance; same-wave shared-file owners must not overlap |
+| W21 | DS-06 (planned child), RS-38, RS-58 | All direct providers merge and pass relevant conformance; same-wave shared-file owners must not overlap |
+| W22 | DEMO-SALES (synthetic gate, unbuilt), RS-54, RS-60 | Demo only: A1–A9, browser + PG isolation + zero-transport proof required; not real release |
+| W23 | RS-61, RS-INT03 | All direct providers merge and pass relevant conformance; same-wave shared-file owners must not overlap |
+| W24 | RS-59 | All direct providers merge and pass relevant conformance; same-wave shared-file owners must not overlap |
+| W25 | RS-62 | All direct providers merge and pass relevant conformance; same-wave shared-file owners must not overlap |
+| W26 | RS-INT04 | All direct providers merge and pass relevant conformance; same-wave shared-file owners must not overlap |
+| W27 | RS-64 | All direct providers merge and pass relevant conformance; same-wave shared-file owners must not overlap |
+| W28 | RS-65 | All direct providers merge and pass relevant conformance; same-wave shared-file owners must not overlap |
+| W29 | RS-RELEASE | Full controlled live release only after all legacy RS-INT and U1–U4 evidence |
 
 **Shared-file serialization:**
+
+**Additional RF-01 edges (review-branch proposal):** RS-20 → RS-30 for `backend/app/staff_routes.py`; RS-19 → DS-01 → DS-02 → RS-58 for `backend/app/live_routes.py`; DS-01 → DS-02 → RS-58 for `backend/app/live_demo.py`; RS-07/41 → DS-03 → RS-58 for gateway and typed client; RS-49 → DS-04 for staff details; RS-51/52/53 → DS-05 for owner UI; DS-06 → RS-59 for demo page/role-switch/E2E. These are *file ownership* edges as well as the contract dependencies. RF-05 must reconcile the old packet copies before DS implementation.
 
 | Earlier owner | Later owner | Shared artifact |
 |---|---|---|
@@ -7973,7 +8407,7 @@ All modifications to `development.md` status and `docs/repo_context.md` during f
 
 Review follow-ups [RF-01–RF-05](#1817-review-amendments-and-follow-up-tickets) are additional planning/delivery work. They are Not completed and are not included in the original 67-packet count. Apply the contract corrections in section18.17.1 when extracting any affected packet.
 
-All are **Not completed**. A planned contract is not a merged provider. Readiness at execution is checked per packet: READY only when required inputs/fixture freeze and shared-file gates pass; otherwise WAITING_DEPENDENCY or BLOCKED_EXTERNAL. No implementation ticket is checked off by this planning work.
+**RS-01's synthetic contract freeze is merged in PR #61.** The remaining RS-02–RS-67 implementation packets are **Not completed** unless subsequently verified against merged evidence. A planned contract is not a merged provider. Readiness at execution is checked per packet: READY only when required inputs/fixture freeze and shared-file gates pass; otherwise WAITING_DEPENDENCY or BLOCKED_EXTERNAL. RF-01's documentation proposal does not complete any DS implementation, live acceptance or release gate.
 
 | ID / status | Outcome | Workstream / merge wave | Direct dependencies | Output contract | Effort | Critical-path relevance |
 |---|---|---|---|---|---|---|
@@ -8054,7 +8488,7 @@ Each linked assignment includes the relevant draft DTO and schema excerpts so a 
 Builder boundary: implement one ready packet only. Read its copied contracts, docs/repo_context.md and listed source. Do not choose new API fields, dependencies, auth rules, business policy or UI flows. If current source contradicts the packet, return Needs Architect Decision with evidence and continue only independent parts. Never skip a failing test or use production credentials/data. One logical micro-commit after relevant validation during an authorized implementation task; publication/merge needs that task's authorization. Documentation status is Not completed until code, tests and recorded acceptance pass.
 
 <a id="rs-01"></a>
-#### RS-01 — Freeze live-v1 envelopes and synthetic consumer fixtures — Not completed
+#### RS-01 — Freeze live-v1 envelopes and synthetic consumer fixtures — Completed synthetic freeze (PR #61; provider work separate)
 
 [Open the RS-01 assignment](docs/tickets/restaurant-service/RS-01.md).
 
@@ -8524,9 +8958,12 @@ These five bounded follow-ups are **Not completed**. Documentation edits are int
 The table defines additive gates, not new runtime APIs. Original dependencies remain effective until RF-01 updates the canonical DAG, waves, consumers and milestone records together. No follow-up can waive U1–U4, tenant isolation or live release proof. RF-03 follows RS-48 because both can touch queue layout; it must not run concurrently with that owner. RF-04 follows RF-02 if both edit onboarding/support wording. RF-05 runs last among concurrent documentation edits and republishes every status/link without changing completion evidence.
 
 <a id="rf-01"></a>
-#### RF-01 — Define an earlier complete synthetic sales demo — Not completed
+#### RF-01 — Define an earlier complete synthetic sales demo — Planning proposal in unmerged review branch
 
 [Open the RF-01 assignment](docs/tickets/restaurant-service/RF-01.md).
+
+**RF-01 planning artifact:** [Five-minute demonstration, bounded DS child packets, route/security matrix, negative tests, and proof rules](docs/demo/restaurant-sales-walkthrough.md). Issue [#62](https://github.com/anmolsansi/OrderlyApp/issues/62) tracks the micro-commit plan. The graph and wave revisions below are **proposed** on a review branch, not merged runtime behavior. This RF-01 task concerns planning, not building a demonstration.
+
 
 <a id="rf-02"></a>
 #### RF-02 — Prepare the paid-pilot offer and evidence checklist — Not completed
@@ -8547,3 +8984,30 @@ The table defines additive gates, not new runtime APIs. Original dependencies re
 #### RF-05 — Split the master guide without losing executable ticket context — Not completed
 
 [Open the RF-05 assignment](docs/tickets/restaurant-service/RF-05.md).
+
+
+#### 18.17.3 RF-01 provider-independent DEMO-SALES overlay (proposed, not implemented)
+
+**Source evidence:** RS-01 frozen synthetic registry/fixture files and tests merged on `main` at `ed738ada2cdf9610a780a09e7bb24f690b7d80ba` (PR #61). The existing RS-20 staff read queue contract contains no provider readiness response, while its RS-30 predecessor is a shared `backend/app/staff_routes.py` ownership gate. RS-58's original RS-37 dependence and RS-59's original RS-INT02/03 merge gates remain binding for the **full-service** milestone.
+
+**Architecture decision:** the early synthetic demonstration is an additional milestone `DEMO-SALES`, with one guest-owned synthetic restaurant/session and reused live business logic. Preserve the full RS-58/59 conformance responsibilities and real provider, feedback, budget, recovery and release tests. Split an earlier provider-free slice into six bounded child packets. Their contracts, ownership, route tests and acceptance are defined in the [RF-01 handoff](docs/demo/restaurant-sales-walkthrough.md#6-implementation-handoff-six-bounded-child-packets).
+
+| New packet | Direct providers / prerequisite | Output and exact ownership |
+|---|---|---|
+| **DS-01** | RS-01, RS-07, RS-19, RS-22, RS-29, RS-41 | Guest-owned demo copy, synthetic staff order/payment/campaign endpoints; `backend/app/live_demo.py`, `backend/app/live_routes.py`, `backend/tests/test_live_demo_isolation.py` |
+| **DS-02** | DS-01, RS-09, RS-10, RS-16, RS-29 | Demo-only owner settings/menu/availability/offer/setup reads and strictly hypothetical campaign results; `backend/app/live_demo_views.py` plus explicit DS-01 extension/tests |
+| **DS-03** | DS-02, RS-07, RS-41 | Allowlisted demo gateway and typed browser client, `app/api/orderly/[...path]/route.ts`, `lib/live-api.ts`, `tests/live-api.test.ts` |
+| **DS-04** | DS-03, RS-47, RS-48, RS-49 | Demo staff UI reusing StaffQueue, StaffOrderDetail, StaffPaymentForm and guest-owned demo API adapter |
+| **DS-05** | DS-03, RS-51, RS-52, RS-53 | Demo owner UI reusing menu, campaign draft and campaign review controls with simulated-only results |
+| **DS-06** | DS-04, DS-05, RS-44, RS-45, RS-46, RS-57 | `/demo` role-switch, existing customer ordering/voice UI, reset, full browser and zero-side-effect proof |
+
+**One schedule correction:** replace the draft `RS-30 → RS-20` dependency with `RS-20 → RS-30` for `backend/app/staff_routes.py` serialization. RS-20 is a role-scoped read of orders and does not require live provider setup. RS-30 remains required for RS-31/32 and full release; any unrecognized runtime config dependency in RS-20 must block this correction rather than be bypassed. **No other provider-only dependency is removed from the full-release DAG.**
+
+**New merge edges:** the machine-readable §18.7 graph adds RS01/07/19/22/29/41 → DS-01; DS-01 + RS09/10/16/29 → DS-02; DS-02 + RS07/41 → DS-03; DS-03 + RS47/48/49 → DS-04; DS-03 + RS51/52/53 → DS-05; DS-04/05 + RS44/45/46/57 → DS-06; DS-06 → DEMO-SALES. Add DS-01/02/03 → RS-58 and DS-06 → RS-59 for serialized ownership and later full-conformance tests. All original RS-INT01–04 and RS-RELEASE edges remain.
+
+**Change control:** the original standalone RS-20/30/58/59 packet copies still describe their old ordering/CREATE paths. **RF-05 must update those source packet copies and the RS-INT02/03/04 consumer descriptions before any DS implementer uses them.** This planning PR must not masquerade as the implementation or as a frozen replacement for an RS-01 fixture. Treat DS execution as `WAITING_DEPENDENCY` until packet sync, merge prerequisites, and named conformance pass.
+
+**Five-minute run:** [full click-by-click script and recovery case](docs/demo/restaurant-sales-walkthrough.md#9-five-minute-operator-walkthrough-one-synthetic-restaurant): guest orders using reviewed voice or text → staff advances state → cashier records a synthetic full payment assertion → owner changes availability and previews hypothetical marketing results → reset to a clean private scope.
+
+**Acceptance:** validated acyclic graph, no concurrent same-file owners, explicit authorized screen/route mapping, and concrete A1–A9 runtime test owners. DEMO-SALES cannot be claimed passed until all DS files, PostgreSQL/Chromium E2E, two-guest separation, transport-spy zero-send/zero-money checks and full relevant CI prove it. No real send, delivery, collection, Clerk membership, U1–U4 signoff or live release acceptance is implied. Rollback only this documentation/scheduling overlay if the proposed serialization cannot be justified, preserving all old release providers.
+
