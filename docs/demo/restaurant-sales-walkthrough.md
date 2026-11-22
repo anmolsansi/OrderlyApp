@@ -166,3 +166,39 @@ All screens/routes below are **planned**, and acceptance must be shown in a real
 
 **Presenter talk track:** “This demonstrates a restaurant-owned workflow. The guest reviews a voice suggestion before placing an order. Staff moves that same order through fulfillment and records an on-premises payment assertion. The owner can change availability and prepare an outreach campaign. Every marketing result in this screen is a **simulation**. We have not sent any messages or collected any money. Real restaurant launch requires separate security, pricing, compliance, provider and device testing.”
 
+## 10. Uncertain request, negative paths and acceptance evidence
+
+### Uncertain-request recovery demonstration
+
+After guest checkout, simulate a network failure *after* the server might commit: the client has stored original `Idempotency-Key`, quote digest, restaurant and original request payload before making the POST. Show **“We are checking whether the order was placed”**, not “failed, submit again.” On the existing `/r/{rid}/recovery` route, query the owner-scoped order/receipt or retry the **identical command key and body** per CON-18 replay rules. Expected: exactly one order, one receipt, one payment state, no duplicate basket write. If there is no safe resolution, retain uncertainty and stop. Changing the key, restaurant, order target, total or body returns 409/not_found, not a second order. The original guest's reset cannot recover the revoked receipt, which must not erase live business history.
+
+For an ambiguous voice instruction, e.g., “add something spicy and send it,” the selected-catalog parser must propose clarification instead of inventing an item or sending anything. If microphone permissions are denied, the typed field remains available and the edited proposal still requires explicit Add. New item availability changed by owner invalidates a stale cart/proposal/quote until reviewed.
+
+### Mandatory acceptance matrix for DS-01–06 and DEMO-SALES
+
+| Case | Positive proof | Negative / failure proof | Evidence owner |
+|---|---|---|---|
+| A1, consistent order | One guest `oid` appears in receipt, staff queue, transition history and recorded payment exactly once | Duplicate command key with new target/body 409; stale version 409; no order/cash charge duplication | DS-01, RS-18/21/22, DS-04/06 |
+| A2, tenant/session | Guest A and B each get distinct `rid` and can't see/mutate the other's order or campaign | Forged demo flag, foreign UUID, fake role, lost cookie and direct real staff route all denied; no leaking another tenant's existence | DS-01/02/03, DS-06 |
+| A3, reset | A reset starts fresh synthetic data and old ID no longer authorizes A | B and live tenant unchanged; no resurrection from client cache; unknown old ID 404 | DS-01, DS-06 |
+| A4, owner management | Owner reads synthetic settings/offers/menu and versioned availability update reflects in customer menu | Another guest cannot edit; stale catalog version 409, unsupported edit method 404 | DS-02/05 |
+| A5, marketing preview | Draft/offer, consent-filtered synthetic audience and deterministic approved preview | Expired/changed preview 409; suppressed count remains excluded; zero eligible accepted with zero result; no live contact exposed | RS-24/26/28/29, DS-01/02/05 |
+| A6, zero external side effects | Transport spy sees **0** MSG91 HTTP, **0** SendGrid HTTP, **0** worker claims, **0** PSP/bank operations, **0** real send records | `/send`, `/dispatch`, `/retry`, non-allowlisted methods rejected; later worker refuses demo at claim and just before transport | DS-01/02/03/06, later RS-34/58 |
+| A7, voice safety | Current-catalog, version-tagged proposal, visible edit and manual fallback; only explicit Add mutates cart | Ambiguous/cross-restaurant/stale catalog/denied mic cannot execute or silently price/submit | RS-55–57, DS-06 |
+| A8, UI/accessibility | Five-minute flow and clear persistent demo banner; form errors, empty/loading/unavailable state, keyboard actions | Network error never falls back to fixture or reports paid/sent; typed fallback survives denial | DS-04/05/06 |
+| A9, full release preserved | Graph still contains RS-30–37, RS-INT01–04, RS-64/65 and release evidence | No production or signed-provider U1–U4 acceptance inferred from synthetic result | RF-01 structural validator, later RS-58/59/62 |
+
+**For the RF-01 planning PR:** the only valid proofs are that the source packets were inspected, route/owner inventory is complete, the revised DAG parses and is acyclic, its predecessor graph excludes all live-send/feedback gates for DEMO-SALES, same-wave file ownership is disjoint, documentation links resolve, and full-release gates are still reachable. Run structural checks against `development.md` and record exact SHA. **Do not claim that A1–A8 have been executed** until the DS packets supply real PostgreSQL, Vitest and Playwright output.
+
+**For implementing DEMO-SALES:** run existing test/CI gates plus `python -m pytest backend/tests/test_live_demo_isolation.py backend/tests/test_live_demo_views.py`, `npm run test -- tests/live-api.test.ts`, and `npm run test:e2e -- e2e/demo-staff-role.spec.ts e2e/demo-owner.spec.ts e2e/live-demo.spec.ts e2e/demo-sales.spec.ts` after their owner files exist. The actual CI environment must include isolated PostgreSQL and real Chromium. Observe full zero-transport negative evidence with spy counters and record the exact source SHA. An unrun test, a mocked database-only success or a blocked provider account is not a PASS.
+
+### Handoff checklist, risk and rollback
+
+- **RF-02:** use the script only as a planned demo offer. Prices, signatures, onboarding responsibilities, and a paid customer remain unverified until genuine evidence is collected.
+- **RF-05:** reconcile changed RS-20/30/58/59 packet copies, extract DS-01–06 with exact owner/tests and update the execution guide; never silently change a frozen RS-01 fixture.
+- **RS-58/59:** later complete the broader isolated demo rules, payment reversal and full live integration proof. Existing provider-dependent merge gates remain.
+- **RS-62/INT04:** incorporate the demo E2E as a synthetic compatibility proof, not real-provider/launch evidence.
+- **Risk register:** P1, accidental demo-to-live authorization (block on scope check and negative tests); P1, provider network leakage (hard-disable + transport spy); P1, staff queue hidden provider dependency (restore original ordering if shown); P2, concurrent component edits (serialize owned files); P2, optimistic marketing claims (persistent explicit hypothetical labels).
+- **Rollback:** revert the proposed DS overlay and RS-20/30 ordering change on the planning branch if reviewer rejects the split. Runtime rollback after later DS implementation requires disabled demo entrypoints, preserved live ledgers, no deletion of business receipts and revalidation of original mock routes. The existing full-service DAG and all live external-input gates remain intact.
+
+**Final state:** RF-01 documentation and graph analysis may be accepted in a review PR. **DEMO-SALES implementation remains Not completed** until its six child packets and runtime acceptance are merged and tested. No actual providers, new screens, demo tenant databases or hosted configuration are delivered by this document.
