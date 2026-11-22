@@ -107,3 +107,32 @@ Record only **opaque references** in the repository or a review-safe PR. A real 
 
 Negative examples: "Owner liked the preview" cannot satisfy proposal_requested; a draft with terms cannot satisfy accepted_pilot; a pay-at-restaurant record cannot satisfy actual paid_project; an MSG91 request cannot prove delivered SMS or improved sales.
 
+## 5. Pilot measurement agreement and observation sheet
+
+**Agree all definitions, baseline, numeric targets and observation windows BEFORE the live pilot starts.** The owner and technical operator must confirm which analytics instrumentation or manual collection method supplies each numerator/denominator. If it does not exist, mark NOT MEASURED, not zero or PASS.
+
+| Metric | Exact calculation and evidence | Baseline | Pilot target | Observation window | Observed |
+|---|---|---|---|---|---|
+| Staff acknowledgment time | Seconds from durable new-order creation to the first confirmed staff acknowledgement for the same order. Report sample count and median/P95 for eligible orders; exclude test/synthetic orders and annotate excluded/unacknowledged orders | **NOT MEASURED** | **OWNER DECISION REQUIRED** | **OWNER DECISION REQUIRED** | NOT MEASURED |
+| Ordering completion rate | Numerator: distinct real guest sessions that complete one valid accepted live order. Denominator: eligible real guest ordering sessions that reach the agreed ordering-start event. Choose and freeze session/deduplication rules before baseline | **NOT MEASURED** | **OWNER DECISION REQUIRED** | **OWNER DECISION REQUIRED** | NOT MEASURED |
+| Errors requiring staff intervention | Count of unique real order incidents needing manual correction, help or recovery; report count and rate per 100 accepted real orders, with incident reason, version and reconciliation outcome | **NOT MEASURED** | **OWNER DECISION REQUIRED** | **OWNER DECISION REQUIRED** | NOT MEASURED |
+| Staff usability | Named staff complete an agreed representative task list without assistance; report successful tasks/attempted tasks and number of participants, and collect structured difficulty feedback separately | **NOT MEASURED** | **OWNER DECISION REQUIRED** | **OWNER DECISION REQUIRED** | NOT MEASURED |
+
+**Measurement contract:** restaurant operations approver and provider evidence owner agree exactly what starts/ends the window, operating hours covered, what qualifies as real, sample adequacy and how missing/unacknowledged events count. Freeze the build and time zone per comparison, and record any mid-pilot feature change as a new segment. Do not silently exclude failures.
+
+### Per-window private observation row
+
+| Field | Value |
+|---|---|
+| Pilot/build/restaurant code | **NOT RECORDED** |
+| Metric name, frozen numerator/denominator and source | **OWNER DECISION REQUIRED** |
+| Baseline start/end UTC and sample size | **NOT RECORDED** |
+| Pilot start/end UTC, device and environment | **NOT RECORDED** |
+| Agreed threshold, minimum sample and evaluator | **OWNER DECISION REQUIRED** |
+| Observed numerator, denominator, median/P95 where relevant | **NOT MEASURED** |
+| Exclusions, incident references and confidence limitations | **NOT RECORDED** |
+| Private raw-evidence pointer and approver/date | **NOT RECORDED** |
+| Assessment | **BLOCKED** until actual observations and owner approval |
+
+**No sales-uplift inference:** order count, payment recording, simulated results, SMS accepted by a provider and email delivered are not evidence of increased restaurant revenue or marketing ROI. Revenue attribution and financial success claims require a separately agreed, independently verifiable methodology and transaction evidence, outside this ticket.
+
