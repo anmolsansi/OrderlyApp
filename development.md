@@ -32,7 +32,9 @@ This legacy deep link now points to the [original full baseline commands and fai
 
 **RF-01:** provider-independent four-capability DEMO-SALES **planning** merged in [PR #63](https://github.com/anmolsansi/OrderlyApp/pull/63). Its revised graph is an accepted proposed plan, not an implemented demo. Earlier tracking text saying PR #63 is still unmerged is obsolete.
 
-**RF-05:** documentation split and packet synchronization on review branch [docs/rf-05-compact-roadmap-packets](https://github.com/anmolsansi/OrderlyApp/tree/docs/rf-05-compact-roadmap-packets), tracked in [issue #64](https://github.com/anmolsansi/OrderlyApp/issues/64) and [OPE-348](https://linear.app/openclaw-neutron/issue/OPE-348). **Unmerged until explicit review/approval**.
+**RF-05:** documentation split and packet synchronization merged in [PR #65](https://github.com/anmolsansi/OrderlyApp/pull/65) on `main` as `0d2219e1300051a3ed7c7ed549f7668589b56d3d`. This is a documentation prerequisite, not evidence of live or DEMO-SALES implementation.
+
+**RF-02:** configurable [paid pilot offer](docs/pilot/restaurant-offer.md) and [onboarding/evidence checklist](docs/pilot/restaurant-onboarding.md) drafted for [PR #67](https://github.com/anmolsansi/OrderlyApp/pull/67). Documentation review in progress; no real owner decision, accepted offer or paid project is claimed.
 
 **RS-02–RS-67, DS-01–DS-06 and live integration/hosted pilot gates:** not claimed completed; read actual merged source and recorded evidence at execution before changing a status. The old 0/67 planning number is not an implementation metric after RS-01 merged. Treat remaining implementation as **66 RS packets**, plus independent DS/INT and release work, subject to dependency checks. No paid customer acceptance is on record.
 
@@ -51,11 +53,29 @@ This legacy deep link now points to the [original full baseline commands and fai
 
 **External decisions (must not be invented):** U1 restaurant-specific prices/tax/fees/receipt wording; U2 retention/export/deletion/consent/privacy policy; U3 MSG91/SendGrid account ownership, approved send templates and conservative charge bounds; U4 actual restaurant/staff/device/network and pilot signoffs. Production activation is disabled until these inputs and verified providers exist.
 
+### RF-02 commercial handoff to RS-65
+
+RF-02 provides **draft documentation and a private-evidence capture format**, not a sale or live-acceptance result. The [pilot offer](docs/pilot/restaurant-offer.md) identifies commercial charges, hosting and restaurant-funded messaging responsibility, support, exclusions, payment timing, pilot period and exit/data-handoff fields. The [onboarding checklist](docs/pilot/restaurant-onboarding.md) assigns approval roles for menu/tables/staff/account setup and training, and explicitly distinguishes `interested`, `proposal_requested`, `accepted_pilot` and `paid_project`. All unapproved amounts, contacts and terms remain **OWNER DECISION REQUIRED**.
+
+| Commercial evidence required by RS-65 | Current state | Evidence needed before acceptance |
+|---|---|---|
+| Setup/recurring/support, taxes, payer-by-cost and timing | **BLOCKED** | Both authorized signatories approve exact offer revision, charges, restaurant-funded MSG91/SendGrid billing, hosting and support owner/window |
+| Signed accepted pilot | **NOT RECORDED** | Dated restricted executed-terms reference, scope, duration, notice and exit/data handoff |
+| Actually paid project | **NOT RECORDED** | Accepted pilot plus independently matched received-payment evidence; invoice, mock checkout or simulated recorded cash do not count |
+| U1 menu/pricing/tax/receipt and U2 retention/consent/export | **BLOCKED** | Named restaurant/provider approvals and dated private evidence, no production data in Git |
+| U3 real providers/templates/charge caps and U4 site/staff/devices | **BLOCKED** | Authenticated provider and real-device/locale checks, approved budget caps, named build and actual restaurant signoffs |
+| Pilot measurements and continue/revise/stop decision | **NOT MEASURED** | Before activation agree staff-acknowledgment time, real ordering completion, manual-intervention errors, staff usability, baseline, targets, observation windows, data source and named decision owners |
+| Feature claim review | **PLANNED/SIMULATED ONLY** | Actual build-specific test/evidence for each advertised capability; zero real sends/settlement in DEMO-SALES |
+
+**RS-65 remains Not completed.** Its own G1–G8/E1–E5 tests, actual policy/provider/device evidence, integration checks and [RS-RELEASE](docs/tickets/restaurant-service/RS-RELEASE.md) must pass separately. Documentation cannot unlock real marketing sends, pilot activation, billing or public "paid customer" claims. The real restaurant owner desk review is not performed; RF-02 itself remains under PR review. No API, database, migration, secret or deployment behavior changes in RF-02.
+
+
+
 **Failure/rollback:** keep the old mock routes and schema intact; all new live changes are additive with compatible app/schema rollout. A lost command response is uncertain until reconciled with its **original** identity. Never repeat with a fresh key or claim a completed payment/send from synthetic fixtures. For documentation extraction, revert the RF-05 branch as a unit if acceptance/link/coverage checks fail. Do not modify secrets, live configuration or applied migrations in RF-05.
 
 ## Proposed sequence
 
-Follow the **[79-node/258-edge RF-01 graph and 30-wave schedule](docs/contracts/restaurant-service-plan.md#187-dependency-dag)**, not numerical ID order. Initial path: **RS-01 (merged synthetic) → RF-01 (merged planning) → RF-05 (docs review) → RS-02 / RS-11 / RS-39**; **RS-67 before RS-04**; **RS-20 before RS-30** for serialized staff route ownership; DS-01→06 only after their exact provider dependency gates. The earlier **DEMO-SALES W22** is an additive synthetic milestone. Provider send, reconciliation, INT and full-release gates remain binding.
+Follow the **[79-node/258-edge RF-01 graph and 30-wave schedule](docs/contracts/restaurant-service-plan.md#187-dependency-dag)**, not numerical ID order. Initial path: **RS-01 (merged synthetic) → RF-01 (merged planning) → RF-05 (merged docs) → RS-02 / RS-11 / RS-39**; **RS-67 before RS-04**; **RS-20 before RS-30** for serialized staff route ownership; DS-01→06 only after their exact provider dependency gates. The earlier **DEMO-SALES W22** is an additive synthetic milestone. Provider send, reconciliation, INT and full-release gates remain binding.
 
 [Detailed dependency table and file-ownership edges](docs/contracts/restaurant-service-plan.md#187-dependency-dag) · [All 30 proposed waves](docs/contracts/restaurant-service-plan.md#188-workstreams-and-execution-waves) · [RF-01 A1–A9 gate](docs/demo/restaurant-sales-walkthrough.md#10-uncertain-request-negative-paths-and-acceptance-evidence)
 
@@ -154,7 +174,7 @@ The [C-A command fingerprint](docs/contracts/restaurant-service-v1.md), [C-B dur
 | Follow-up | Assignment | Evidence status |
 |---|---|---|
 | <a id="rf-01"></a>RF-01 | [Define earlier synthetic sales-demo planning](docs/tickets/restaurant-service/RF-01.md) | Merged planning in PR #63, not a built demo |
-| <a id="rf-02"></a>RF-02 | [Prepare the paid pilot offer and evidence checklist](docs/tickets/restaurant-service/RF-02.md) | Not completed |
+| <a id="rf-02"></a>RF-02 | [Prepare the paid pilot offer and evidence checklist](docs/tickets/restaurant-service/RF-02.md) · [offer](docs/pilot/restaurant-offer.md) · [onboarding](docs/pilot/restaurant-onboarding.md) | Draft in [PR #67](https://github.com/anmolsansi/OrderlyApp/pull/67), unmerged; real commercial and pilot evidence blocked |
 | <a id="rf-03"></a>RF-03 | [Make waiting orders noticeable to staff](docs/tickets/restaurant-service/RF-03.md) | Not completed |
 | <a id="rf-04"></a>RF-04 | [Rehearse manual outage recovery](docs/tickets/restaurant-service/RF-04.md) | Not completed |
 | <a id="rf-05"></a>RF-05 | [Split the guide and synchronize packets](docs/tickets/restaurant-service/RF-05.md) | Review branch unmerged |
