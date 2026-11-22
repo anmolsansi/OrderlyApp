@@ -4,6 +4,8 @@
 
 **Prerequisites in the serial plan.** RF-05, RS-37, RS-54, RS-66.
 
+**RF-01 gate separation:** Campaign provider claim/dispatch/real-feedback behavior is a **full-service** checkpoint and remains required before RS-59/RS-RELEASE. The earlier DEMO-SALES shows only labeled hypothetical marketing results with zero MSG91/SendGrid calls; it **does not** waive two-worker cap, consent race, callback reconciliation, U3 or this checkpoint. [Canonical graph](../../contracts/restaurant-service-plan.md#187-dependency-dag).
+
 ## First check
 
 Run two fake workers against the last available daily allowance. Compare claims, reservations and transport calls, then lose a response and inspect whether either worker attempts a resend.
