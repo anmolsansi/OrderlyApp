@@ -4318,7 +4318,8 @@
         ]
       },
       "expected_status": 200,
-      "idempotency_key": null
+      "idempotency_key": null,
+      "request_schema": null
     },
     {
       "id": "CON-06-2",
@@ -4342,7 +4343,8 @@
         "version": 1
       },
       "expected_status": 200,
-      "idempotency_key": null
+      "idempotency_key": null,
+      "request_schema": "member_update"
     },
     {
       "id": "CON-09-1",
@@ -4372,7 +4374,8 @@
         "hours": []
       },
       "expected_status": 200,
-      "idempotency_key": null
+      "idempotency_key": null,
+      "request_schema": "settings_update"
     },
     {
       "id": "CON-10-1",
@@ -4401,7 +4404,8 @@
         ]
       },
       "expected_status": 200,
-      "idempotency_key": null
+      "idempotency_key": null,
+      "request_schema": null
     },
     {
       "id": "CON-10-2",
@@ -4433,7 +4437,8 @@
         ]
       },
       "expected_status": 200,
-      "idempotency_key": null
+      "idempotency_key": null,
+      "request_schema": "availability_update"
     },
     {
       "id": "CON-12-1",
@@ -4458,7 +4463,8 @@
         ]
       },
       "expected_status": 200,
-      "idempotency_key": null
+      "idempotency_key": null,
+      "request_schema": null
     },
     {
       "id": "CON-12-2",
@@ -4483,7 +4489,8 @@
         "url": "https://example.invalid/r/r-demo?table=00000002-1111-4111-8111-111111111111"
       },
       "expected_status": 200,
-      "idempotency_key": null
+      "idempotency_key": null,
+      "request_schema": "table_update"
     },
     {
       "id": "CON-13-1",
@@ -4520,7 +4527,8 @@
         ]
       },
       "expected_status": 200,
-      "idempotency_key": null
+      "idempotency_key": null,
+      "request_schema": null
     },
     {
       "id": "CON-14-1",
@@ -4563,7 +4571,8 @@
         ]
       },
       "expected_status": 200,
-      "idempotency_key": null
+      "idempotency_key": null,
+      "request_schema": "cart_put"
     },
     {
       "id": "CON-14-2",
@@ -4584,7 +4593,8 @@
         "items": []
       },
       "expected_status": 200,
-      "idempotency_key": null
+      "idempotency_key": null,
+      "request_schema": "cart_delete"
     },
     {
       "id": "CON-15-1",
@@ -4651,7 +4661,8 @@
         }
       },
       "expected_status": 200,
-      "idempotency_key": null
+      "idempotency_key": null,
+      "request_schema": "quote_request"
     },
     {
       "id": "CON-16-1",
@@ -4688,7 +4699,8 @@
         "active": false
       },
       "expected_status": 200,
-      "idempotency_key": null
+      "idempotency_key": null,
+      "request_schema": "offer_update"
     },
     {
       "id": "CON-18-1",
@@ -4745,7 +4757,8 @@
         "payment_instruction": "Pay at restaurant"
       },
       "expected_status": 201,
-      "idempotency_key": "00000004-1111-4111-8111-111111111111"
+      "idempotency_key": "00000004-1111-4111-8111-111111111111",
+      "request_schema": "order_request"
     },
     {
       "id": "CON-19-1",
@@ -4811,7 +4824,8 @@
         }
       },
       "expected_status": 200,
-      "idempotency_key": null
+      "idempotency_key": null,
+      "request_schema": null
     },
     {
       "id": "CON-20-1",
@@ -4886,7 +4900,8 @@
         ]
       },
       "expected_status": 200,
-      "idempotency_key": null
+      "idempotency_key": null,
+      "request_schema": null
     },
     {
       "id": "CON-20-2",
@@ -4926,7 +4941,8 @@
         "as_of": "2026-10-11T09:00:00+00:00"
       },
       "expected_status": 200,
-      "idempotency_key": null
+      "idempotency_key": null,
+      "request_schema": null
     },
     {
       "id": "CON-21-1",
@@ -5005,7 +5021,8 @@
         ]
       },
       "expected_status": 200,
-      "idempotency_key": "00000004-1111-4111-8111-111111111111"
+      "idempotency_key": "00000004-1111-4111-8111-111111111111",
+      "request_schema": "transition_request"
     },
     {
       "id": "CON-22-1",
@@ -5083,7 +5100,8 @@
         ]
       },
       "expected_status": 200,
-      "idempotency_key": "00000004-1111-4111-8111-111111111111"
+      "idempotency_key": "00000004-1111-4111-8111-111111111111",
+      "request_schema": "payment_request"
     },
     {
       "id": "CON-23-1",
@@ -5162,7 +5180,8 @@
         ]
       },
       "expected_status": 200,
-      "idempotency_key": "00000004-1111-4111-8111-111111111111"
+      "idempotency_key": "00000004-1111-4111-8111-111111111111",
+      "request_schema": "reversal_request"
     },
     {
       "id": "CON-25-1",
@@ -5184,15 +5203,16 @@
         "recorded": true
       },
       "expected_status": 200,
-      "idempotency_key": null
+      "idempotency_key": null,
+      "request_schema": "consent"
     },
     {
       "id": "CON-26-1",
       "contract": "CON-26",
       "synthetic": true,
       "method": "POST",
-      "path": "/v1/live/unsubscribe/synthetic-capability",
-      "gateway_path": "/api/orderly/live/unsubscribe/synthetic-capability",
+      "path": "/v1/live/unsubscribe/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "gateway_path": "/api/orderly/live/unsubscribe/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
       "auth": "capability_token",
       "request": {},
       "response_schema": "unsubscribe",
@@ -5200,7 +5220,8 @@
         "unsubscribed": true
       },
       "expected_status": 200,
-      "idempotency_key": null
+      "idempotency_key": null,
+      "request_schema": "empty_request"
     },
     {
       "id": "CON-28-1",
@@ -5228,8 +5249,9 @@
         "status": "draft",
         "approval_id": null
       },
-      "expected_status": 201,
-      "idempotency_key": null
+      "expected_status": null,
+      "idempotency_key": null,
+      "request_schema": "campaign_create"
     },
     {
       "id": "CON-29-1",
@@ -5253,8 +5275,9 @@
         "offer_version": 1,
         "setup_ready": false
       },
-      "expected_status": 200,
-      "idempotency_key": null
+      "expected_status": null,
+      "idempotency_key": null,
+      "request_schema": "preview_request"
     },
     {
       "id": "CON-29-2",
@@ -5279,8 +5302,9 @@
         "currency": "INR",
         "approved_at": "2026-10-11T09:00:00+00:00"
       },
-      "expected_status": 201,
-      "idempotency_key": "00000004-1111-4111-8111-111111111111"
+      "expected_status": null,
+      "idempotency_key": "00000004-1111-4111-8111-111111111111",
+      "request_schema": "approve_request"
     },
     {
       "id": "CON-30-1",
@@ -5311,7 +5335,8 @@
         }
       },
       "expected_status": 200,
-      "idempotency_key": null
+      "idempotency_key": null,
+      "request_schema": null
     },
     {
       "id": "CON-37-1",
@@ -5337,7 +5362,8 @@
         "approval_id": null
       },
       "expected_status": 200,
-      "idempotency_key": "00000004-1111-4111-8111-111111111111"
+      "idempotency_key": "00000004-1111-4111-8111-111111111111",
+      "request_schema": "pause_request"
     },
     {
       "id": "CON-38-1",
@@ -5369,7 +5395,8 @@
         }
       },
       "expected_status": 200,
-      "idempotency_key": null
+      "idempotency_key": null,
+      "request_schema": null
     },
     {
       "id": "CON-58-1",
@@ -5387,7 +5414,8 @@
         "expires_at": "2026-10-11T10:00:00+00:00"
       },
       "expected_status": 201,
-      "idempotency_key": null
+      "idempotency_key": null,
+      "request_schema": "empty_request"
     },
     {
       "id": "CON-60-1",
@@ -5411,7 +5439,8 @@
         ]
       },
       "expected_status": 503,
-      "idempotency_key": null
+      "idempotency_key": null,
+      "request_schema": null
     }
   ],
   "wire_status_note": "Synthetic expected contracts only. HTTP statuses not explicitly promised by CON records require provider confirmation. No requests were sent.",
