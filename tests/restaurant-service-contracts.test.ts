@@ -42,6 +42,7 @@ type Bundle = {
     conflicts: Array<{ name: string; path: string; value: unknown; expected_status: number }>;
     security_cases: Array<{ name: string; expected_status: number }>;
     same_key_replay: { expected_status: number };
+    canonicalization_vectors: Array<{ name: string; input: unknown; canonical_json: string; sha256: string }>;
   };
   mock_fixture_blob_sha: Record<string, string>;
   external_evidence_gates: Record<string, string>;
@@ -413,6 +414,14 @@ describe('RS-01 live-v1 synthetic contract readers', () => {
       expect(conflict.expected_status).toBe(409);
     }
     expect(record.security_cases.map(c => c.expected_status)).toEqual([403, 404]);
+    expect(record.canonicalization_vectors).toHaveLength(2);
+    for (const vector of record.canonicalization_vectors) {
+      const encoded = JSON.stringify(canonical(vector.input));
+      expect(encoded, vector.name).toBe(vector.canonical_json);
+      expect(createHash('sha256').update(encoded, 'utf8').digest('hex'), vector.name).toBe(vector.sha256);
+      expect(encoded).toContain('नमस्ते');
+    }
+    expect(record.canonicalization_vectors[0].sha256).not.toBe(record.canonicalization_vectors[1].sha256);
   });
 
 
