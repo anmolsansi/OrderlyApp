@@ -58,3 +58,81 @@ This legacy deep link now points to the [original full baseline commands and fai
 Follow the **[79-node/258-edge RF-01 graph and 30-wave schedule](docs/contracts/restaurant-service-plan.md#187-dependency-dag)**, not numerical ID order. Initial path: **RS-01 (merged synthetic) → RF-01 (merged planning) → RF-05 (docs review) → RS-02 / RS-11 / RS-39**; **RS-67 before RS-04**; **RS-20 before RS-30** for serialized staff route ownership; DS-01→06 only after their exact provider dependency gates. The earlier **DEMO-SALES W22** is an additive synthetic milestone. Provider send, reconciliation, INT and full-release gates remain binding.
 
 [Detailed dependency table and file-ownership edges](docs/contracts/restaurant-service-plan.md#187-dependency-dag) · [All 30 proposed waves](docs/contracts/restaurant-service-plan.md#188-workstreams-and-execution-waves) · [RF-01 A1–A9 gate](docs/demo/restaurant-sales-walkthrough.md#8-acceptance-matrix)
+
+### 18.9 Task index
+
+**Original 67 RS packet files are preserved with their first-check scenario, consumed DTO/SQL schemas, owned paths, error rules, acceptance and rollback.** The contract column links to the RS-01 shared registry; use the [proposed DAG](docs/contracts/restaurant-service-plan.md#187-dependency-dag) for latest direct dependencies and waves, not historical copied prerequisites.
+
+| Packet | Goal | Evidence status | Maintained shared contract source |
+|---|---|---|---|
+| <a id="rs-01"></a>[RS-01](docs/tickets/restaurant-service/RS-01.md) | Freeze live-v1 envelopes and synthetic consumer fixtures | Synthetic freeze merged, PR #61 | [CON-01](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-02"></a>[RS-02](docs/tickets/restaurant-service/RS-02.md) | Add live restaurant configuration and table storage | Not completed | [CON-02](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-03"></a>[RS-03](docs/tickets/restaurant-service/RS-03.md) | Add restaurant-owned order, receipt and action ledgers | Not completed | [CON-03](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-04"></a>[RS-04](docs/tickets/restaurant-service/RS-04.md) | Add memberships and an explicit initial-owner bootstrap | Not completed | [CON-04](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-05"></a>[RS-05](docs/tickets/restaurant-service/RS-05.md) | Verify Clerk session tokens in the backend | Not completed | [CON-05](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-06"></a>[RS-06](docs/tickets/restaurant-service/RS-06.md) | Authorize restaurant roles and revoke staff membership | Not completed | [CON-06](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-07"></a>[RS-07](docs/tickets/restaurant-service/RS-07.md) | Extend the same-origin gateway for explicit live routes | Not completed | [CON-07](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-08"></a>[RS-08](docs/tickets/restaurant-service/RS-08.md) | Provide staff sign-in and active restaurant selection | Not completed | [CON-08](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-09"></a>[RS-09](docs/tickets/restaurant-service/RS-09.md) | Read and update restaurant branding and ordering hours | Not completed | [CON-09](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-10"></a>[RS-10](docs/tickets/restaurant-service/RS-10.md) | Publish owner menu edits and staff availability edits | Not completed | [CON-10](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-11"></a>[RS-11](docs/tickets/restaurant-service/RS-11.md) | Freeze restaurant-specific pricing and receipt inputs | Not completed | [CON-11](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-12"></a>[RS-12](docs/tickets/restaurant-service/RS-12.md) | Create active table links without granting order access | Not completed | [CON-12](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-13"></a>[RS-13](docs/tickets/restaurant-service/RS-13.md) | Serve a scoped live menu and current availability | Not completed | [CON-13](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-14"></a>[RS-14](docs/tickets/restaurant-service/RS-14.md) | Persist a separate revisioned live basket | Not completed | [CON-14](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-15"></a>[RS-15](docs/tickets/restaurant-service/RS-15.md) | Calculate one versioned live quote | Not completed | [CON-15](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-16"></a>[RS-16](docs/tickets/restaurant-service/RS-16.md) | Store owner-defined public promotion rules | Not completed | [CON-16](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-17"></a>[RS-17](docs/tickets/restaurant-service/RS-17.md) | Apply promotion checks to live quotes | Not completed | [CON-17](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-18"></a>[RS-18](docs/tickets/restaurant-service/RS-18.md) | Commit or replay one live order atomically | Not completed | [CON-18](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-19"></a>[RS-19](docs/tickets/restaurant-service/RS-19.md) | Read live receipts through revocable guest access | Not completed | [CON-19](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-20"></a>[RS-20](docs/tickets/restaurant-service/RS-20.md) | Read a bounded staff queue and selected order | Not completed | [CON-20](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-21"></a>[RS-21](docs/tickets/restaurant-service/RS-21.md) | Apply versioned staff order transitions | Not completed | [CON-21](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-22"></a>[RS-22](docs/tickets/restaurant-service/RS-22.md) | Record exactly one full payment | Not completed | [CON-22](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-23"></a>[RS-23](docs/tickets/restaurant-service/RS-23.md) | Append payment reversals and close settlement work | Not completed | [CON-23](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-24"></a>[RS-24](docs/tickets/restaurant-service/RS-24.md) | Persist contacts and separate channel-consent evidence | Not completed | [CON-24](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-25"></a>[RS-25](docs/tickets/restaurant-service/RS-25.md) | Capture optional customer marketing consent independently | Not completed | [CON-25](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-26"></a>[RS-26](docs/tickets/restaurant-service/RS-26.md) | Suppress a channel through an unguessable unsubscribe link | Not completed | [CON-26](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-27"></a>[RS-27](docs/tickets/restaurant-service/RS-27.md) | Store campaign drafts, approvals and recipient work | Not completed | [CON-27](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-28"></a>[RS-28](docs/tickets/restaurant-service/RS-28.md) | Create and edit owner campaign drafts | Not completed | [CON-28](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-29"></a>[RS-29](docs/tickets/restaurant-service/RS-29.md) | Freeze and approve a bounded campaign preview | Not completed | [CON-29](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-30"></a>[RS-30](docs/tickets/restaurant-service/RS-30.md) | Validate restaurant-owned provider configuration without exposing secrets | Not completed | [CON-30](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-31"></a>[RS-31](docs/tickets/restaurant-service/RS-31.md) | Send one approved SMS through MSG91 | Not completed | [CON-31](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-32"></a>[RS-32](docs/tickets/restaurant-service/RS-32.md) | Send one approved email through SendGrid | Not completed | [CON-32](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-33"></a>[RS-33](docs/tickets/restaurant-service/RS-33.md) | Claim recipient work with durable leases and cost reservations | Not completed | [CON-33](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-34"></a>[RS-34](docs/tickets/restaurant-service/RS-34.md) | Dispatch claimed work and reconcile durable outcomes | Not completed | [CON-34](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-35"></a>[RS-35](docs/tickets/restaurant-service/RS-35.md) | Authenticate and reduce SendGrid event callbacks | Not completed | [CON-35](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-36"></a>[RS-36](docs/tickets/restaurant-service/RS-36.md) | Reconcile SMS delivery using authenticated provider evidence | Not completed | [CON-36](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-37"></a>[RS-37](docs/tickets/restaurant-service/RS-37.md) | Pause campaigns and expose safe reconciliation status | Not completed | [CON-37](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-38"></a>[RS-38](docs/tickets/restaurant-service/RS-38.md) | Read operational and campaign summaries without revenue claims | Not completed | [CON-38](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-39"></a>[RS-39](docs/tickets/restaurant-service/RS-39.md) | Apply light/dark tokens with pre-paint preference restoration | Not completed | [CON-39](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-40"></a>[RS-40](docs/tickets/restaurant-service/RS-40.md) | Build live role shells and stable accessible feedback | Not completed | [CON-40](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-41"></a>[RS-41](docs/tickets/restaurant-service/RS-41.md) | Create a typed live API adapter with safe uncertainty | Not completed | [CON-41](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-42"></a>[RS-42](docs/tickets/restaurant-service/RS-42.md) | Render menu-first live ordering with fulfillment context | Not completed | [CON-42](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-43"></a>[RS-43](docs/tickets/restaurant-service/RS-43.md) | Render one live basket with responsive summary and review | Not completed | [CON-43](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-44"></a>[RS-44](docs/tickets/restaurant-service/RS-44.md) | Review and submit a live pay-at-restaurant order | Not completed | [CON-44](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-45"></a>[RS-45](docs/tickets/restaurant-service/RS-45.md) | Recover an uncertain live order across reload and theme changes | Not completed | [CON-45](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-46"></a>[RS-46](docs/tickets/restaurant-service/RS-46.md) | Show receipt/status and separate optional marketing opt-in | Not completed | [CON-46](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-47"></a>[RS-47](docs/tickets/restaurant-service/RS-47.md) | Render the staff queue with stale-data protection | Not completed | [CON-47](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-48"></a>[RS-48](docs/tickets/restaurant-service/RS-48.md) | Use one order-detail controller across phone and wide layouts | Not completed | [CON-48](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-49"></a>[RS-49](docs/tickets/restaurant-service/RS-49.md) | Record payment and reversal through explicit inline forms | Not completed | [CON-49](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-50"></a>[RS-50](docs/tickets/restaurant-service/RS-50.md) | Provide owner settings, tables and staff membership screens | Not completed | [CON-50](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-51"></a>[RS-51](docs/tickets/restaurant-service/RS-51.md) | Provide owner menu pricing and staff availability controls | Not completed | [CON-51](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-52"></a>[RS-52](docs/tickets/restaurant-service/RS-52.md) | Create a draft-first marketing screen | Not completed | [CON-52](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-53"></a>[RS-53](docs/tickets/restaurant-service/RS-53.md) | Review exact campaign recipients, content and maximum cost | Not completed | [CON-53](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-54"></a>[RS-54](docs/tickets/restaurant-service/RS-54.md) | Display campaign outcomes and owner activity summaries | Not completed | [CON-54](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-55"></a>[RS-55](docs/tickets/restaurant-service/RS-55.md) | Capture editable browser speech with manual fallback | Not completed | [CON-55](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-56"></a>[RS-56](docs/tickets/restaurant-service/RS-56.md) | Parse voice against only the selected live catalog | Not completed | [CON-56](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-57"></a>[RS-57](docs/tickets/restaurant-service/RS-57.md) | Apply reviewed voice proposals through the same basket path | Not completed | [CON-57](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-58"></a>[RS-58](docs/tickets/restaurant-service/RS-58.md) | Isolate synthetic role demos and deny all external side effects | Not completed | [CON-58](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-59"></a>[RS-59](docs/tickets/restaurant-service/RS-59.md) | Present a connected sales demo with visible simulation labels | Not completed | [CON-59](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-60"></a>[RS-60](docs/tickets/restaurant-service/RS-60.md) | Expose live readiness, safe logs and worker heartbeat | Not completed | [CON-60](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-61"></a>[RS-61](docs/tickets/restaurant-service/RS-61.md) | Declare an opt-in worker and compatible deployment sequence | Not completed | [CON-61](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-62"></a>[RS-62](docs/tickets/restaurant-service/RS-62.md) | Add live contract and critical-path tests to existing CI | Not completed | [CON-62](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-63"></a>[RS-63](docs/tickets/restaurant-service/RS-63.md) | Specify retention, export and deletion policy before destructive work | Not completed | [CON-63](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-64"></a>[RS-64](docs/tickets/restaurant-service/RS-64.md) | Prove backup, restore and compatible rollback in isolation | Not completed | [CON-64](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-65"></a>[RS-65](docs/tickets/restaurant-service/RS-65.md) | Collect pilot pricing, provider and real-device acceptance evidence | Not completed | [CON-65](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-66"></a>[RS-66](docs/tickets/restaurant-service/RS-66.md) | Edit public offers in the owner marketing workspace | Not completed | [CON-66](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-67"></a>[RS-67](docs/tickets/restaurant-service/RS-67.md) | Provision a disabled live restaurant without adopting mock data | Not completed | [CON-67](docs/contracts/restaurant-service-v1.md) |
+
+### 18.10 Full implementation packets
+
+Every ticket above is an independently readable assignment. The [old inlined master packet copy](docs/plans/orderly-history.md#1810-full-implementation-packets) is historical only. A builder packet must still contain the exact CON/DTO/SQL/schema definitions, security boundary, request/response examples, failure behavior, owned files, negative tests and rollback for its dependency slice. Do not hand off a bare contract ID or treat a draft as an implemented API.
