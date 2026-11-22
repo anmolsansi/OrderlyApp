@@ -4,6 +4,8 @@
 
 **Prerequisites in the serial plan.** RF-03, RF-05, RS-23, RS-46, RS-49.
 
+**RF-01 gate separation:** This checkpoint remains mandatory for full-service RS-59 and RS-RELEASE. It is **not** a prerequisite for the earlier provider-independent DEMO-SALES milestone, whose independent A1–A9 PostgreSQL/Chromium, role and uncertainty proofs are recorded only after DS-01–06 implementation. The early demo does not certify real staff identities, send/settlement policy or this checkpoint. [Canonical graph](../../contracts/restaurant-service-plan.md#187-dependency-dag).
+
 ## First check
 
 Use a guest, order_staff member and cashier. Complete an order operationally before recording payment and capture the intermediate Completed/Unpaid state.
