@@ -69,3 +69,13 @@ Proposed operating procedure, subject to both parties' approval:
 
 **This section establishes a process, not a promised SLA.** Escalation phone, compensation and response deadlines remain unapproved until named and signed.
 
+## 5. Included work, exclusions and changes
+
+**Candidate deliverables, only after implementation evidence and written scope approval:** one restaurant's dine-in/takeaway web ordering; restaurant-scoped menu/availability, hours and tables; staff order queue and status transitions; recording a full pay-at-restaurant payment; owner administration; optional consent-based marketing after U2/U3 acceptance; and editable voice proposals with typed fallback where supported.
+
+**Explicit exclusions:** online card/UPI collection, bank settlement, delivery/driver dispatch, third-party aggregators, payroll, inventory, accounting or tax advice, split/partial bills, hardware procurement, bulk import without agreed mapping, guaranteed campaign sales uplift, and unrestricted support. Synthetic DEMO-SALES screens and mock order receipts **do not** constitute live restaurant delivery.
+
+**Change requests:** Restaurant authorized requester documents the desired outcome, reason and priority. Provider responds with changed scope, price, deployment/test effect and expected acceptance evidence. Both authorized commercial signatories approve the written change **before** work or cost begins. Unapproved changes remain excluded. No verbal discussion or demo click amends the pilot.
+
+**Acceptance is per feature and environment.** Record the actual deployed build, tenant, reviewer, test case and acceptance result privately. Failure/blocked work may not be represented as successfully supplied.
+
