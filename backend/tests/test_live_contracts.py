@@ -426,6 +426,13 @@ def test_canonical_command_digest_and_idempotency_conflicts() -> None:
         assert hashlib.sha256(canonical(request).encode("utf-8")).hexdigest() != record["sha256"]
         assert conflict["expected_status"] == 409
     assert [case["expected_status"] for case in record["security_cases"]] == [403, 404]
+    assert len(record["canonicalization_vectors"]) == 2
+    for vector in record["canonicalization_vectors"]:
+        encoded = canonical(vector["input"])
+        assert encoded == vector["canonical_json"], vector["name"]
+        assert hashlib.sha256(encoded.encode("utf-8")).hexdigest() == vector["sha256"]
+        assert "नमस्ते" in encoded
+    assert record["canonicalization_vectors"][0]["sha256"] != record["canonicalization_vectors"][1]["sha256"]
 
 
 
