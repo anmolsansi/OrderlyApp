@@ -35,3 +35,26 @@ This legacy deep link now points to the [original full baseline commands and fai
 **RF-05:** documentation split and packet synchronization on review branch [docs/rf-05-compact-roadmap-packets](https://github.com/anmolsansi/OrderlyApp/tree/docs/rf-05-compact-roadmap-packets), tracked in [issue #64](https://github.com/anmolsansi/OrderlyApp/issues/64) and [OPE-348](https://linear.app/openclaw-neutron/issue/OPE-348). **Unmerged until explicit review/approval**.
 
 **RS-02–RS-67, DS-01–DS-06 and live integration/hosted pilot gates:** not claimed completed; read actual merged source and recorded evidence at execution before changing a status. The old 0/67 planning number is not an implementation metric after RS-01 merged. Treat remaining implementation as **66 RS packets**, plus independent DS/INT and release work, subject to dependency checks. No paid customer acceptance is on record.
+
+## Readiness and release gates
+
+| Gate | Required observable evidence | Current claim |
+|---|---|---|
+| **DEMO-SALES** | DS-01–06, real PostgreSQL/Chromium browser journey, A1–A9 and two-guest isolation, simulation labels, **zero** provider calls and money movement | **Proposed, NOT built or passed** |
+| **RS-INT01** | Identity, catalog and live checkout with tenant authorization, money vectors and replay | Not completed |
+| **RS-INT02** | Real customer/staff/cashier transaction and UI recovery | Not completed; no bypass for full service |
+| **RS-INT03** | Campaign claim/dispatch/callback feedback, worker race and budget tests | Not completed; no provider acceptance implied |
+| **RS-INT04** | Combined role/voice/demo compatibility on isolated stack, negative provider spies, mock regression | Not completed |
+| **RS-64 / RS-65** | Failure/rollback rehearsal and real provider/customer/device/pilot acceptance | Not completed; U1–U4 outstanding |
+| **RS-RELEASE** | Controlled live tenant activation after all integration evidence, on-call/rollback/retention gates and external signoff | Not completed |
+| **Older mock ST-13, INT-02, RELEASE-GATE** | Hosted restart, cleanup scheduling and separate public mock release evidence | Deferred/incomplete, not waived by restaurant plan |
+
+**External decisions (must not be invented):** U1 restaurant-specific prices/tax/fees/receipt wording; U2 retention/export/deletion/consent/privacy policy; U3 MSG91/SendGrid account ownership, approved send templates and conservative charge bounds; U4 actual restaurant/staff/device/network and pilot signoffs. Production activation is disabled until these inputs and verified providers exist.
+
+**Failure/rollback:** keep the old mock routes and schema intact; all new live changes are additive with compatible app/schema rollout. A lost command response is uncertain until reconciled with its **original** identity. Never repeat with a fresh key or claim a completed payment/send from synthetic fixtures. For documentation extraction, revert the RF-05 branch as a unit if acceptance/link/coverage checks fail. Do not modify secrets, live configuration or applied migrations in RF-05.
+
+## Proposed sequence
+
+Follow the **[79-node/258-edge RF-01 graph and 30-wave schedule](docs/contracts/restaurant-service-plan.md#187-dependency-dag)**, not numerical ID order. Initial path: **RS-01 (merged synthetic) → RF-01 (merged planning) → RF-05 (docs review) → RS-02 / RS-11 / RS-39**; **RS-67 before RS-04**; **RS-20 before RS-30** for serialized staff route ownership; DS-01→06 only after their exact provider dependency gates. The earlier **DEMO-SALES W22** is an additive synthetic milestone. Provider send, reconciliation, INT and full-release gates remain binding.
+
+[Detailed dependency table and file-ownership edges](docs/contracts/restaurant-service-plan.md#187-dependency-dag) · [All 30 proposed waves](docs/contracts/restaurant-service-plan.md#188-workstreams-and-execution-waves) · [RF-01 A1–A9 gate](docs/demo/restaurant-sales-walkthrough.md#8-acceptance-matrix)
