@@ -52,3 +52,20 @@ Every **OWNER DECISION REQUIRED** cell blocks a contractual offer or price claim
 
 **Do not collect real provider credentials into this repository or the pilot evidence sheet.** Keep provider keys, customer contact details, signed agreements and proof of payment in separately restricted systems. Before provider activation, obtain cost caps, allowed regions and approved templates. Failed/uncertain sends are not proof of successful delivery.
 
+## 4. Support and incident handling
+
+**Support service owner:** **OWNER DECISION REQUIRED**.
+**Named support contact/channel and backup:** **OWNER DECISION REQUIRED**.
+**Restaurant primary contact and authorized escalation contact:** **OWNER DECISION REQUIRED**.
+**Time zone, operating days, included support window and total hours:** **OWNER DECISION REQUIRED**.
+**Initial response targets by severity and exclusions for holidays/after-hours:** **OWNER DECISION REQUIRED**.
+**Service coverage and maintenance windows:** **OWNER DECISION REQUIRED**.
+
+Proposed operating procedure, subject to both parties' approval:
+1. Restaurant staff report a problem using the approved support channel and only a safe incident ID, time, affected workflow and severity. No customer phone, receipt secret, raw email or credential belongs in the ticket.
+2. The named provider owner acknowledges within the **agreed** response window, records whether ordering, staff progress, or a provider integration is affected, and names who is investigating.
+3. For unavailable/uncertain service, the restaurant switches to its agreed manual ordering procedure. Staff **must reconcile the original order/payment reference before retrying**, never submit fresh payment identities just because a browser timed out.
+4. Provider and restaurant owners record impact, fix, recovery verification and any customer-facing communication after agreement. Marketing is disabled independently if provider status or consent is uncertain.
+
+**This section establishes a process, not a promised SLA.** Escalation phone, compensation and response deadlines remain unapproved until named and signed.
+
