@@ -192,6 +192,50 @@ SCHEMAS: dict[str, Any] = {
         "request_id": "str",
     },
     "error": {"error": "@error_payload"},
+
+    "memberships_list": {"memberships": ["@membership"]},
+    "tables_list": {"tables": ["@table"]},
+    "guest_order": {"receipt": "@receipt", "operation": "@operation", "payment": "@payment"},
+    "recorded": {"recorded": "bool"},
+    "messaging_setup": {"sms": "@setup", "email": "@setup"},
+    "cart_item_input": {
+        "id": "str", "restaurant_id": "rid", "menu_item_id": "str",
+        "quantity": "quantity", "modifiers": ["@modifier_selection"],
+        "special_instructions": "str?",
+    },
+    "member_update": {"expected_version": "revision", "role": "enum:owner|order_staff|cashier", "active": "bool"},
+    "settings_update": {
+        "expected_version": "revision", "name": "str", "timezone": "enum:Asia/Kolkata",
+        "hours": ["@hour"], "is_open": "bool", "brand_label": "str",
+    },
+    "availability_update": {"expected_catalog_version": "positive_int", "available": "bool"},
+    "table_update": {"expected_version": "revision", "label": "str", "active": "bool"},
+    "cart_put": {"expected_revision": "revision", "items": ["@cart_item_input"]},
+    "cart_delete": {"expected_revision": "revision"},
+    "quote_request": {
+        "expected_revision": "revision", "fulfillment": "enum:dine_in|takeaway",
+        "table_id": "uuid?", "promotion_code": "str?",
+    },
+    "offer_update": {
+        "expected_version": "revision", "code": "str", "starts_at": "utc",
+        "ends_at": "utc", "min_subtotal_minor": "money", "percent_bps": "positive_int",
+        "max_discount_minor": "money", "max_redemptions": "positive_int", "active": "bool",
+    },
+    "order_request": {
+        "expected_revision": "revision", "quote_digest": "digest", "fulfillment": "enum:dine_in|takeaway",
+        "table_id": "uuid?", "promotion_code": "str?",
+    },
+    "transition_request": {
+        "expected_version": "revision", "target": "enum:Accepted|Rejected|Preparing|Ready|Completed|Cancelled",
+        "reason": "str?",
+    },
+    "payment_request": {"expected_version": "revision", "method": "enum:cash|upi|card|other"},
+    "reversal_request": {"expected_version": "revision", "payment_event_id": "uuid", "reason": "str"},
+    "empty_request": {},
+    "campaign_create": {"channel": "enum:sms|email", "offer_id": "uuid", "message": "str", "subject": "str?"},
+    "preview_request": {"expected_version": "revision"},
+    "approve_request": {"expected_version": "revision", "preview_id": "uuid", "max_cost_minor": "money"},
+    "pause_request": {"expected_version": "revision"},
 }
 
 
@@ -378,6 +422,67 @@ def test_canonical_command_digest_and_idempotency_conflicts() -> None:
         assert conflict["expected_status"] == 409
     assert [case["expected_status"] for case in record["security_cases"]] == [403, 404]
 
+
+
+def test_wire_cases_share_valid_request_response_shapes() -> None:
+    fixture = read_bundle()
+    wire_cases = fixture["wire_cases"]
+    assert len(wire_cases) >= 25
+    used = set()
+    for case in wire_cases:
+        assert case["id"] not in used
+        used.add(case["id"])
+        assert case["synthetic"] is True
+        assert case["contract"] in fixture["contracts"]
+        assert case["method"] in {"GET", "PUT", "POST", "DELETE"}
+        assert case["auth"] in {
+            "public", "guest_cookie", "capability_token", "clerk_staff",
+            "clerk_owner", "clerk_order_staff", "clerk_cashier",
+        }
+        assert case["path"].replace("/v1/live/", "/api/orderly/live/") == case["gateway_path"]
+        assert "r-other" not in case["path"]
+        assert case["response_schema"] in SCHEMAS
+        assert validate(SCHEMAS[case["response_schema"]], case["response"]) == [], case["id"]
+        if case["method"] == "GET":
+            assert case["request"] is None
+            assert case["request_schema"] is None
+        else:
+            assert case["request_schema"] in SCHEMAS, case["id"]
+            assert validate(SCHEMAS[case["request_schema"]], case["request"]) == [], case["id"]
+        if case["idempotency_key"] is not None:
+            assert case["method"] == "POST"
+            assert case["idempotency_key"] == fixture["canonical_command"]["key"]
+        if case["expected_status"] is not None:
+            assert case["expected_status"] in {200, 201, 503}
+    assert any(case["path"].endswith("/payment-reversals") for case in wire_cases)
+    assert all(not case["path"].endswith("/reversals") for case in wire_cases)
+
+
+def test_malformed_wire_requests_and_protocol_negatives_fail_closed() -> None:
+    fixture = read_bundle()
+    wires = {item["id"]: item for item in fixture["wire_cases"]}
+    negatives = [
+        ("CON-14-1", "items.0.restaurant_id", "r-other"),
+        ("CON-14-1", "expected_revision", True),
+        ("CON-15-1", "promotion_code", None),
+        ("CON-16-1", "max_discount_minor", "200"),
+        ("CON-18-1", "payment_token", "forbidden"),
+        ("CON-28-1", "channel", "whatsapp"),
+    ]
+    for case_id, field, value in negatives:
+        item = wires[case_id]
+        operation = "remove" if case_id == "CON-15-1" else ("add" if field == "payment_token" else "replace")
+        request = apply_mutation(item["request"], {
+            "action": operation, "path": field, "value": value,
+        })
+        errors = validate(SCHEMAS[item["request_schema"]], request)
+        assert field in errors, (case_id, field, errors)
+    protocol = fixture["protocol_negative_cases"]
+    assert [item["expected_status"] for item in protocol] == [401, 403, 404, 409, 409, 404, 503]
+    for item in protocol:
+        assert item["no_write"] is True
+        assert item["contract"] in fixture["contracts"]
+        assert item["code"]
 
 def test_old_mock_fixture_blobs_are_byte_identical_to_base() -> None:
     expected = read_bundle()["mock_fixture_blob_sha"]
