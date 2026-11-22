@@ -7574,5 +7574,80 @@
         "request_id": "synthetic-request-protocol-7"
       }
     }
-  ]
+  ],
+  "daily_send_budget_fixture": {
+    "synthetic": true,
+    "live_provider_verified": false,
+    "time_zone": "Asia/Kolkata",
+    "current": {
+      "restaurant_id": "r-demo",
+      "channel": "sms",
+      "budget_day": "2026-10-11",
+      "cap_minor": 5000,
+      "reserved_minor": 120
+    },
+    "delivery_reference": {
+      "restaurant_id": "r-demo",
+      "budget_channel": "sms",
+      "budget_day": "2026-10-11",
+      "reserved_minor": 120
+    },
+    "following_day": {
+      "restaurant_id": "r-demo",
+      "channel": "sms",
+      "budget_day": "2026-10-12",
+      "cap_minor": 4000,
+      "reserved_minor": 0
+    },
+    "lock_order": [
+      "live_restaurants",
+      "live_daily_send_budgets",
+      "live_campaigns_and_approvals",
+      "live_contacts",
+      "live_deliveries"
+    ],
+    "rules": {
+      "uncertain_keeps_reservation": true,
+      "accepted_keeps_reservation": true,
+      "release_only_with_proven_no_send": true,
+      "midnight_creates_separate_row": true,
+      "cross_channel_separate": true
+    },
+    "negative": [
+      {
+        "name": "money_as_string",
+        "path": "current.cap_minor",
+        "action": "replace",
+        "value": "5000",
+        "expected_field": "current.cap_minor"
+      },
+      {
+        "name": "over_reserved_daily_cap",
+        "path": "current.reserved_minor",
+        "action": "replace",
+        "value": 5001,
+        "expected_field": "current.reserved_minor"
+      },
+      {
+        "name": "missing_budget_day",
+        "path": "delivery_reference.budget_day",
+        "action": "remove",
+        "expected_field": "delivery_reference.budget_day"
+      },
+      {
+        "name": "foreign_restaurant",
+        "path": "delivery_reference.restaurant_id",
+        "action": "replace",
+        "value": "r-other",
+        "expected_field": "delivery_reference.restaurant_id"
+      },
+      {
+        "name": "budget_link_channel_mismatch",
+        "path": "delivery_reference.budget_channel",
+        "action": "replace",
+        "value": "email",
+        "expected_field": "delivery_reference.budget_channel"
+      }
+    ]
+  }
 }
