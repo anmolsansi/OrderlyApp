@@ -4,6 +4,8 @@
 
 **Prerequisites in the serial plan.** RF-05, RS-59, RS-62, RS-63.
 
+**RF-01 gate separation:** DEMO-SALES is an earlier additional, synthetic-only A1–A9 milestone after DS-01–06. RS-INT04 still requires RS-59, RS-62, RS-63 and its full demo/role/voice/compatibility review. Keep two-guest isolation and zero-send/money negative evidence in both, but neither synthetic review proves U1–U4, external feedback or the production RS-RELEASE gate. [Canonical graph](../../contracts/restaurant-service-plan.md#187-dependency-dag).
+
 ## First check
 
 Open the synthetic service with two independent guest sessions and an instrumented transport. Run the role walkthrough and retain the zero-live-egress evidence alongside mock regression results.

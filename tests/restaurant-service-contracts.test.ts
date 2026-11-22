@@ -325,7 +325,7 @@ describe('RS-01 live-v1 synthetic contract readers', () => {
   const bundle = readBundle();
 
   it('preserves the approved registry and all three amendments verbatim', () => {
-    const development = readFileSync(join(root, 'development.md'), 'utf8');
+    const development = readFileSync(join(root, 'docs/plans/orderly-history.md'), 'utf8');
     const published = readFileSync(join(root, 'docs/contracts/restaurant-service-v1.md'), 'utf8');
     const begin = development.indexOf('#### Shared wire, authorization and failure semantics');
     const end = development.indexOf('### 18.7 Dependency DAG', begin);

@@ -12,7 +12,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / "tests/fixtures/restaurant-service/v1.json"
 DOCUMENT = ROOT / "docs/contracts/restaurant-service-v1.md"
-DEVELOPMENT = ROOT / "development.md"
+DEVELOPMENT = ROOT / "docs/plans/orderly-history.md"
 MOCK_ROOT = ROOT / "tests/fixtures/contracts"
 
 PREVIEW_FIELDS: dict[str, Any] = {
