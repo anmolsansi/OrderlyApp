@@ -148,3 +148,21 @@ RF-01's candidate DAG preserves the original live tasks/checkpoints and adds six
 
 **Acyclicity proof method:** parse the machine-readable §18.7 edge list, remove only the single `RS-30 → RS-20` edge, add the single `RS-20 → RS-30` serialization edge plus all DS/DEMO edges, then Kahn-sort every node and calculate `wave(node) = 1 + max(wave(predecessors))`. Assert all nodes visit exactly once, DEMO-SALES has no provider-send/real-feedback ancestor, and each shared-file pair has an ordered path. This is a **structural planning check**, not unit/E2E/hosted evidence.
 
+## 9. Five-minute operator walkthrough, one synthetic restaurant
+
+All screens/routes below are **planned**, and acceptance must be shown in a real browser after DS implementation. Use fixture-only sample data and an isolated test database. A demonstrator must not use a real restaurant or real customer contact.
+
+| Clock | Action and screen | Expected visible proof | Owning packet |
+|---|---|---|---|
+| **0:00–0:30** | Open `/demo`; create a demo session. Say, “This is a safe simulation, no real orders, payments or messages.” | Persistent **DEMO, NO REAL ORDERS / PAYMENTS / MESSAGES** banner. Fresh `rid` and customer/staff/owner role links for the same synthetic restaurant | DS-01, DS-06 |
+| **0:30–1:20** | Customer link `/r/{rid}`. Browse menu. Choose a synthetic item; say a simple order request via Start/Stop speech **or** type it when microphone is denied. Inspect and edit the voice proposal before pressing **Add to basket** | Selected catalog and modifier/quantity proposal, no automatic mutation; cart revision increases only after explicit Add. Unsupported/ambiguous transcript clarifies, not guesses | RS-13/42/43/55/56/57 |
+| **1:20–2:00** | Review basket and pay-at-restaurant quote; submit once with its UUID key. Open `/r/{rid}/orders/{oid}` | `Submitted`, canonical INR-paise total and immutable receipt; no card charging or money-moving action | RS-14/15/18/19/44/46, DS-01 |
+| **2:00–3:00** | Staff role link `/demo/{rid}/staff`. Show the same `oid`. Explicitly perform **Accepted → Preparing → Ready → Completed**. Record “cash” or “UPI” as an asserted full payment | Single order transitions and versions, `Paid` *recorded by staff* and no bank/PSP confirmation. Still no Clerk impersonation or access to real staff route | RS-20/21/22/47/48/49, DS-01/04 |
+| **3:00–4:05** | Owner role link `/demo/{rid}/owner`. View menu and toggle one item unavailable, then open a synthetic campaign draft against an existing offer, review channel/content and eligible/suppressed counts | New menu catalog version; draft and preview show exact synthetic audience and no real addresses. Setup shows `provider_mode=disabled` | RS-09/10/16/24/26/27/28/29/51/52/53, DS-02/05 |
+| **4:05–4:35** | Open campaign's **Simulation** result and overview. Do not offer a real-send button | “Would be queued” and “Would be suppressed,” `actual_sent=0`, `actual_delivered=0`, `actual_spend_minor=0`. No claims of campaign performance or revenue | DS-02/05 |
+| **4:35–5:00** | Use Reset to open a new demo scope, revisit former order ID and show it cannot be opened. Refresh current demo; return to role links | Old `rid` inaccessible. Fresh fixture has an empty cart, no prior recorded payments or campaigns; no silent shared fixture fallback | DS-01/06 |
+
+**Every visual route is an explicit permission boundary.** The customer route is guest-authenticated, staff and owner **demo** routes are server-bound to the creating guest, and real staff routes still require active Clerk membership. Do not expose a direct demo switch inside the real /staff route or treat a URL `rid` as authorization.
+
+**Presenter talk track:** “This demonstrates a restaurant-owned workflow. The guest reviews a voice suggestion before placing an order. Staff moves that same order through fulfillment and records an on-premises payment assertion. The owner can change availability and prepare an outreach campaign. Every marketing result in this screen is a **simulation**. We have not sent any messages or collected any money. Real restaurant launch requires separate security, pricing, compliance, provider and device testing.”
+
