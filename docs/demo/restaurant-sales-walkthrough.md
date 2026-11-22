@@ -202,3 +202,24 @@ For an ambiguous voice instruction, e.g., “add something spicy and send it,”
 - **Rollback:** revert the proposed DS overlay and RS-20/30 ordering change on the planning branch if reviewer rejects the split. Runtime rollback after later DS implementation requires disabled demo entrypoints, preserved live ledgers, no deletion of business receipts and revalidation of original mock routes. The existing full-service DAG and all live external-input gates remain intact.
 
 **Final state:** RF-01 documentation and graph analysis may be accepted in a review PR. **DEMO-SALES implementation remains Not completed** until its six child packets and runtime acceptance are merged and tested. No actual providers, new screens, demo tenant databases or hosted configuration are delivered by this document.
+
+## 11. RF-01 planning verification record
+
+**Evidence date:** 2026-11-22. **Baseline:** `ed738ada2cdf9610a780a09e7bb24f690b7d80ba`. **Graph candidate before this evidence-only commit:** `d3d6d7323781969f8c434b29d3be1d39b65f07ee`. Tracking: GitHub [#62](https://github.com/anmolsansi/OrderlyApp/issues/62) and Linear [OPE-347](https://linear.app/openclaw-neutron/issue/OPE-347/rf-01-plan-earlier-synthetic-four-capability-demo-sales-gate).
+
+| Structural or documentation check | Actual result |
+|---|---|
+| Parse revised §18.7 machine-readable edge JSON | PASS: 79 unique nodes, 258 directed edges |
+| Topological sort of every node | PASS: 79/79 nodes consumed, 0 cycles |
+| Mermaid graph equivalent to JSON edge list | PASS: all 258 edges present in each, 0 missing/extra |
+| Full §18.8 wave table | PASS: W0–W29 (30 wave rows), every node listed exactly once |
+| DEMO-SALES prerequisite safety | PASS: W22; no RS-30–38, RS-54/58/59, RS-INT02/03 provider/feedback task among ancestors |
+| Full-service gates preserved | PASS: RS-58/59, RS-INT01–04, RS-RELEASE remain reachable; RS-RELEASE W29 |
+| Shared-file serialization | PASS against explicitly declared RF-01 ownership pairs; DS-04 and DS-05 share a wave but no owned file |
+| Changed-file scope from GitHub compare | PASS: exactly `development.md` and `docs/demo/restaurant-sales-walkthrough.md` |
+| Named source documentation links | PASS: RF-01 ticket, RS-01 contract, ticket execution guide resolve from GitHub branch |
+| Markdown fence balance | PASS: even opening/closing fence counts in both changed files |
+| Runtime PostgreSQL/browser/send isolation, staff/device U1–U4 | **NOT RUN / NOT IMPLEMENTED**. Deferred to DS-01–06, RS-58/59 and RS-INT evidence owners |
+| Current PR required CI | **Not claimed here**. Must be inspected on the exact open PR head |
+
+The checks above evaluate the **planning artifact**, not a running service. If an assigned builder finds a source/contract mismatch or a live dependency on the earlier demo path, report `Needs Architect Decision` and do not mark the corresponding runtime check passed. Standalone RS-20/30/58/59 packet sync by RF-05 remains an explicit prerequisite. This branch is intended for review and **must not be merged without a new explicit request**.
