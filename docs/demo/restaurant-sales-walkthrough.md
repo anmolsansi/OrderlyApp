@@ -138,3 +138,13 @@ These are **proposed new tickets**, not implemented providers and not additional
 
 **Rollback:** if a live staff queue unexpectedly needs RS-30 or demo mode cannot be isolated, revert the schedule/child overlay and keep the prior full-release DAG. Do not revert RS-01, change already-shipped mock behavior, delete restaurant business data or ship a weaker gateway. Stop fake transport entirely if zero-send enforcement cannot be proved.
 
+## 8. Waves, critical path and file-ownership proof
+
+RF-01's candidate DAG preserves the original live tasks/checkpoints and adds six DS packets plus one `DEMO-SALES` gate. The schedule-only RS-20/RS-30 edge reversal is necessary. Dependency levels (W0, W1, …) are **topological levels**, not weeks, dates or implementation completion claims.
+
+**Computed candidate (before running any child code):** RS-20 W14, RS-21 W15, RS-22 W16, DS-01 W17, DS-02 W18, DS-03 W19, DS-04 W20, DS-05 W20, DS-06 W21, DEMO-SALES W22. RS-30 stays required for live providers, not DS. Earlier DEMO-SALES precedes the full provider-dependent RS-59 merge/RS-INT04/RS-RELEASE. The only planned same-wave DS pair is DS-04/DS-05, which own different staff versus owner UI files. The linearly reused demo kernel, gateway and page paths have directed handoff edges, never parallel writers.
+
+**File-serialization checks to rerun after any DAG edit:** `backend/app/staff_routes.py` RS-20 → RS-30; `backend/app/live_routes.py` RS-19 → DS-01 → DS-02 → RS-58; `backend/app/live_demo.py` DS-01 → DS-02 → RS-58; gateway/`lib/live-api.ts` RS-07/41 → DS-03 → RS-58; `StaffOrderDetail.tsx` RS-49 → DS-04; owner components RS-51/52/53 → DS-05; `app/demo/page.tsx` DS-06 → RS-59. Other existing shared-file gates in §18.8 remain binding.
+
+**Acyclicity proof method:** parse the machine-readable §18.7 edge list, remove only the single `RS-30 → RS-20` edge, add the single `RS-20 → RS-30` serialization edge plus all DS/DEMO edges, then Kahn-sort every node and calculate `wave(node) = 1 + max(wave(predecessors))`. Assert all nodes visit exactly once, DEMO-SALES has no provider-send/real-feedback ancestor, and each shared-file pair has an ordered path. This is a **structural planning check**, not unit/E2E/hosted evidence.
+
