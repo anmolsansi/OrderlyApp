@@ -21,3 +21,21 @@ OrderlyApp currently has a **mock-only ordering portfolio demo**. The RF-01 four
 
 **Observed outcome:** These are questions and draft answers prepared for review. No real restaurant owner participated; owner approval and real feedback are **NOT RECORDED**.
 
+## 2. Commercial terms and invoice decision register
+
+Every **OWNER DECISION REQUIRED** cell blocks a contractual offer or price claim. No number in a sample or demo is a quote. Charges must be written in the chosen currency, with taxes, timing and payer shown separately.
+
+| Commercial term | Proposed contract value | Decision owner / required evidence |
+|---|---|---|
+| One-time onboarding/setup charge | **OWNER DECISION REQUIRED** | Provider commercial owner proposes; restaurant signatory accepts in signed offer |
+| Recurring service charge and cadence | **OWNER DECISION REQUIRED** | Both signatories approve amount, billing frequency and included features |
+| Included support hours per billing period | **OWNER DECISION REQUIRED** | Provider support owner and restaurant signatory approve exact hours |
+| Additional support hourly rate and approval | **OWNER DECISION REQUIRED** | Provider quotes; restaurant approves *before* extra billable time |
+| Proposal currency, rounding, tax/GST and invoice details | **OWNER DECISION REQUIRED** | Provider billing owner and restaurant finance owner; qualified tax review if needed |
+| Deposit, first invoice, subsequent payment dates and due terms | **OWNER DECISION REQUIRED** | Both authorized signatories approve dates and conditions |
+| Late-payment treatment, disputed charges and refund/credit terms | **OWNER DECISION REQUIRED** | Both signatories and legal review as applicable |
+| Pilot budget ceiling and change-order approval | **OWNER DECISION REQUIRED** | Restaurant financial approver and provider commercial owner |
+| Any discount or conversion to ongoing service | **OWNER DECISION REQUIRED** | Explicit later written amendment, never assumed |
+
+**Billing rule:** A proposal request is not an accepted pilot. A signed pilot is not a paid project. Record **paid_project** only after a real matched payment receipt or verified settlement confirmation, held privately. Do not create invoices, initiate payment collection or assert customer acceptance from this document. This project does not implement online payments.
+
