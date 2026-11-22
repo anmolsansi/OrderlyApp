@@ -81,3 +81,29 @@ Training rehearsal using approved **synthetic fixtures** before live service:
 
 **Change-control workflow:** restaurant requester submits a written request to the named provider lead. Provider scopes effort, pricing, risk, test impact and timing. Restaurant financial/operational signatories approve before work, and both sides update the offer revision. Urgent operational recovery does not silently expand promised features.
 
+## 4. Evidence sources and commercial stage register
+
+Record only **opaque references** in the repository or a review-safe PR. A real restaurant private evidence record must keep full original emails, signatures, receipts and observations under authorized access, with retention controlled by U2.
+
+| Commercial stage | Minimum dated evidence needed | Not acceptable evidence |
+|---|---|---|
+| **interested** | Dated, attributable private consent/interest note and source reference | A website view, unsolicited contact, or fictional roleplay |
+| **proposal_requested** | Dated owner-authorized request for a proposal, version/purpose and private source pointer | A sales presentation, demo page click or provider-written quote alone |
+| **accepted_pilot** | Versioned signed terms by both authorized parties, agreed scope/price/period/support/exit, private executed-document reference and acceptance timestamp | Verbal intent or an unsigned draft |
+| **paid_project** | Accepted pilot **plus independently verifiable received payment**, amount/currency/invoice reconciliation, date and restricted bank/receipt reference | "Cash recorded" in synthetic demo, invoice issued, provider send delivery or a pending transfer |
+
+**No transition is automatic.** Payment must match the contract and be verified before moving to paid_project. A later dispute, refund or reversal requires a separate correction record rather than rewriting the original evidence. A stage may remain BLOCKED or revert to earlier status after verified cancellation.
+
+### Evidence register template, private record only
+
+| Evidence ID | Stage/gate | Observation UTC | Actor/approver role | Version/setting | Result | Restricted source pointer | Reviewer/date |
+|---|---|---|---|---|---|---|---|
+| **NOT RECORDED** | interested | NOT RECORDED | OWNER DECISION REQUIRED | NOT RECORDED | BLOCKED | NOT RECORDED | NOT RECORDED |
+| **NOT RECORDED** | proposal_requested | NOT RECORDED | OWNER DECISION REQUIRED | NOT RECORDED | BLOCKED | NOT RECORDED | NOT RECORDED |
+| **NOT RECORDED** | accepted_pilot | NOT RECORDED | OWNER DECISION REQUIRED | NOT RECORDED | BLOCKED | NOT RECORDED | NOT RECORDED |
+| **NOT RECORDED** | paid_project | NOT RECORDED | OWNER DECISION REQUIRED | NOT RECORDED | BLOCKED | NOT RECORDED | NOT RECORDED |
+
+**Suggested reference convention:** use an opaque case ID and a private storage location only; do not put restaurant names, phone numbers, email addresses or bank details into GitHub, Linear, Git commits or CI logs. The user of this template assigns access, retention and audit history in the private system.
+
+Negative examples: "Owner liked the preview" cannot satisfy proposal_requested; a draft with terms cannot satisfy accepted_pilot; a pay-at-restaurant record cannot satisfy actual paid_project; an MSG91 request cannot prove delivered SMS or improved sales.
+
