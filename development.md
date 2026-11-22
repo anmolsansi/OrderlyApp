@@ -177,7 +177,7 @@ The [C-A command fingerprint](docs/contracts/restaurant-service-v1.md), [C-B dur
 | <a id="rf-02"></a>RF-02 | [Prepare the paid pilot offer and evidence checklist](docs/tickets/restaurant-service/RF-02.md) · [offer](docs/pilot/restaurant-offer.md) · [onboarding](docs/pilot/restaurant-onboarding.md) | Draft in [PR #67](https://github.com/anmolsansi/OrderlyApp/pull/67), unmerged; real commercial and pilot evidence blocked |
 | <a id="rf-03"></a>RF-03 | [Make waiting orders noticeable to staff](docs/tickets/restaurant-service/RF-03.md) | Not completed |
 | <a id="rf-04"></a>RF-04 | [Rehearse manual outage recovery](docs/tickets/restaurant-service/RF-04.md) | Not completed |
-| <a id="rf-05"></a>RF-05 | [Split the guide and synchronize packets](docs/tickets/restaurant-service/RF-05.md) | Review branch unmerged |
+| <a id="rf-05"></a>RF-05 | [Split the guide and synchronize packets](docs/tickets/restaurant-service/RF-05.md) | Documentation merged in [PR #65](https://github.com/anmolsansi/OrderlyApp/pull/65); not live implementation |
 
 **Six proposed DEMO-SALES child packets** preserve RF-01's earlier provider-independent contract and do not replace RS-58/59 full-release conformance.
 
