@@ -155,6 +155,14 @@ test('theme header wraps, remains operable at text zoom, and keeps an unsaved dr
   expect(dimensions.width).toBeGreaterThanOrEqual(44);
   expect(dimensions.height).toBeGreaterThanOrEqual(44);
   expect(dimensions.right).toBeLessThanOrEqual(376);
+  await page.evaluate(() => { document.documentElement.style.fontSize = '400%'; });
+  const highlyZoomed = await button.evaluate(element => {
+    const rect = element.getBoundingClientRect();
+    return { right: rect.right, width: rect.width, height: rect.height };
+  });
+  expect(highlyZoomed.right).toBeLessThanOrEqual(376);
+  expect(highlyZoomed.width).toBeGreaterThanOrEqual(44);
+  expect(highlyZoomed.height).toBeGreaterThanOrEqual(44);
   await expect(name).toHaveValue('Keep during zoom and resize');
 });
 
