@@ -303,3 +303,30 @@ def test_receipts_reject_update_and_delete(db):
         (rid, oid),
     ).fetchone()[0] == original
 
+
+def test_cross_restaurant_order_references_are_rejected(db):
+    a, b = add_restaurant(db), add_restaurant(db)
+    oid_a, oid_b = add_order(db, a), add_order(db, b)
+    rejects(
+        db, errors.ForeignKeyViolation,
+        "INSERT INTO live_receipts(restaurant_id,id,snapshot) VALUES (%s,%s,%s::jsonb)",
+        (a, oid_b, json.dumps({"id": str(oid_b), "restaurant_id": a})),
+    )
+    rejects(
+        db, errors.ForeignKeyViolation,
+        """INSERT INTO live_order_events
+           (restaurant_id,order_id,id,version,to_status,actor,created_at)
+           VALUES (%s,%s,%s,2,'Ready','synthetic-staff',now())""",
+        (a, oid_b, uuid4()),
+    )
+    rejects(
+        db, errors.ForeignKeyViolation,
+        """INSERT INTO live_guest_access
+           (restaurant_id,order_id,guest_id) VALUES (%s,%s,%s)""",
+        (a, oid_b, add_guest(db)),
+    )
+    add_receipt(db, a, oid_a)
+    assert db.execute(
+        "SELECT COUNT(*) FROM live_receipts WHERE restaurant_id=%s", (a,)
+    ).fetchone()[0] == 1
+
