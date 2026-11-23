@@ -322,7 +322,148 @@
     "created_at": "2026-10-11T09:00:00+00:00",
     "payment_instruction": "Pay at restaurant"
   },
-  "negative_cases": [],
+  "negative_cases": [
+    {
+      "id": "missing_named_approver",
+      "case_kind": "MISSING_OR_STALE_U1",
+      "contract_id": "CON-11",
+      "synthetic": true,
+      "missing_or_invalid_field": "approved_by",
+      "description": "No named restaurant owner/accountant approval",
+      "expected": {
+        "live_ready": false,
+        "reason": "u1_unverified",
+        "use_synthetic_fallback": false
+      },
+      "runtime_verified": false
+    },
+    {
+      "id": "missing_source_date",
+      "case_kind": "MISSING_OR_STALE_U1",
+      "contract_id": "CON-11",
+      "synthetic": true,
+      "missing_or_invalid_field": "source_date",
+      "description": "Policy source date absent",
+      "expected": {
+        "live_ready": false,
+        "reason": "u1_unverified",
+        "use_synthetic_fallback": false
+      },
+      "runtime_verified": false
+    },
+    {
+      "id": "missing_tax_inclusion",
+      "case_kind": "MISSING_OR_STALE_U1",
+      "contract_id": "CON-11",
+      "synthetic": true,
+      "missing_or_invalid_field": "tax_inclusion",
+      "description": "No verified inclusion/exclusion policy",
+      "expected": {
+        "live_ready": false,
+        "reason": "u1_unverified",
+        "use_synthetic_fallback": false
+      },
+      "runtime_verified": false
+    },
+    {
+      "id": "missing_taxable_basis",
+      "case_kind": "MISSING_OR_STALE_U1",
+      "contract_id": "CON-11",
+      "synthetic": true,
+      "missing_or_invalid_field": "taxable_basis",
+      "description": "No approved basis after/before discount",
+      "expected": {
+        "live_ready": false,
+        "reason": "u1_unverified",
+        "use_synthetic_fallback": false
+      },
+      "runtime_verified": false
+    },
+    {
+      "id": "missing_charge_policy",
+      "case_kind": "MISSING_OR_STALE_U1",
+      "contract_id": "CON-11",
+      "synthetic": true,
+      "missing_or_invalid_field": "charge_policy",
+      "description": "Charges, taxability and sequencing unapproved",
+      "expected": {
+        "live_ready": false,
+        "reason": "u1_unverified",
+        "use_synthetic_fallback": false
+      },
+      "runtime_verified": false
+    },
+    {
+      "id": "missing_receipt_identity",
+      "case_kind": "MISSING_OR_STALE_U1",
+      "contract_id": "CON-11",
+      "synthetic": true,
+      "missing_or_invalid_field": "business_identity",
+      "description": "Empty business identity cannot be used for live receipt",
+      "expected": {
+        "live_ready": false,
+        "reason": "u1_unverified",
+        "use_synthetic_fallback": false
+      },
+      "runtime_verified": false
+    },
+    {
+      "id": "missing_signed_sample",
+      "case_kind": "MISSING_OR_STALE_U1",
+      "contract_id": "CON-11",
+      "synthetic": true,
+      "missing_or_invalid_field": "real_receipt_sample",
+      "description": "No dated approved itemized receipt reconciles totals",
+      "expected": {
+        "live_ready": false,
+        "reason": "u1_unverified",
+        "use_synthetic_fallback": false
+      },
+      "runtime_verified": false
+    },
+    {
+      "id": "stale_pricing_version",
+      "case_kind": "MISSING_OR_STALE_U1",
+      "contract_id": "CON-11",
+      "synthetic": true,
+      "missing_or_invalid_field": "pricing_version",
+      "description": "Approval references a different pricing version",
+      "expected": {
+        "live_ready": false,
+        "reason": "u1_unverified",
+        "use_synthetic_fallback": false
+      },
+      "runtime_verified": false
+    },
+    {
+      "id": "foreign_restaurant_policy",
+      "case_kind": "MISSING_OR_STALE_U1",
+      "contract_id": "CON-11",
+      "synthetic": true,
+      "missing_or_invalid_field": "restaurant_id",
+      "description": "Approval scoped to a different restaurant",
+      "expected": {
+        "live_ready": false,
+        "reason": "u1_unverified",
+        "use_synthetic_fallback": false
+      },
+      "runtime_verified": false
+    },
+    {
+      "id": "unapproved_rounding",
+      "case_kind": "MISSING_OR_STALE_U1",
+      "contract_id": "CON-11",
+      "synthetic": true,
+      "missing_or_invalid_field": "tax_rounding",
+      "description": "Tax and cash rounding policy not approved",
+      "expected": {
+        "live_ready": false,
+        "reason": "u1_unverified",
+        "use_synthetic_fallback": false
+      },
+      "runtime_verified": false
+    }
+  ],
   "evidence_gate": {
     "status": "BLOCKED_U1",
     "live_ready": false,
