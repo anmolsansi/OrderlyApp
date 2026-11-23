@@ -150,3 +150,49 @@ def test_db_b_exact_columns(db):
         }
         assert actual == columns, name
 
+
+def test_primary_keys_uniques_and_fk_delete_policies(db):
+    relation_names = [
+        "live_carts", "live_orders", "live_receipts", "live_guest_access",
+        "live_order_events", "live_payment_events", "live_commands",
+    ]
+    constraints = db.execute(
+        """SELECT conrelid::regclass::text, contype,
+                  confrelid::regclass::text, confdeltype, pg_get_constraintdef(oid)
+           FROM pg_constraint WHERE conrelid=ANY(%s::regclass[])""",
+        (relation_names,),
+    ).fetchall()
+    keys = {(table, definition) for table, kind, _, _, definition in constraints
+            if kind in {"p", "u"}}
+    assert any(table == "live_orders" and "PRIMARY KEY (restaurant_id, id)" in d
+               for table, d in keys)
+    assert any(table == "live_commands" and
+               "PRIMARY KEY (restaurant_id, actor_kind, actor_id, key)" in d
+               for table, d in keys)
+    assert any(table == "live_order_events" and
+               "UNIQUE (restaurant_id, order_id, version)" in d
+               for table, d in keys)
+    fks = {(table, target, deletion, definition)
+           for table, kind, target, deletion, definition in constraints if kind == "f"}
+    for table, target in (
+        ("live_carts", "guest_sessions"),
+        ("live_guest_access", "guest_sessions"),
+    ):
+        assert any(src == table and dst == target and deletion == "c"
+                   for src, dst, deletion, _ in fks)
+    for table, target in (
+        ("live_carts", "live_restaurants"),
+        ("live_orders", "live_restaurants"),
+        ("live_receipts", "live_orders"),
+        ("live_guest_access", "live_orders"),
+        ("live_order_events", "live_orders"),
+        ("live_payment_events", "live_orders"),
+        ("live_commands", "live_restaurants"),
+    ):
+        assert any(src == table and dst == target and deletion == "r"
+                   for src, dst, deletion, _ in fks)
+    assert any(src == "live_payment_events" and dst == "live_payment_events"
+               and deletion == "r" and
+               "FOREIGN KEY (restaurant_id, order_id, reverses_id)" in definition
+               for src, dst, deletion, definition in fks)
+
