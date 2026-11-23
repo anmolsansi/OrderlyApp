@@ -1875,6 +1875,9 @@ html[data-theme='dark'] {
   font: inherit;
   cursor: pointer;
 }
+.live-theme-header-inner { padding-inline: min(1.5rem, 4vw); }
+.live-theme-identity { max-width: 100%; overflow-wrap: anywhere; }
+.live-theme-toggle { max-width: 100%; overflow-wrap: anywhere; padding-inline: min(1rem, 3vw); }
 @media (max-width: 40rem) {
-  .live-theme-header-inner { padding: 0.75rem 1rem; }
+  .live-theme-header-inner { padding-inline: min(1rem, 4vw); }
 }
