@@ -6,3 +6,9 @@
 **Owner:** RS-11 supplies an evidence artifact, not a runtime provider. RS-15 consumes this only after its applicable conformance gates. Named restaurant/accountant approval (U1) is absent.
 
 This file is a reviewable pricing policy **template**, not a live DB configuration, executable pricing profile, regulatory opinion, production tax table, or customer receipt. All invented names, numbers and identifiers below are intentionally synthetic. The companion [machine-readable vectors](../../tests/fixtures/restaurant-service/pricing.json) are isolated test evidence and **never** runtime fallback data.
+
+## 1. Frozen shared boundary and units
+
+CON-11 consumes RS-01 COMMON/DTO and hands inputs to RS-15. Backend `/v1/live` is exposed via same-origin `/api/orderly/live`. No route or database schema is created by RS-11. Restaurant IDs are TEXT (1–100 characters). JSON names are snake_case. Money is **strict integer INR paise**, `0..2147483647` inclusive. No strings, booleans, floats, negative numbers, implicit paisa-to-rupee conversion, or floating-point intermediate arithmetic are accepted as money. Overflows are invalid, `422 money_out_of_range` where a live API boundary applies.
+
+Existing public total shape is exactly `{currency:"INR",subtotal_minor,discount_minor,tax_minor,charges_minor,total_minor}`. All five amounts are nonnegative integers in paise. Arithmetic must be checked before persisting or returning a quote. This artifact does not add fields to existing shared DTOs and does not modify the USD-cent `mock-v1` service.
