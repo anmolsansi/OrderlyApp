@@ -73,3 +73,18 @@ The rounding boundary above is **discount floor in paise**. It does not establis
 The synthetic receipt example in `pricing.json` mirrors the frozen RS-01 `LiveOrderReceipt` shape: `schema_version=1`, `kind="live-v1"`, UUID `id`, UTC `created_at`, `payment_instruction="Pay at restaurant"`, `fulfillment`, optional `table_id`/`table_label`, `restaurant_id`, `restaurant_name`, server-validated `items`, `totals`, `pricing_version`, `promotion_code`, `offer_version`, `business_identity`, and `synthetic=true`. No online-payment or tip field is present.
 
 Fixture example: `r-demo`, one pizza line at 1,200 paise, 0 discount, 0 tax, 0 charges, total 1,200 INR paise. `business_identity={}` is valid **only** because the example is synthetic. Actual legal name, address, registration or tax numbers, jurisdiction-specific receipt fields, invoice title/numbering, exemptions, rounding presentation, transaction date/time, mandatory text and evidence must be supplied and approved by the **named restaurant owner/accountant**. Do not guess which fields or wording are legally required.
+
+## 6. U1 approval packet, owner/accountant must supply
+
+| Evidence needed for one actual restaurant | Record to request | Current status |
+|---|---|---|
+| Accountable identity | Restaurant ID, legal/trading name, approver name/role and privately stored evidence reference | **OWNER DECISION REQUIRED** |
+| Real catalog pricing | Source price list, item/modifier tax applicability, tax-inclusive or tax-exclusive label, effective date | **OWNER DECISION REQUIRED** |
+| Tax policy | Applicable jurisdiction, rates/categories, tax inclusion, before/after-discount basis, exemption handling, per-line vs subtotal rounding, who approved formula | **OWNER DECISION REQUIRED** |
+| Other charges | Charge name, fixed/percentage basis, applicability, taxability, caps, calculation order, refund/cancellation treatment | **OWNER DECISION REQUIRED** |
+| Cash/invoice rounding | Minor-unit precision, all intermediate and final rounding modes, per-line vs aggregate handling, worked boundary receipt | **OWNER DECISION REQUIRED** |
+| Receipt identity | Exact approved business identity key names and values, required disclosures and invoice fields, signed sample without customer PII | **OWNER DECISION REQUIRED** |
+| One reconciled real sample | Itemized prices, discounts, tax/charges breakdown, total, date, approval link and source-policy version | **OWNER DECISION REQUIRED** |
+| Operational change control | `pricing_version` owner, effective timestamp, approval workflow, rollback and stale quote revalidation | **OWNER DECISION REQUIRED** |
+
+Record a **source date** and **approval date** separately; they need not be the same. Keep actual customer, payment, tax-registration or contact details in access-controlled private evidence, with only a safe opaque pointer in this repository. An empty/synthetic reference is not U1 acceptance.
