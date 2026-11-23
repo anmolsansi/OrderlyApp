@@ -51,10 +51,15 @@ def add_restaurant(db, rid=None):
 
 def add_guest(db, *, expired=False):
     gid = f"rs03-g-{uuid4().hex}"
-    expiry = datetime.now(timezone.utc) + timedelta(days=-1 if expired else 1)
+    now = datetime.now(timezone.utc)
+    created_at = now - timedelta(days=2) if expired else now
+    expiry = now - timedelta(days=1) if expired else now + timedelta(days=1)
+    # Guest-session storage requires expiry AFTER creation, even when the
+    # synthetic row has already expired at the time of the cleanup exercise.
     db.execute(
-        "INSERT INTO guest_sessions (id,token_hash,expires_at) VALUES (%s,%s,%s)",
-        (gid, uuid4().hex, expiry),
+        """INSERT INTO guest_sessions (id,token_hash,created_at,expires_at)
+           VALUES (%s,%s,%s,%s)""",
+        (gid, uuid4().hex, created_at, expiry),
     )
     return gid
 
