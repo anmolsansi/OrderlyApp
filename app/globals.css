@@ -1816,3 +1816,23 @@ html[data-theme='dark'] {
 .live-task-screen .live-status-warning { color: var(--live-warning); }
 .live-task-screen .live-status-error { color: var(--live-error); }
 .live-task-screen .live-status-pending { color: var(--live-muted); }
+
+.live-task-screen :is(a, button, input, select, textarea):focus-visible,
+.live-theme-toggle:focus-visible {
+  outline: 3px solid var(--live-focus);
+  outline-offset: 3px;
+}
+.live-task-screen a:not([class]) {
+  color: var(--live-link);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+.live-task-screen a:not([class]):visited {
+  color: var(--live-link-visited);
+}
+@media (forced-colors: active) {
+  .live-theme-toggle,
+  .live-task-screen :is(a, button, input, select, textarea):focus-visible {
+    forced-color-adjust: auto;
+  }
+}
