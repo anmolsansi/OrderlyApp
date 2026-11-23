@@ -68,3 +68,27 @@ CREATE TABLE live_order_events (
     FOREIGN KEY (restaurant_id, order_id)
         REFERENCES live_orders(restaurant_id, id) ON DELETE RESTRICT
 );
+
+-- Payment ledger is a record of at-restaurant payments, not online settlement.
+-- A reversal must refer to an event for the SAME restaurant and SAME order.
+-- Full-payment and reversal eligibility are later service-level locked-order checks.
+CREATE TABLE live_payment_events (
+    restaurant_id TEXT NOT NULL,
+    order_id UUID NOT NULL,
+    id UUID NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN ('recorded', 'reversed')),
+    reverses_id UUID NULL,
+    amount_minor INTEGER NOT NULL CHECK (amount_minor >= 0),
+    currency TEXT NOT NULL CHECK (currency = 'INR'),
+    method TEXT NULL CHECK (method IN ('cash', 'upi', 'card', 'other')),
+    actor TEXT NOT NULL,
+    reason TEXT NULL,
+    created_at TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (restaurant_id, id),
+    UNIQUE (restaurant_id, order_id, id),
+    UNIQUE (restaurant_id, reverses_id),
+    FOREIGN KEY (restaurant_id, order_id)
+        REFERENCES live_orders(restaurant_id, id) ON DELETE RESTRICT,
+    FOREIGN KEY (restaurant_id, order_id, reverses_id)
+        REFERENCES live_payment_events(restaurant_id, order_id, id) ON DELETE RESTRICT
+);
