@@ -1,7 +1,15 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
+import { IBM_Plex_Sans } from 'next/font/google';
 import './globals.css';
 import { ThemeToggle } from './components/ThemeToggle';
+
+const plexSans = IBM_Plex_Sans({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  display: 'swap',
+  variable: '--font-orderly-live-sans',
+});
 
 const themeBootstrap = `(function () {
   var theme = 'light';
@@ -26,7 +34,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         {/* Runs before body parsing, independent of React hydration and storage availability. */}
         <script dangerouslySetInnerHTML={{ __html: themeBootstrap }} />
       </head>
-      <body>
+      <body className={plexSans.variable}>
         <header aria-label="Appearance" className="live-theme-header">
           <div className="live-theme-header-inner">
             <span className="live-theme-identity">OrderlyApp appearance</span>
