@@ -49,3 +49,22 @@ CREATE TABLE live_guest_access (
     FOREIGN KEY (restaurant_id, order_id)
         REFERENCES live_orders(restaurant_id, id) ON DELETE RESTRICT
 );
+
+-- Operational events are append-only and versions are unique per restaurant/order.
+-- Payment actions may also advance an order version, so event versions need not
+-- be contiguous.
+CREATE TABLE live_order_events (
+    restaurant_id TEXT NOT NULL,
+    order_id UUID NOT NULL,
+    id UUID NOT NULL,
+    version BIGINT NOT NULL,
+    from_status TEXT NULL,
+    to_status TEXT NOT NULL,
+    actor TEXT NOT NULL,
+    reason TEXT NULL,
+    created_at TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (restaurant_id, id),
+    UNIQUE (restaurant_id, order_id, version),
+    FOREIGN KEY (restaurant_id, order_id)
+        REFERENCES live_orders(restaurant_id, id) ON DELETE RESTRICT
+);
