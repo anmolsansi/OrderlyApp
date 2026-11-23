@@ -451,3 +451,43 @@ def test_payment_inr_max_minor_unit_and_optional_method(db):
         (rid, eid),
     ).fetchone() == (2_147_483_647, "INR", None)
 
+
+def test_reversals_must_reference_same_order_and_cannot_repeat(db):
+    rid = add_restaurant(db)
+    first_order, second_order = add_order(db, rid), add_order(db, rid)
+    original = add_payment(db, rid, first_order)
+    reversed_id = add_payment(
+        db, rid, first_order, kind="reversed",
+        reverses_id=original, method=None,
+    )
+    rejects(
+        db, errors.UniqueViolation,
+        """INSERT INTO live_payment_events
+           (restaurant_id,order_id,id,kind,reverses_id,amount_minor,currency,
+            actor,created_at)
+           VALUES (%s,%s,%s,'reversed',%s,123,'INR','synthetic-cashier',now())""",
+        (rid, first_order, uuid4(), original),
+    )
+    rejects(
+        db, errors.ForeignKeyViolation,
+        """INSERT INTO live_payment_events
+           (restaurant_id,order_id,id,kind,reverses_id,amount_minor,currency,
+            actor,created_at)
+           VALUES (%s,%s,%s,'reversed',%s,123,'INR','synthetic-cashier',now())""",
+        (rid, second_order, uuid4(), original),
+    )
+    other = add_restaurant(db)
+    other_oid = add_order(db, other)
+    rejects(
+        db, errors.ForeignKeyViolation,
+        """INSERT INTO live_payment_events
+           (restaurant_id,order_id,id,kind,reverses_id,amount_minor,currency,
+            actor,created_at)
+           VALUES (%s,%s,%s,'reversed',%s,123,'INR','synthetic-cashier',now())""",
+        (other, other_oid, uuid4(), original),
+    )
+    assert db.execute(
+        "SELECT reverses_id FROM live_payment_events WHERE restaurant_id=%s AND id=%s",
+        (rid, reversed_id),
+    ).fetchone() == (original,)
+
