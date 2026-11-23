@@ -17,3 +17,15 @@ CREATE TABLE live_restaurants (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Tables are tenant-scoped by composite identity; no cross-restaurant uniqueness
+-- is imposed on table UUIDs or labels.
+CREATE TABLE live_tables (
+  restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,
+  id UUID NOT NULL,
+  label TEXT NOT NULL CHECK (length(label) BETWEEN 1 AND 30),
+  active BOOLEAN NOT NULL DEFAULT true,
+  version BIGINT NOT NULL DEFAULT 1 CHECK (version > 0),
+  PRIMARY KEY (restaurant_id, id),
+  UNIQUE (restaurant_id, label)
+);
