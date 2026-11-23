@@ -154,3 +154,28 @@ def test_unconfigured_restaurant_stays_disabled_and_defaults_are_safe(db):
         (rid,),
     ).fetchone() == (False,)
 
+
+def test_table_ids_and_labels_are_tenant_scoped(db):
+    rid_a, rid_b = mock_restaurant(db), mock_restaurant(db)
+    add_live(db, rid_a)
+    add_live(db, rid_b)
+    shared_id = uuid4()
+    add_table(db, rid_a, "T1", table_id=shared_id)
+    add_table(db, rid_b, "T1", table_id=shared_id)
+    assert db.execute(
+        "SELECT COUNT(*) FROM live_tables WHERE id = %s", (shared_id,)
+    ).fetchone()[0] == 2
+    rejects(
+        db, errors.UniqueViolation,
+        "INSERT INTO live_tables (restaurant_id,id,label) VALUES (%s,%s,%s)",
+        (rid_a, uuid4(), "T1"),
+    )
+    rejects(
+        db, errors.UniqueViolation,
+        "INSERT INTO live_tables (restaurant_id,id,label) VALUES (%s,%s,%s)",
+        (rid_a, shared_id, "Another"),
+    )
+    assert db.execute(
+        "SELECT COUNT(*) FROM live_tables WHERE id = %s", (shared_id,)
+    ).fetchone()[0] == 2
+
