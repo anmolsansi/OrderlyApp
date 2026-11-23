@@ -107,3 +107,11 @@ CREATE TABLE live_commands (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (restaurant_id, actor_kind, actor_id, key)
 );
+
+-- Access patterns are tenant-first; no global cross-tenant order scans.
+CREATE INDEX live_orders_queue
+    ON live_orders (restaurant_id, status, created_at DESC, id DESC);
+CREATE INDEX live_access_guest
+    ON live_guest_access (guest_id, restaurant_id, order_id);
+CREATE INDEX live_payment_order
+    ON live_payment_events (restaurant_id, order_id, created_at, id);
