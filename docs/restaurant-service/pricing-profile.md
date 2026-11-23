@@ -88,3 +88,16 @@ Fixture example: `r-demo`, one pizza line at 1,200 paise, 0 discount, 0 tax, 0 c
 | Operational change control | `pricing_version` owner, effective timestamp, approval workflow, rollback and stale quote revalidation | **OWNER DECISION REQUIRED** |
 
 Record a **source date** and **approval date** separately; they need not be the same. Keep actual customer, payment, tax-registration or contact details in access-controlled private evidence, with only a safe opaque pointer in this repository. An empty/synthetic reference is not U1 acceptance.
+
+## 7. Live activation gate: fail closed
+
+`live_ready=false` whenever **any** required U1 policy, receipt identity, version, source, date, approver or reconciled sample is missing, unverified, inconsistent, expired or not tied to the exact restaurant. The synthetic profile always has `live_ready=false` even though its own arithmetic passes.
+
+| Candidate | Synthetic vectors | Named U1 approval | Reconciled real receipt | Live-ready |
+|---|---|---|---|---|
+| This `r-demo` fixture | yes | no | no | **false** |
+| Real restaurant, one missing tax/receipt field | maybe | incomplete | no | **false** |
+| Real restaurant, policy or identity changed after approval | n/a | stale | must renew | **false** |
+| Future real restaurant with complete signed evidence | separate checks needed | possible | possible | **not asserted by RS-11** |
+
+For an unverified actual restaurant, downstream quote must respond `503 pricing_unconfigured` using the COMMON error envelope, **not** return a zero-tax fixture quote. Deployment, menu access, owner role or path `rid` is not a substitute for this check. Restaurant-specific policy must be actively selected by a verified owner/operator, never inferred from demo data.
