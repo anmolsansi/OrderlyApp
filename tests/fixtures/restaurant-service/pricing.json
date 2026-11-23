@@ -1,0 +1,669 @@
+{
+  "contract_id": "CON-11",
+  "schema_version": 1,
+  "synthetic": true,
+  "scope": "synthetic-pricing-and-U1-evidence-only",
+  "live_ready": false,
+  "source": {
+    "contract_set": "restaurant-service/live-v1",
+    "source_fixture": "tests/fixtures/restaurant-service/v1.json",
+    "prepared_date": "2026-11-23",
+    "baseline_commit": "21c2b1f060db23790580b3b4bbbbc195112b2171",
+    "evidence_type": "hand-calculated-synthetic",
+    "approved_restaurant_source": null
+  },
+  "profile": {
+    "schema_version": 1,
+    "pricing_version": 1,
+    "restaurant_id": "r-demo",
+    "currency": "INR",
+    "synthetic": true,
+    "live_ready": false,
+    "minor_unit": "paise",
+    "discount_rounding": "floor_nonnegative_percent_product",
+    "tax_minor": 0,
+    "charges_minor": 0,
+    "tax_inclusion": null,
+    "taxable_basis": null,
+    "charge_policy": null,
+    "business_identity": {},
+    "source_kind": "synthetic_test_fixture",
+    "source_date": "2026-11-23",
+    "approved_by": null
+  },
+  "rules": {
+    "unit": "INR paise",
+    "integer_only": true,
+    "money_min": 0,
+    "money_max": 2147483647,
+    "line_minor": "unit_minor * quantity",
+    "subtotal_minor": "sum(line_minor)",
+    "discount_minor": "min(floor(subtotal_minor * percent_bps / 10000), max_discount_minor, subtotal_minor)",
+    "total_minor": "subtotal_minor - discount_minor + tax_minor + charges_minor",
+    "synthetic_tax_minor": 0,
+    "synthetic_charges_minor": 0,
+    "real_tax_rounding": "OWNER DECISION REQUIRED",
+    "real_tax_inclusion": "OWNER DECISION REQUIRED",
+    "real_taxable_basis": "OWNER DECISION REQUIRED",
+    "no_promotion_discount_minor": 0
+  },
+  "positive_cases": [
+    {
+      "id": "zero_discount",
+      "contract_id": "CON-11",
+      "schema_version": 1,
+      "synthetic": true,
+      "pricing_version": 1,
+      "input": {
+        "restaurant_id": "r-demo",
+        "lines": [
+          {
+            "unit_minor": 1200,
+            "quantity": 1
+          }
+        ],
+        "offer": null
+      },
+      "expected": {
+        "currency": "INR",
+        "subtotal_minor": 1200,
+        "discount_minor": 0,
+        "tax_minor": 0,
+        "charges_minor": 0,
+        "total_minor": 1200
+      },
+      "hand_calculation": "1 * 1200 = 1200; no promotion (offer=null), so discount=0; total=1200+0+0=1200"
+    },
+    {
+      "id": "capped_discount",
+      "contract_id": "CON-11",
+      "schema_version": 1,
+      "synthetic": true,
+      "pricing_version": 1,
+      "input": {
+        "restaurant_id": "r-demo",
+        "lines": [
+          {
+            "unit_minor": 1200,
+            "quantity": 1
+          }
+        ],
+        "offer": {
+          "percent_bps": 2500,
+          "max_discount_minor": 200
+        }
+      },
+      "expected": {
+        "currency": "INR",
+        "subtotal_minor": 1200,
+        "discount_minor": 200,
+        "tax_minor": 0,
+        "charges_minor": 0,
+        "total_minor": 1000
+      },
+      "hand_calculation": "floor(1200 * 2500 / 10000)=300; min(300,200,1200)=200; total=1000"
+    },
+    {
+      "id": "multiline_capped",
+      "contract_id": "CON-11",
+      "schema_version": 1,
+      "synthetic": true,
+      "pricing_version": 1,
+      "input": {
+        "restaurant_id": "r-demo",
+        "lines": [
+          {
+            "unit_minor": 1999,
+            "quantity": 2
+          },
+          {
+            "unit_minor": 501,
+            "quantity": 1
+          }
+        ],
+        "offer": {
+          "percent_bps": 1250,
+          "max_discount_minor": 500
+        }
+      },
+      "expected": {
+        "currency": "INR",
+        "subtotal_minor": 4499,
+        "discount_minor": 500,
+        "tax_minor": 0,
+        "charges_minor": 0,
+        "total_minor": 3999
+      },
+      "hand_calculation": "1999*2+501=4499; floor(4499*1250/10000)=floor(562.375)=562; cap 500; total=3999"
+    },
+    {
+      "id": "sub_paise_floor",
+      "contract_id": "CON-11",
+      "schema_version": 1,
+      "synthetic": true,
+      "pricing_version": 1,
+      "input": {
+        "restaurant_id": "r-demo",
+        "lines": [
+          {
+            "unit_minor": 1,
+            "quantity": 1
+          }
+        ],
+        "offer": {
+          "percent_bps": 5000,
+          "max_discount_minor": 999
+        }
+      },
+      "expected": {
+        "currency": "INR",
+        "subtotal_minor": 1,
+        "discount_minor": 0,
+        "tax_minor": 0,
+        "charges_minor": 0,
+        "total_minor": 1
+      },
+      "hand_calculation": "floor(1*5000/10000)=floor(0.5)=0; total=1"
+    },
+    {
+      "id": "above_half_paise",
+      "contract_id": "CON-11",
+      "schema_version": 1,
+      "synthetic": true,
+      "pricing_version": 1,
+      "input": {
+        "restaurant_id": "r-demo",
+        "lines": [
+          {
+            "unit_minor": 3,
+            "quantity": 1
+          }
+        ],
+        "offer": {
+          "percent_bps": 5000,
+          "max_discount_minor": 999
+        }
+      },
+      "expected": {
+        "currency": "INR",
+        "subtotal_minor": 3,
+        "discount_minor": 1,
+        "tax_minor": 0,
+        "charges_minor": 0,
+        "total_minor": 2
+      },
+      "hand_calculation": "floor(3*5000/10000)=floor(1.5)=1; total=2"
+    },
+    {
+      "id": "exact_integer",
+      "contract_id": "CON-11",
+      "schema_version": 1,
+      "synthetic": true,
+      "pricing_version": 1,
+      "input": {
+        "restaurant_id": "r-demo",
+        "lines": [
+          {
+            "unit_minor": 200,
+            "quantity": 1
+          }
+        ],
+        "offer": {
+          "percent_bps": 500,
+          "max_discount_minor": 999
+        }
+      },
+      "expected": {
+        "currency": "INR",
+        "subtotal_minor": 200,
+        "discount_minor": 10,
+        "tax_minor": 0,
+        "charges_minor": 0,
+        "total_minor": 190
+      },
+      "hand_calculation": "floor(200*500/10000)=10 exactly; total=190"
+    },
+    {
+      "id": "full_discount",
+      "contract_id": "CON-11",
+      "schema_version": 1,
+      "synthetic": true,
+      "pricing_version": 1,
+      "input": {
+        "restaurant_id": "r-demo",
+        "lines": [
+          {
+            "unit_minor": 1200,
+            "quantity": 1
+          }
+        ],
+        "offer": {
+          "percent_bps": 10000,
+          "max_discount_minor": 2147483647
+        }
+      },
+      "expected": {
+        "currency": "INR",
+        "subtotal_minor": 1200,
+        "discount_minor": 1200,
+        "tax_minor": 0,
+        "charges_minor": 0,
+        "total_minor": 0
+      },
+      "hand_calculation": "floor(1200*10000/10000)=1200; cap never adds more than subtotal; total=0"
+    },
+    {
+      "id": "maximum_total",
+      "contract_id": "CON-11",
+      "schema_version": 1,
+      "synthetic": true,
+      "pricing_version": 1,
+      "input": {
+        "restaurant_id": "r-demo",
+        "lines": [
+          {
+            "unit_minor": 2147483647,
+            "quantity": 1
+          }
+        ],
+        "offer": null
+      },
+      "expected": {
+        "currency": "INR",
+        "subtotal_minor": 2147483647,
+        "discount_minor": 0,
+        "tax_minor": 0,
+        "charges_minor": 0,
+        "total_minor": 2147483647
+      },
+      "hand_calculation": "Maximum allowed unit and subtotal=2147483647; no promotion (offer=null), zero tax and charges; total=2147483647"
+    }
+  ],
+  "receipt_example": {
+    "fulfillment": "dine_in",
+    "table_id": "00000002-1111-4111-8111-111111111111",
+    "restaurant_id": "r-demo",
+    "restaurant_name": "Synthetic Restaurant",
+    "table_label": "T1",
+    "items": [
+      {
+        "id": "line-one",
+        "restaurant_id": "r-demo",
+        "menu_item_id": "i-one",
+        "quantity": 1,
+        "modifiers": [],
+        "special_instructions": null,
+        "name": "Sample Pizza",
+        "unit_minor": 1200,
+        "line_minor": 1200
+      }
+    ],
+    "totals": {
+      "currency": "INR",
+      "subtotal_minor": 1200,
+      "discount_minor": 0,
+      "tax_minor": 0,
+      "charges_minor": 0,
+      "total_minor": 1200
+    },
+    "pricing_version": 1,
+    "promotion_code": null,
+    "offer_version": null,
+    "business_identity": {},
+    "synthetic": true,
+    "schema_version": 1,
+    "kind": "live-v1",
+    "id": "00000001-1111-4111-8111-111111111111",
+    "created_at": "2026-10-11T09:00:00+00:00",
+    "payment_instruction": "Pay at restaurant"
+  },
+  "negative_cases": [
+    {
+      "id": "missing_named_approver",
+      "case_kind": "MISSING_OR_STALE_U1",
+      "contract_id": "CON-11",
+      "synthetic": true,
+      "missing_or_invalid_field": "approved_by",
+      "description": "No named restaurant owner/accountant approval",
+      "expected": {
+        "live_ready": false,
+        "reason": "u1_unverified",
+        "use_synthetic_fallback": false
+      },
+      "runtime_verified": false
+    },
+    {
+      "id": "missing_source_date",
+      "case_kind": "MISSING_OR_STALE_U1",
+      "contract_id": "CON-11",
+      "synthetic": true,
+      "missing_or_invalid_field": "source_date",
+      "description": "Policy source date absent",
+      "expected": {
+        "live_ready": false,
+        "reason": "u1_unverified",
+        "use_synthetic_fallback": false
+      },
+      "runtime_verified": false
+    },
+    {
+      "id": "missing_tax_inclusion",
+      "case_kind": "MISSING_OR_STALE_U1",
+      "contract_id": "CON-11",
+      "synthetic": true,
+      "missing_or_invalid_field": "tax_inclusion",
+      "description": "No verified inclusion/exclusion policy",
+      "expected": {
+        "live_ready": false,
+        "reason": "u1_unverified",
+        "use_synthetic_fallback": false
+      },
+      "runtime_verified": false
+    },
+    {
+      "id": "missing_taxable_basis",
+      "case_kind": "MISSING_OR_STALE_U1",
+      "contract_id": "CON-11",
+      "synthetic": true,
+      "missing_or_invalid_field": "taxable_basis",
+      "description": "No approved basis after/before discount",
+      "expected": {
+        "live_ready": false,
+        "reason": "u1_unverified",
+        "use_synthetic_fallback": false
+      },
+      "runtime_verified": false
+    },
+    {
+      "id": "missing_charge_policy",
+      "case_kind": "MISSING_OR_STALE_U1",
+      "contract_id": "CON-11",
+      "synthetic": true,
+      "missing_or_invalid_field": "charge_policy",
+      "description": "Charges, taxability and sequencing unapproved",
+      "expected": {
+        "live_ready": false,
+        "reason": "u1_unverified",
+        "use_synthetic_fallback": false
+      },
+      "runtime_verified": false
+    },
+    {
+      "id": "missing_receipt_identity",
+      "case_kind": "MISSING_OR_STALE_U1",
+      "contract_id": "CON-11",
+      "synthetic": true,
+      "missing_or_invalid_field": "business_identity",
+      "description": "Empty business identity cannot be used for live receipt",
+      "expected": {
+        "live_ready": false,
+        "reason": "u1_unverified",
+        "use_synthetic_fallback": false
+      },
+      "runtime_verified": false
+    },
+    {
+      "id": "missing_signed_sample",
+      "case_kind": "MISSING_OR_STALE_U1",
+      "contract_id": "CON-11",
+      "synthetic": true,
+      "missing_or_invalid_field": "real_receipt_sample",
+      "description": "No dated approved itemized receipt reconciles totals",
+      "expected": {
+        "live_ready": false,
+        "reason": "u1_unverified",
+        "use_synthetic_fallback": false
+      },
+      "runtime_verified": false
+    },
+    {
+      "id": "stale_pricing_version",
+      "case_kind": "MISSING_OR_STALE_U1",
+      "contract_id": "CON-11",
+      "synthetic": true,
+      "missing_or_invalid_field": "pricing_version",
+      "description": "Approval references a different pricing version",
+      "expected": {
+        "live_ready": false,
+        "reason": "u1_unverified",
+        "use_synthetic_fallback": false
+      },
+      "runtime_verified": false
+    },
+    {
+      "id": "foreign_restaurant_policy",
+      "case_kind": "MISSING_OR_STALE_U1",
+      "contract_id": "CON-11",
+      "synthetic": true,
+      "missing_or_invalid_field": "restaurant_id",
+      "description": "Approval scoped to a different restaurant",
+      "expected": {
+        "live_ready": false,
+        "reason": "u1_unverified",
+        "use_synthetic_fallback": false
+      },
+      "runtime_verified": false
+    },
+    {
+      "id": "unapproved_rounding",
+      "case_kind": "MISSING_OR_STALE_U1",
+      "contract_id": "CON-11",
+      "synthetic": true,
+      "missing_or_invalid_field": "tax_rounding",
+      "description": "Tax and cash rounding policy not approved",
+      "expected": {
+        "live_ready": false,
+        "reason": "u1_unverified",
+        "use_synthetic_fallback": false
+      },
+      "runtime_verified": false
+    },
+    {
+      "id": "fractional_money",
+      "case_kind": "INVALID_INPUT",
+      "contract_id": "CON-11",
+      "synthetic": true,
+      "field": "lines[0].unit_minor",
+      "value": 12.5,
+      "expected": {
+        "accepted": false,
+        "reason": "invalid_input",
+        "live_ready": false
+      },
+      "runtime_verified": false
+    },
+    {
+      "id": "string_money",
+      "case_kind": "INVALID_INPUT",
+      "contract_id": "CON-11",
+      "synthetic": true,
+      "field": "lines[0].unit_minor",
+      "value": "1200",
+      "expected": {
+        "accepted": false,
+        "reason": "invalid_input",
+        "live_ready": false
+      },
+      "runtime_verified": false
+    },
+    {
+      "id": "boolean_money",
+      "case_kind": "INVALID_INPUT",
+      "contract_id": "CON-11",
+      "synthetic": true,
+      "field": "lines[0].unit_minor",
+      "value": true,
+      "expected": {
+        "accepted": false,
+        "reason": "invalid_input",
+        "live_ready": false
+      },
+      "runtime_verified": false
+    },
+    {
+      "id": "negative_money",
+      "case_kind": "INVALID_INPUT",
+      "contract_id": "CON-11",
+      "synthetic": true,
+      "field": "lines[0].unit_minor",
+      "value": -1,
+      "expected": {
+        "accepted": false,
+        "reason": "invalid_input",
+        "live_ready": false
+      },
+      "runtime_verified": false
+    },
+    {
+      "id": "money_exceeds_max",
+      "case_kind": "INVALID_INPUT",
+      "contract_id": "CON-11",
+      "synthetic": true,
+      "field": "lines[0].unit_minor",
+      "value": 2147483648,
+      "expected": {
+        "accepted": false,
+        "reason": "money_out_of_range",
+        "live_ready": false
+      },
+      "runtime_verified": false
+    },
+    {
+      "id": "subtotal_overflow",
+      "case_kind": "INVALID_INPUT",
+      "contract_id": "CON-11",
+      "synthetic": true,
+      "field": "subtotal_minor",
+      "value": 2147483648,
+      "expected": {
+        "accepted": false,
+        "reason": "money_out_of_range",
+        "live_ready": false
+      },
+      "runtime_verified": false
+    },
+    {
+      "id": "negative_discount_cap",
+      "case_kind": "INVALID_INPUT",
+      "contract_id": "CON-11",
+      "synthetic": true,
+      "field": "offer.max_discount_minor",
+      "value": -1,
+      "expected": {
+        "accepted": false,
+        "reason": "invalid_input",
+        "live_ready": false
+      },
+      "runtime_verified": false
+    },
+    {
+      "id": "unknown_mutation_field",
+      "case_kind": "INVALID_INPUT",
+      "contract_id": "CON-11",
+      "synthetic": true,
+      "field": "unexpected_field",
+      "value": "unapproved",
+      "expected": {
+        "accepted": false,
+        "reason": "invalid_input",
+        "live_ready": false
+      },
+      "runtime_verified": false
+    },
+    {
+      "id": "unsupported_tax_rule",
+      "case_kind": "INVALID_INPUT",
+      "contract_id": "CON-11",
+      "synthetic": true,
+      "field": "tax_rounding",
+      "value": "unspecified",
+      "expected": {
+        "accepted": false,
+        "reason": "pricing_unconfigured",
+        "live_ready": false
+      },
+      "runtime_verified": false
+    },
+    {
+      "id": "inconsistent_receipt_total",
+      "case_kind": "INVALID_INPUT",
+      "contract_id": "CON-11",
+      "synthetic": true,
+      "field": "receipt_example.totals.total_minor",
+      "value": 1199,
+      "expected": {
+        "accepted": false,
+        "reason": "invalid_input",
+        "live_ready": false
+      },
+      "runtime_verified": false
+    }
+  ],
+  "evidence_gate": {
+    "status": "BLOCKED_U1",
+    "live_ready": false,
+    "synthetic_vectors_pass_do_not_unblock": true,
+    "required_approvals": [
+      "named_restaurant_id",
+      "named_owner_or_accountant_and_role",
+      "private_source_pointer",
+      "source_date",
+      "approval_date",
+      "pricing_version_and_effective_date",
+      "real_menu_price_list",
+      "tax_inclusion",
+      "tax_basis_after_discount",
+      "tax_rate_and_exemption_policy",
+      "tax_and_cash_rounding",
+      "applicable_charges_and_taxability",
+      "approved_receipt_business_identity",
+      "required_receipt_fields_and_wording",
+      "reconciled_dated_real_receipt_sample",
+      "change_and_rollback_owner"
+    ],
+    "source_date": null,
+    "approval_date": null,
+    "real_receipt_sample_pointer": null,
+    "blocked_conditions": [
+      "any_required_approval_missing",
+      "synthetic_profile",
+      "source_or_approval_is_stale",
+      "sample_totals_do_not_reconcile",
+      "sample_not_scoped_to_restaurant",
+      "receipt_identity_is_empty",
+      "policy_exceeds_frozen_contract"
+    ],
+    "not_a_runtime_decision_function": true
+  },
+  "conformance": {
+    "source_contract_id": "CON-11",
+    "consumer": "RS-15",
+    "provider_implemented": false,
+    "real_u1_approved": false,
+    "postgresql_conformance_verified": false,
+    "live_quote_verified": false,
+    "existing_rs01_fixture_mutated": false,
+    "acceptance": {
+      "1_synthetic_hand_calculation": "pending_independent_execution",
+      "2_missing_evidence_blocks_live": "fixture_expected_no_runtime_provider",
+      "3_real_owner_approved_receipt": "BLOCKED_U1",
+      "4_provider_consumer_contract_and_postgresql": "BLOCKED_RS15",
+      "5_mock_regression": "not_run_by_fixture"
+    },
+    "expected_http_errors_for_future_provider": [
+      "invalid_input",
+      "money_out_of_range",
+      "pricing_unconfigured",
+      "quote_changed",
+      "not_found"
+    ],
+    "no_mock_usd_cents_changes": true,
+    "con16_offer_bounds": "When offer is present, percent_bps must be 1..10000 and max_discount_minor >0; no promotion is null, not a zero-valued offer"
+  },
+  "receipt_checks": {
+    "matches_rs01_core_receipt": true,
+    "corresponding_positive_case": "zero_discount",
+    "business_identity_empty_synthetic_only": true,
+    "real_sample_approved": false
+  }
+}
