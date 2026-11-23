@@ -545,3 +545,32 @@ def test_command_key_is_unique_per_restaurant_actor_and_durable(db):
         "SELECT COUNT(*) FROM live_commands WHERE key=%s", (key,)
     ).fetchone()[0] == 3
 
+
+def test_legacy_mock_order_tables_remain_separate_and_orders_restrict_delete(db):
+    before = db.execute(
+        "SELECT (SELECT COUNT(*) FROM guest_orders),"
+        "       (SELECT COUNT(*) FROM orders)"
+    ).fetchone()
+    rid = add_restaurant(db)
+    oid = add_order(db, rid)
+    add_receipt(db, rid, oid)
+    add_order_event(db, rid, oid)
+    assert db.execute(
+        "SELECT (SELECT COUNT(*) FROM guest_orders),"
+        "       (SELECT COUNT(*) FROM orders)"
+    ).fetchone() == before
+    rejects(
+        db, errors.ForeignKeyViolation,
+        "DELETE FROM live_orders WHERE restaurant_id=%s AND id=%s",
+        (rid, oid),
+    )
+    rejects(
+        db, errors.ForeignKeyViolation,
+        "DELETE FROM live_restaurants WHERE restaurant_id=%s",
+        (rid,),
+    )
+    assert db.execute(
+        "SELECT COUNT(*) FROM live_orders WHERE restaurant_id=%s AND id=%s",
+        (rid, oid),
+    ).fetchone()[0] == 1
+
