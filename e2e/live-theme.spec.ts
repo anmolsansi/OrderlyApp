@@ -128,3 +128,32 @@ test('saved dark restores without a React hydration warning', async ({ page }) =
   await expect(page.getByLabel('Demo name')).toBeVisible();
   expect(hydrationWarnings).toEqual([]);
 });
+
+test('theme header wraps, remains operable at text zoom, and keeps an unsaved draft on resize', async ({ page }) => {
+  await page.goto('/sign-in');
+  const name = page.getByLabel('Demo name');
+  await name.fill('Keep during zoom and resize');
+  for (const width of [375, 1280]) {
+    await page.setViewportSize({ width, height: 800 });
+    const button = toggle(page);
+    await expect(button).toBeVisible();
+    const rect = await button.boundingBox();
+    expect(rect).not.toBeNull();
+    expect(rect!.x).toBeGreaterThanOrEqual(0);
+    expect(rect!.x + rect!.width).toBeLessThanOrEqual(width + 1);
+    await button.click();
+    await expect(name).toHaveValue('Keep during zoom and resize');
+  }
+  await page.setViewportSize({ width: 375, height: 800 });
+  await page.evaluate(() => { document.documentElement.style.fontSize = '200%'; });
+  const button = toggle(page);
+  await expect(button).toBeVisible();
+  const dimensions = await button.evaluate(element => {
+    const r = element.getBoundingClientRect();
+    return { width: r.width, height: r.height, right: r.right };
+  });
+  expect(dimensions.width).toBeGreaterThanOrEqual(44);
+  expect(dimensions.height).toBeGreaterThanOrEqual(44);
+  expect(dimensions.right).toBeLessThanOrEqual(376);
+  await expect(name).toHaveValue('Keep during zoom and resize');
+});
