@@ -283,3 +283,23 @@ def test_receipt_snapshot_is_bound_to_exact_order_and_json_object(db):
         (rid, oid2, json.dumps({"id": str(oid2), "restaurant_id": "other-tenant"})),
     )
 
+
+def test_receipts_reject_update_and_delete(db):
+    rid = add_restaurant(db)
+    oid = add_order(db, rid)
+    original = add_receipt(db, rid, oid)
+    rejects(
+        db, errors.CheckViolation,
+        "UPDATE live_receipts SET snapshot=%s::jsonb WHERE restaurant_id=%s AND id=%s",
+        (json.dumps({**original, "total_minor": 999}), rid, oid),
+    )
+    rejects(
+        db, errors.CheckViolation,
+        "DELETE FROM live_receipts WHERE restaurant_id=%s AND id=%s",
+        (rid, oid),
+    )
+    assert db.execute(
+        "SELECT snapshot FROM live_receipts WHERE restaurant_id=%s AND id=%s",
+        (rid, oid),
+    ).fetchone()[0] == original
+
