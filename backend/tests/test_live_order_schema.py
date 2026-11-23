@@ -411,3 +411,43 @@ def test_order_events_are_append_only(db):
         (rid, event_id),
     ).fetchone() == (None,)
 
+
+@pytest.mark.parametrize("field,value", [
+    ("kind", "online-settled"),
+    ("amount_minor", -1),
+    ("currency", "USD"),
+    ("method", "bitcoin"),
+])
+def test_invalid_payment_fields_are_rejected(db, field, value):
+    rid = add_restaurant(db)
+    oid = add_order(db, rid)
+    fields = {
+        "kind": "recorded", "amount_minor": 123,
+        "currency": "INR", "method": "upi",
+    }
+    fields[field] = value
+    rejects(
+        db, errors.CheckViolation,
+        """INSERT INTO live_payment_events
+           (restaurant_id,order_id,id,kind,amount_minor,currency,
+            method,actor,created_at)
+           VALUES (%s,%s,%s,%s,%s,%s,%s,'synthetic-cashier',now())""",
+        (rid, oid, uuid4(), fields["kind"], fields["amount_minor"],
+         fields["currency"], fields["method"]),
+    )
+    assert db.execute(
+        "SELECT COUNT(*) FROM live_payment_events WHERE restaurant_id=%s",
+        (rid,),
+    ).fetchone()[0] == 0
+
+
+def test_payment_inr_max_minor_unit_and_optional_method(db):
+    rid = add_restaurant(db)
+    oid = add_order(db, rid)
+    eid = add_payment(db, rid, oid, amount_minor=2_147_483_647, method=None)
+    assert db.execute(
+        "SELECT amount_minor,currency,method FROM live_payment_events "
+        "WHERE restaurant_id=%s AND id=%s",
+        (rid, eid),
+    ).fetchone() == (2_147_483_647, "INR", None)
+
