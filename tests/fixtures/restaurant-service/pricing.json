@@ -1,0 +1,70 @@
+{
+  "contract_id": "CON-11",
+  "schema_version": 1,
+  "synthetic": true,
+  "scope": "synthetic-pricing-and-U1-evidence-only",
+  "live_ready": false,
+  "source": {
+    "contract_set": "restaurant-service/live-v1",
+    "source_fixture": "tests/fixtures/restaurant-service/v1.json",
+    "prepared_date": "2026-11-23",
+    "baseline_commit": "21c2b1f060db23790580b3b4bbbbc195112b2171",
+    "evidence_type": "hand-calculated-synthetic",
+    "approved_restaurant_source": null
+  },
+  "profile": {
+    "schema_version": 1,
+    "pricing_version": 1,
+    "restaurant_id": "r-demo",
+    "currency": "INR",
+    "synthetic": true,
+    "live_ready": false,
+    "minor_unit": "paise",
+    "discount_rounding": "floor_nonnegative_percent_product",
+    "tax_minor": 0,
+    "charges_minor": 0,
+    "tax_inclusion": null,
+    "taxable_basis": null,
+    "charge_policy": null,
+    "business_identity": {},
+    "source_kind": "synthetic_test_fixture",
+    "source_date": "2026-11-23",
+    "approved_by": null
+  },
+  "rules": {
+    "unit": "INR paise",
+    "integer_only": true,
+    "money_min": 0,
+    "money_max": 2147483647,
+    "line_minor": "unit_minor * quantity",
+    "subtotal_minor": "sum(line_minor)",
+    "discount_minor": "min(floor(subtotal_minor * percent_bps / 10000), max_discount_minor, subtotal_minor)",
+    "total_minor": "subtotal_minor - discount_minor + tax_minor + charges_minor",
+    "synthetic_tax_minor": 0,
+    "synthetic_charges_minor": 0,
+    "real_tax_rounding": "OWNER DECISION REQUIRED",
+    "real_tax_inclusion": "OWNER DECISION REQUIRED",
+    "real_taxable_basis": "OWNER DECISION REQUIRED"
+  },
+  "positive_cases": [],
+  "receipt_example": null,
+  "negative_cases": [],
+  "evidence_gate": {
+    "status": "BLOCKED_U1",
+    "live_ready": false,
+    "synthetic_vectors_pass_do_not_unblock": true,
+    "required_approvals": [],
+    "source_date": null,
+    "approval_date": null,
+    "real_receipt_sample_pointer": null
+  },
+  "conformance": {
+    "source_contract_id": "CON-11",
+    "consumer": "RS-15",
+    "provider_implemented": false,
+    "real_u1_approved": false,
+    "postgreSQL_conformance_verified": false,
+    "live_quote_verified": false,
+    "existing_rs01_fixture_mutated": false
+  }
+}
