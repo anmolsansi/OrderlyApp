@@ -1755,3 +1755,40 @@ html[data-theme='dark'] {
   --live-link: #c4b5fd;
   --live-link-visited: #f9a8d4;
 }
+
+/* Live consumers opt into this scope, so the original marketplace stays dark. */
+.live-task-screen {
+  min-height: 100vh;
+  background: var(--live-page);
+  color: var(--live-text);
+  font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  font-size: 1rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.live-task-screen :is(.card, .live-panel) {
+  border: 1px solid var(--live-border);
+  background: var(--live-panel);
+  color: var(--live-text);
+  box-shadow: none;
+}
+.live-task-screen .live-panel-secondary {
+  background: var(--live-panel-secondary);
+}
+.live-task-screen :is(p, label, input, button, select, textarea, .live-status) {
+  font-size: 1rem;
+  line-height: 1.5;
+}
+.live-task-screen :is(p, label, .live-muted) {
+  color: var(--live-muted);
+}
+.live-task-screen h1 {
+  font-size: 1.75rem;
+  line-height: 1.2;
+  letter-spacing: normal;
+}
+.live-task-screen h2 {
+  font-size: 1.25rem;
+  line-height: 1.2;
+  letter-spacing: normal;
+}
