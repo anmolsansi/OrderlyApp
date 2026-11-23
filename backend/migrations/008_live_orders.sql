@@ -92,3 +92,18 @@ CREATE TABLE live_payment_events (
     FOREIGN KEY (restaurant_id, order_id, reverses_id)
         REFERENCES live_payment_events(restaurant_id, order_id, id) ON DELETE RESTRICT
 );
+
+-- Durable idempotency response record scoped to a verified restaurant/actor.
+-- Store only a digest and actor identity, never the guest cookie or bearer token.
+-- A future service hashes a guest's internal session ID before writing actor_id.
+CREATE TABLE live_commands (
+    restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,
+    actor_kind TEXT NOT NULL,
+    actor_id TEXT NOT NULL,
+    key UUID NOT NULL,
+    payload_sha256 TEXT NOT NULL,
+    response JSONB NOT NULL,
+    response_status INTEGER NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (restaurant_id, actor_kind, actor_id, key)
+);
