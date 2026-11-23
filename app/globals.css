@@ -1761,7 +1761,7 @@ html[data-theme='dark'] {
   min-height: 100vh;
   background: var(--live-page);
   color: var(--live-text);
-  font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-orderly-live-sans), 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
   font-size: 1rem;
   line-height: 1.5;
   overflow-wrap: anywhere;
@@ -1843,7 +1843,7 @@ html[data-theme='dark'] {
   border-bottom: 1px solid var(--live-border);
   background: var(--live-panel);
   color: var(--live-text);
-  font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-orderly-live-sans), 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
   font-size: 1rem;
   line-height: 1.5;
 }
