@@ -44,7 +44,8 @@
     "synthetic_charges_minor": 0,
     "real_tax_rounding": "OWNER DECISION REQUIRED",
     "real_tax_inclusion": "OWNER DECISION REQUIRED",
-    "real_taxable_basis": "OWNER DECISION REQUIRED"
+    "real_taxable_basis": "OWNER DECISION REQUIRED",
+    "no_promotion_discount_minor": 0
   },
   "positive_cases": [
     {
@@ -61,10 +62,7 @@
             "quantity": 1
           }
         ],
-        "offer": {
-          "percent_bps": 0,
-          "max_discount_minor": 0
-        }
+        "offer": null
       },
       "expected": {
         "currency": "INR",
@@ -74,7 +72,7 @@
         "charges_minor": 0,
         "total_minor": 1200
       },
-      "hand_calculation": "1 * 1200 = 1200; floor(1200 * 0 / 10000)=0; total=1200-0+0+0=1200"
+      "hand_calculation": "1 * 1200 = 1200; no promotion (offer=null), so discount=0; total=1200+0+0=1200"
     },
     {
       "id": "capped_discount",
@@ -268,10 +266,7 @@
             "quantity": 1
           }
         ],
-        "offer": {
-          "percent_bps": 0,
-          "max_discount_minor": 0
-        }
+        "offer": null
       },
       "expected": {
         "currency": "INR",
@@ -281,7 +276,7 @@
         "charges_minor": 0,
         "total_minor": 2147483647
       },
-      "hand_calculation": "Maximum allowed unit and subtotal=2147483647; no discount, tax or charges; total=2147483647"
+      "hand_calculation": "Maximum allowed unit and subtotal=2147483647; no promotion (offer=null), zero tax and charges; total=2147483647"
     }
   ],
   "receipt_example": {
@@ -662,7 +657,8 @@
       "quote_changed",
       "not_found"
     ],
-    "no_mock_usd_cents_changes": true
+    "no_mock_usd_cents_changes": true,
+    "con16_offer_bounds": "When offer is present, percent_bps must be 1..10000 and max_discount_minor >0; no promotion is null, not a zero-valued offer"
   },
   "receipt_checks": {
     "matches_rs01_core_receipt": true,
