@@ -102,3 +102,29 @@ def test_schema_exposes_exact_db_a_columns(db):
         ).fetchall()
         assert {row[0] for row in rows} == names, table
 
+
+def test_primary_keys_uniques_and_on_delete_contract(db):
+    keys = db.execute(
+        """SELECT conrelid::regclass::text, contype, pg_get_constraintdef(oid)
+           FROM pg_constraint WHERE conrelid IN
+           ('live_restaurants'::regclass, 'live_tables'::regclass)"""
+    ).fetchall()
+    assert any(table == "live_restaurants" and kind == "p" and
+               "PRIMARY KEY (restaurant_id)" in definition
+               for table, kind, definition in keys)
+    assert any(table == "live_tables" and kind == "p" and
+               "PRIMARY KEY (restaurant_id, id)" in definition
+               for table, kind, definition in keys)
+    assert any(table == "live_tables" and kind == "u" and
+               "UNIQUE (restaurant_id, label)" in definition
+               for table, kind, definition in keys)
+    fks = db.execute(
+        """SELECT conrelid::regclass::text, confrelid::regclass::text,
+                  confdeltype
+           FROM pg_constraint WHERE contype = 'f'
+           AND conrelid IN ('live_restaurants'::regclass, 'live_tables'::regclass)"""
+    ).fetchall()
+    assert ("live_restaurants", "restaurants", "r") in fks
+    assert ("live_restaurants", "guest_sessions", "n") in fks
+    assert ("live_tables", "live_restaurants", "r") in fks
+
