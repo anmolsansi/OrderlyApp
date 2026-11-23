@@ -1836,3 +1836,45 @@ html[data-theme='dark'] {
     forced-color-adjust: auto;
   }
 }
+
+.live-theme-header {
+  position: relative;
+  z-index: 1;
+  border-bottom: 1px solid var(--live-border);
+  background: var(--live-panel);
+  color: var(--live-text);
+  font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+.live-theme-header-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1.25rem;
+  max-width: 73.75rem;
+  margin: 0 auto;
+  padding: 0.75rem 1.5rem;
+}
+.live-theme-identity {
+  color: var(--live-muted);
+  font-weight: 600;
+}
+.live-theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0.625rem 1rem;
+  border: 1px solid transparent;
+  border-radius: 0.5rem;
+  background: var(--live-primary-background);
+  color: var(--live-primary-text);
+  font: inherit;
+  cursor: pointer;
+}
+@media (max-width: 40rem) {
+  .live-theme-header-inner { padding: 0.75rem 1rem; }
+}
