@@ -372,3 +372,22 @@ def test_guest_deletion_retains_restaurant_order_receipt_and_events(db):
         (rid, payment_id),
     ).fetchone() == (payment_id, 123)
 
+
+def test_operational_event_version_is_unique_and_not_contiguous(db):
+    rid = add_restaurant(db)
+    oid = add_order(db, rid)
+    first = add_order_event(db, rid, oid, version=1)
+    later = add_order_event(db, rid, oid, version=3)
+    rejects(
+        db, errors.UniqueViolation,
+        """INSERT INTO live_order_events
+           (restaurant_id,order_id,id,version,to_status,actor,created_at)
+           VALUES (%s,%s,%s,3,'Ready','synthetic-staff',now())""",
+        (rid, oid, uuid4()),
+    )
+    assert db.execute(
+        "SELECT id FROM live_order_events WHERE restaurant_id=%s AND order_id=%s "
+        "ORDER BY version",
+        (rid, oid),
+    ).fetchall() == [(first,), (later,)]
+
