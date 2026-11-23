@@ -269,3 +269,15 @@ def test_parent_deletes_restricted_and_existing_live_rows_survive(db):
         "SELECT id FROM live_tables WHERE restaurant_id=%s AND id=%s", (rid, tid)
     ).fetchone() == (tid,)
 
+
+def test_guest_deletion_nulls_demo_owner_without_deleting_restaurant(db):
+    rid = mock_restaurant(db)
+    owner_id = mock_guest(db)
+    add_live(db, rid, synthetic=True, demo_owner_id=owner_id)
+    db.execute("DELETE FROM guest_sessions WHERE id=%s", (owner_id,))
+    assert db.execute(
+        "SELECT synthetic,demo_owner_id,ordering_enabled FROM live_restaurants WHERE restaurant_id=%s",
+        (rid,),
+    ).fetchone() == (True, None, False)
+    assert db.execute("SELECT id FROM restaurants WHERE id=%s", (rid,)).fetchone() == (rid,)
+
