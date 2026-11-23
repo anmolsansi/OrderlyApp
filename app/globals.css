@@ -1718,3 +1718,166 @@ h3 {
     flex-direction: column;
   }
 }
+
+/* RS-39: Approved D15-D20 and D28-D30, isolated from the legacy mock palette. */
+html[data-theme='light'] {
+  color-scheme: light;
+  --live-page: #f8fafc;
+  --live-panel: #ffffff;
+  --live-panel-secondary: #f1f5f9;
+  --live-text: #0f172a;
+  --live-muted: #475569;
+  --live-border: #cbd5e1;
+  --live-primary-background: #6d28d9;
+  --live-primary-text: #ffffff;
+  --live-success: #166534;
+  --live-warning: #92400e;
+  --live-error: #b91c1c;
+  --live-focus: #6d28d9;
+  --live-link: #6d28d9;
+  --live-link-visited: #9d174d;
+}
+
+html[data-theme='dark'] {
+  color-scheme: dark;
+  --live-page: #09090b;
+  --live-panel: #111113;
+  --live-panel-secondary: #18181b;
+  --live-text: #f4f4f5;
+  --live-muted: #a1a1aa;
+  --live-border: #52525b;
+  --live-primary-background: #a78bfa;
+  --live-primary-text: #09090b;
+  --live-success: #86efac;
+  --live-warning: #fcd34d;
+  --live-error: #fca5a5;
+  --live-focus: #a78bfa;
+  --live-link: #c4b5fd;
+  --live-link-visited: #f9a8d4;
+}
+
+/* Live consumers opt into this scope, so the original marketplace stays dark. */
+.live-task-screen {
+  min-height: 100vh;
+  background: var(--live-page);
+  color: var(--live-text);
+  font-family: var(--font-orderly-live-sans), 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  font-size: 1rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.live-task-screen :is(.card, .live-panel) {
+  border: 1px solid var(--live-border);
+  background: var(--live-panel);
+  color: var(--live-text);
+  box-shadow: none;
+}
+.live-task-screen .live-panel-secondary {
+  background: var(--live-panel-secondary);
+}
+.live-task-screen :is(p, label, input, button, select, textarea, .live-status) {
+  font-size: 1rem;
+  line-height: 1.5;
+}
+.live-task-screen :is(p, label, .live-muted) {
+  color: var(--live-muted);
+}
+.live-task-screen h1 {
+  font-size: 1.75rem;
+  line-height: 1.2;
+  letter-spacing: normal;
+}
+.live-task-screen h2 {
+  font-size: 1.25rem;
+  line-height: 1.2;
+  letter-spacing: normal;
+}
+
+.live-task-screen :is(input, select, textarea) {
+  min-height: 2.75rem;
+  max-width: 100%;
+  border: 1px solid var(--live-border);
+  background: var(--live-panel);
+  color: var(--live-text);
+  font: inherit;
+}
+.live-task-screen :is(.live-primary-action, .checkout-button) {
+  min-height: 2.75rem;
+  border: 1px solid transparent;
+  background: var(--live-primary-background);
+  color: var(--live-primary-text);
+  font: inherit;
+}
+.live-task-screen :is(.live-primary-action, .checkout-button):disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.live-task-screen .live-status-success { color: var(--live-success); }
+.live-task-screen .live-status-warning { color: var(--live-warning); }
+.live-task-screen .live-status-error { color: var(--live-error); }
+.live-task-screen .live-status-pending { color: var(--live-muted); }
+
+.live-task-screen :is(a, button, input, select, textarea):focus-visible,
+.live-theme-toggle:focus-visible {
+  outline: 3px solid var(--live-focus);
+  outline-offset: 3px;
+}
+.live-task-screen a:not([class]) {
+  color: var(--live-link);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+.live-task-screen a:not([class]):visited {
+  color: var(--live-link-visited);
+}
+@media (forced-colors: active) {
+  .live-theme-toggle,
+  .live-task-screen :is(a, button, input, select, textarea):focus-visible {
+    forced-color-adjust: auto;
+  }
+}
+
+.live-theme-header {
+  position: relative;
+  z-index: 1;
+  border-bottom: 1px solid var(--live-border);
+  background: var(--live-panel);
+  color: var(--live-text);
+  font-family: var(--font-orderly-live-sans), 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+.live-theme-header-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1.25rem;
+  max-width: 73.75rem;
+  margin: 0 auto;
+  padding: 0.75rem 1.5rem;
+}
+.live-theme-identity {
+  color: var(--live-muted);
+  font-weight: 600;
+}
+.live-theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0.625rem 1rem;
+  border: 1px solid transparent;
+  border-radius: 0.5rem;
+  background: var(--live-primary-background);
+  color: var(--live-primary-text);
+  font: inherit;
+  cursor: pointer;
+}
+.live-theme-header-inner { padding-inline: min(1.5rem, 4vw); }
+.live-theme-identity { max-width: 100%; overflow-wrap: anywhere; }
+.live-theme-toggle { max-width: 100%; overflow-wrap: anywhere; padding-inline: min(1rem, 3vw); }
+@media (max-width: 40rem) {
+  .live-theme-header-inner { padding-inline: min(1rem, 4vw); }
+}
