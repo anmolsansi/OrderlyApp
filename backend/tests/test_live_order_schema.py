@@ -456,18 +456,8 @@ def test_reversals_must_reference_same_order_and_cannot_repeat(db):
     rid = add_restaurant(db)
     first_order, second_order = add_order(db, rid), add_order(db, rid)
     original = add_payment(db, rid, first_order)
-    reversed_id = add_payment(
-        db, rid, first_order, kind="reversed",
-        reverses_id=original, method=None,
-    )
-    rejects(
-        db, errors.UniqueViolation,
-        """INSERT INTO live_payment_events
-           (restaurant_id,order_id,id,kind,reverses_id,amount_minor,currency,
-            actor,created_at)
-           VALUES (%s,%s,%s,'reversed',%s,123,'INR','synthetic-cashier',now())""",
-        (rid, first_order, uuid4(), original),
-    )
+    # Check a wrong-order reference before the valid reversal is recorded,
+    # otherwise the duplicate-reversal UNIQUE guard masks the FK failure.
     rejects(
         db, errors.ForeignKeyViolation,
         """INSERT INTO live_payment_events
@@ -486,11 +476,22 @@ def test_reversals_must_reference_same_order_and_cannot_repeat(db):
            VALUES (%s,%s,%s,'reversed',%s,123,'INR','synthetic-cashier',now())""",
         (other, other_oid, uuid4(), original),
     )
+    reversed_id = add_payment(
+        db, rid, first_order, kind="reversed",
+        reverses_id=original, method=None,
+    )
+    rejects(
+        db, errors.UniqueViolation,
+        """INSERT INTO live_payment_events
+           (restaurant_id,order_id,id,kind,reverses_id,amount_minor,currency,
+            actor,created_at)
+           VALUES (%s,%s,%s,'reversed',%s,123,'INR','synthetic-cashier',now())""",
+        (rid, first_order, uuid4(), original),
+    )
     assert db.execute(
         "SELECT reverses_id FROM live_payment_events WHERE restaurant_id=%s AND id=%s",
         (rid, reversed_id),
     ).fetchone() == (original,)
-
 
 def test_payment_events_are_append_only(db):
     rid = add_restaurant(db)
