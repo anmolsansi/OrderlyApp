@@ -647,7 +647,22 @@
     "real_u1_approved": false,
     "postgreSQL_conformance_verified": false,
     "live_quote_verified": false,
-    "existing_rs01_fixture_mutated": false
+    "existing_rs01_fixture_mutated": false,
+    "acceptance": {
+      "1_synthetic_hand_calculation": "pending_independent_execution",
+      "2_missing_evidence_blocks_live": "fixture_expected_no_runtime_provider",
+      "3_real_owner_approved_receipt": "BLOCKED_U1",
+      "4_provider_consumer_contract_and_postgresql": "BLOCKED_RS15",
+      "5_mock_regression": "not_run_by_fixture"
+    },
+    "expected_http_errors_for_future_provider": [
+      "invalid_input",
+      "money_out_of_range",
+      "pricing_unconfigured",
+      "quote_changed",
+      "not_found"
+    ],
+    "no_mock_usd_cents_changes": true
   },
   "receipt_checks": {
     "matches_rs01_core_receipt": true,
