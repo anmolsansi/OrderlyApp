@@ -75,6 +75,35 @@
         "total_minor": 1200
       },
       "hand_calculation": "1 * 1200 = 1200; floor(1200 * 0 / 10000)=0; total=1200-0+0+0=1200"
+    },
+    {
+      "id": "capped_discount",
+      "contract_id": "CON-11",
+      "schema_version": 1,
+      "synthetic": true,
+      "pricing_version": 1,
+      "input": {
+        "restaurant_id": "r-demo",
+        "lines": [
+          {
+            "unit_minor": 1200,
+            "quantity": 1
+          }
+        ],
+        "offer": {
+          "percent_bps": 2500,
+          "max_discount_minor": 200
+        }
+      },
+      "expected": {
+        "currency": "INR",
+        "subtotal_minor": 1200,
+        "discount_minor": 200,
+        "tax_minor": 0,
+        "charges_minor": 0,
+        "total_minor": 1000
+      },
+      "hand_calculation": "floor(1200 * 2500 / 10000)=300; min(300,200,1200)=200; total=1000"
     }
   ],
   "receipt_example": null,
