@@ -225,3 +225,27 @@ def test_invalid_restaurant_config_is_rejected(db, field, bad):
         "SELECT COUNT(*) FROM live_restaurants WHERE restaurant_id=%s", (rid,)
     ).fetchone()[0] == 0
 
+
+def test_unknown_restaurant_or_demo_guest_rejected(db):
+    rid = mock_restaurant(db)
+    rejects(
+        db, errors.ForeignKeyViolation,
+        "INSERT INTO live_restaurants (restaurant_id,brand_label) VALUES (%s,%s)",
+        (f"unknown-{uuid4().hex}", "Ghost"),
+    )
+    rejects(
+        db, errors.ForeignKeyViolation,
+        """INSERT INTO live_restaurants
+           (restaurant_id,brand_label,demo_owner_id) VALUES (%s,%s,%s)""",
+        (rid, "Invalid owner", f"unknown-guest-{uuid4().hex}"),
+    )
+    add_live(db, rid)
+    rejects(
+        db, errors.ForeignKeyViolation,
+        "INSERT INTO live_tables(restaurant_id,id,label) VALUES (%s,%s,%s)",
+        (f"unknown-live-{uuid4().hex}", uuid4(), "T1"),
+    )
+    assert db.execute(
+        "SELECT COUNT(*) FROM live_tables WHERE restaurant_id=%s", (rid,)
+    ).fetchone()[0] == 0
+
