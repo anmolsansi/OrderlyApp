@@ -491,3 +491,23 @@ def test_reversals_must_reference_same_order_and_cannot_repeat(db):
         (rid, reversed_id),
     ).fetchone() == (original,)
 
+
+def test_payment_events_are_append_only(db):
+    rid = add_restaurant(db)
+    oid = add_order(db, rid)
+    payment = add_payment(db, rid, oid)
+    rejects(
+        db, errors.CheckViolation,
+        "UPDATE live_payment_events SET amount_minor=999 WHERE restaurant_id=%s AND id=%s",
+        (rid, payment),
+    )
+    rejects(
+        db, errors.CheckViolation,
+        "DELETE FROM live_payment_events WHERE restaurant_id=%s AND id=%s",
+        (rid, payment),
+    )
+    assert db.execute(
+        "SELECT amount_minor FROM live_payment_events WHERE restaurant_id=%s AND id=%s",
+        (rid, payment),
+    ).fetchone() == (123,)
+
