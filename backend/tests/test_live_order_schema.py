@@ -511,3 +511,37 @@ def test_payment_events_are_append_only(db):
         (rid, payment),
     ).fetchone() == (123,)
 
+
+def test_command_key_is_unique_per_restaurant_actor_and_durable(db):
+    a, b = add_restaurant(db), add_restaurant(db)
+    key = uuid4()
+    actor = hashlib.sha256(b"synthetic-session-id").hexdigest()
+    response = {"schema_version": 1, "accepted": True}
+
+    def insert(rid, actor_id):
+        db.execute(
+            """INSERT INTO live_commands
+               (restaurant_id,actor_kind,actor_id,key,payload_sha256,response,response_status)
+               VALUES (%s,'guest',%s,%s,%s,%s::jsonb,201)""",
+            (rid, actor_id, key, "f" * 64, json.dumps(response)),
+        )
+
+    insert(a, actor)
+    rejects(
+        db, errors.UniqueViolation,
+        """INSERT INTO live_commands
+           (restaurant_id,actor_kind,actor_id,key,payload_sha256,response,response_status)
+           VALUES (%s,'guest',%s,%s,%s,%s::jsonb,201)""",
+        (a, actor, key, "e" * 64, json.dumps({"changed": True})),
+    )
+    insert(a, "different-synthetic-actor")
+    insert(b, actor)
+    assert db.execute(
+        "SELECT payload_sha256,response,response_status FROM live_commands "
+        "WHERE restaurant_id=%s AND actor_id=%s",
+        (a, actor),
+    ).fetchone() == ("f" * 64, response, 201)
+    assert db.execute(
+        "SELECT COUNT(*) FROM live_commands WHERE key=%s", (key,)
+    ).fetchone()[0] == 3
+
