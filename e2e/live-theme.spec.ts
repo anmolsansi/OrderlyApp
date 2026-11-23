@@ -160,7 +160,7 @@ test('theme header wraps, remains operable at text zoom, and keeps an unsaved dr
 
 function contrastRatio(first: string, second: string): number {
   function luminance(color: string): number {
-    const values = color.match(/[\\d.]+/g)?.slice(0, 3).map(Number);
+    const values = color.match(/[0-9.]+/g)?.slice(0, 3).map(Number);
     if (!values || values.length !== 3) throw new Error(`Unsupported CSS color: ${color}`);
     const [r, g, b] = values.map(channel => {
       const c = channel / 255;
