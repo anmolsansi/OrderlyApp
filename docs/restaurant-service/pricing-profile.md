@@ -1,4 +1,4 @@
-# RS-11 / CON-11 — Restaurant pricing and receipt evidence gate
+# RS-11 / CON-11: Restaurant pricing and receipt evidence gate
 
 **Status:** SYNTHETIC INPUTS DOCUMENTED, LIVE U1 BLOCKED, NOT FROZEN FOR REAL ORDERS.
 **Prepared:** 2026-11-23. **Source:** RS-01 CON-11 registry at `docs/contracts/restaurant-service-v1.md`, RS-11 task packet, CON-17 discount formula, and the RS-01 synthetic contract fixture.
