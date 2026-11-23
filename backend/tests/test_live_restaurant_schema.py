@@ -341,3 +341,46 @@ def test_007_additive_upgrade_preserves_existing_catalog_and_receipt(db):
         (restaurant_id,),
     ).fetchone() == (False,)
 
+
+def test_migration_runner_replay_keeps_checksum_and_rows(postgres_database_url):
+    """Run twice against the explicitly selected migrated TEST database only."""
+    import hashlib
+
+    with psycopg.connect(postgres_database_url) as connection:
+        initial = connection.execute(
+            "SELECT checksum_sha256 FROM schema_migrations WHERE version=%s",
+            (MIGRATION.name,),
+        ).fetchone()
+        assert initial == (hashlib.sha256(MIGRATION.read_bytes()).hexdigest(),)
+        baseline = connection.execute(
+            """SELECT (SELECT COUNT(*) FROM restaurants),
+                      (SELECT COUNT(*) FROM guest_orders),
+                      (SELECT COUNT(*) FROM live_restaurants),
+                      (SELECT COUNT(*) FROM live_tables)"""
+        ).fetchone()
+
+    env = os.environ.copy()
+    env.pop("ORDERLY_FORCE_JSON_STORE", None)
+    env["DATABASE_URL"] = postgres_database_url
+    for _ in range(2):
+        result = subprocess.run(
+            [sys.executable, "backend/scripts/migrate.py"],
+            cwd=ROOT, env=env, capture_output=True, text=True, timeout=45,
+            check=False,
+        )
+        assert result.returncode == 0, "Migration runner did not complete cleanly"
+        assert "Migrations complete" in result.stdout
+        assert f"Applied migration {MIGRATION.name}" not in result.stdout
+
+    with psycopg.connect(postgres_database_url) as connection:
+        assert connection.execute(
+            "SELECT checksum_sha256 FROM schema_migrations WHERE version=%s",
+            (MIGRATION.name,),
+        ).fetchone() == initial
+        assert connection.execute(
+            """SELECT (SELECT COUNT(*) FROM restaurants),
+                      (SELECT COUNT(*) FROM guest_orders),
+                      (SELECT COUNT(*) FROM live_restaurants),
+                      (SELECT COUNT(*) FROM live_tables)"""
+        ).fetchone() == baseline
+
