@@ -330,3 +330,45 @@ def test_cross_restaurant_order_references_are_rejected(db):
         "SELECT COUNT(*) FROM live_receipts WHERE restaurant_id=%s", (a,)
     ).fetchone()[0] == 1
 
+
+def test_guest_deletion_retains_restaurant_order_receipt_and_events(db):
+    rid, guest = add_restaurant(db), add_guest(db, expired=True)
+    oid = add_order(db, rid)
+    receipt = add_receipt(db, rid, oid)
+    event_id = add_order_event(db, rid, oid, version=1)
+    payment_id = add_payment(db, rid, oid)
+    db.execute(
+        "INSERT INTO live_carts (restaurant_id,guest_id) VALUES (%s,%s)",
+        (rid, guest),
+    )
+    db.execute(
+        """INSERT INTO live_guest_access (restaurant_id,order_id,guest_id)
+           VALUES (%s,%s,%s)""",
+        (rid, oid, guest),
+    )
+    # The existing cleanup path deletes guest_sessions; only access/cart may
+    # cascade. This is the FK step inside a rollback-isolated synthetic test.
+    db.execute("DELETE FROM guest_sessions WHERE id=%s", (guest,))
+    assert db.execute(
+        "SELECT COUNT(*) FROM live_carts WHERE guest_id=%s", (guest,)
+    ).fetchone()[0] == 0
+    assert db.execute(
+        "SELECT COUNT(*) FROM live_guest_access WHERE guest_id=%s", (guest,)
+    ).fetchone()[0] == 0
+    assert db.execute(
+        "SELECT snapshot FROM live_receipts WHERE restaurant_id=%s AND id=%s",
+        (rid, oid),
+    ).fetchone()[0] == receipt
+    assert db.execute(
+        "SELECT id FROM live_orders WHERE restaurant_id=%s AND id=%s",
+        (rid, oid),
+    ).fetchone() == (oid,)
+    assert db.execute(
+        "SELECT id FROM live_order_events WHERE restaurant_id=%s AND id=%s",
+        (rid, event_id),
+    ).fetchone() == (event_id,)
+    assert db.execute(
+        "SELECT id,amount_minor FROM live_payment_events WHERE restaurant_id=%s AND id=%s",
+        (rid, payment_id),
+    ).fetchone() == (payment_id, 123)
+
