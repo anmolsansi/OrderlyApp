@@ -257,3 +257,29 @@ def test_order_status_version_defaults_and_queue_index(db):
     assert "live_orders_queue" in indexes
     assert "(restaurant_id, status, created_at DESC, id DESC)" in indexes["live_orders_queue"]
 
+
+def test_receipt_snapshot_is_bound_to_exact_order_and_json_object(db):
+    rid = add_restaurant(db)
+    oid = add_order(db, rid)
+    snapshot = add_receipt(db, rid, oid)
+    assert db.execute(
+        "SELECT snapshot FROM live_receipts WHERE restaurant_id=%s AND id=%s",
+        (rid, oid),
+    ).fetchone()[0] == snapshot
+    rejects(
+        db, errors.CheckViolation,
+        "INSERT INTO live_receipts(restaurant_id,id,snapshot) VALUES (%s,%s,%s::jsonb)",
+        (rid, add_order(db, rid), json.dumps([1, 2])),
+    )
+    oid2 = add_order(db, rid)
+    rejects(
+        db, errors.CheckViolation,
+        "INSERT INTO live_receipts(restaurant_id,id,snapshot) VALUES (%s,%s,%s::jsonb)",
+        (rid, oid2, json.dumps({"id": str(oid), "restaurant_id": rid})),
+    )
+    rejects(
+        db, errors.CheckViolation,
+        "INSERT INTO live_receipts(restaurant_id,id,snapshot) VALUES (%s,%s,%s::jsonb)",
+        (rid, oid2, json.dumps({"id": str(oid2), "restaurant_id": "other-tenant"})),
+    )
+
