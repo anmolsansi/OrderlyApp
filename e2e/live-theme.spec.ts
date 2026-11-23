@@ -72,3 +72,23 @@ test('a denied theme read falls back to light while writes can still succeed', a
   await toggle(page).click();
   await expectTheme(page, 'dark');
 });
+
+test('denied persistence still toggles within the page but resets after reload', async ({ page }) => {
+  await page.addInitScript(key => {
+    const original = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (name: string, value: string) {
+      if (name === key) throw new Error('Synthetic theme write denial');
+      return original.call(this, name, value);
+    };
+  }, THEME_KEY);
+  await page.goto('/sign-in');
+  await toggle(page).click();
+  await expectTheme(page, 'dark');
+  await toggle(page).click();
+  await expectTheme(page, 'light');
+  await toggle(page).click();
+  await expectTheme(page, 'dark');
+  expect(await page.evaluate(key => localStorage.getItem(key), THEME_KEY)).toBeNull();
+  await page.reload();
+  await expectTheme(page, 'light');
+});
