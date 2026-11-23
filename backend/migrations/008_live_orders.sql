@@ -11,3 +11,17 @@ CREATE TABLE live_carts (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (restaurant_id, guest_id)
 );
+
+-- Operational orders are durable restaurant-owned history, not guest-owned mock orders.
+CREATE TABLE live_orders (
+    restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,
+    id UUID NOT NULL,
+    status TEXT NOT NULL CHECK (status IN (
+        'Submitted', 'Accepted', 'Preparing', 'Ready',
+        'Completed', 'Rejected', 'Cancelled'
+    )),
+    version BIGINT NOT NULL DEFAULT 1 CHECK (version > 0),
+    created_at TIMESTAMPTZ NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (restaurant_id, id)
+);
