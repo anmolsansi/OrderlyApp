@@ -1792,3 +1792,27 @@ html[data-theme='dark'] {
   line-height: 1.2;
   letter-spacing: normal;
 }
+
+.live-task-screen :is(input, select, textarea) {
+  min-height: 2.75rem;
+  max-width: 100%;
+  border: 1px solid var(--live-border);
+  background: var(--live-panel);
+  color: var(--live-text);
+  font: inherit;
+}
+.live-task-screen :is(.live-primary-action, .checkout-button) {
+  min-height: 2.75rem;
+  border: 1px solid transparent;
+  background: var(--live-primary-background);
+  color: var(--live-primary-text);
+  font: inherit;
+}
+.live-task-screen :is(.live-primary-action, .checkout-button):disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.live-task-screen .live-status-success { color: var(--live-success); }
+.live-task-screen .live-status-warning { color: var(--live-warning); }
+.live-task-screen .live-status-error { color: var(--live-error); }
+.live-task-screen .live-status-pending { color: var(--live-muted); }
