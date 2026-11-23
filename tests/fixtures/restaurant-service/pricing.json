@@ -195,6 +195,93 @@
         "total_minor": 2
       },
       "hand_calculation": "floor(3*5000/10000)=floor(1.5)=1; total=2"
+    },
+    {
+      "id": "exact_integer",
+      "contract_id": "CON-11",
+      "schema_version": 1,
+      "synthetic": true,
+      "pricing_version": 1,
+      "input": {
+        "restaurant_id": "r-demo",
+        "lines": [
+          {
+            "unit_minor": 200,
+            "quantity": 1
+          }
+        ],
+        "offer": {
+          "percent_bps": 500,
+          "max_discount_minor": 999
+        }
+      },
+      "expected": {
+        "currency": "INR",
+        "subtotal_minor": 200,
+        "discount_minor": 10,
+        "tax_minor": 0,
+        "charges_minor": 0,
+        "total_minor": 190
+      },
+      "hand_calculation": "floor(200*500/10000)=10 exactly; total=190"
+    },
+    {
+      "id": "full_discount",
+      "contract_id": "CON-11",
+      "schema_version": 1,
+      "synthetic": true,
+      "pricing_version": 1,
+      "input": {
+        "restaurant_id": "r-demo",
+        "lines": [
+          {
+            "unit_minor": 1200,
+            "quantity": 1
+          }
+        ],
+        "offer": {
+          "percent_bps": 10000,
+          "max_discount_minor": 2147483647
+        }
+      },
+      "expected": {
+        "currency": "INR",
+        "subtotal_minor": 1200,
+        "discount_minor": 1200,
+        "tax_minor": 0,
+        "charges_minor": 0,
+        "total_minor": 0
+      },
+      "hand_calculation": "floor(1200*10000/10000)=1200; cap never adds more than subtotal; total=0"
+    },
+    {
+      "id": "maximum_total",
+      "contract_id": "CON-11",
+      "schema_version": 1,
+      "synthetic": true,
+      "pricing_version": 1,
+      "input": {
+        "restaurant_id": "r-demo",
+        "lines": [
+          {
+            "unit_minor": 2147483647,
+            "quantity": 1
+          }
+        ],
+        "offer": {
+          "percent_bps": 0,
+          "max_discount_minor": 0
+        }
+      },
+      "expected": {
+        "currency": "INR",
+        "subtotal_minor": 2147483647,
+        "discount_minor": 0,
+        "tax_minor": 0,
+        "charges_minor": 0,
+        "total_minor": 2147483647
+      },
+      "hand_calculation": "Maximum allowed unit and subtotal=2147483647; no discount, tax or charges; total=2147483647"
     }
   ],
   "receipt_example": null,
