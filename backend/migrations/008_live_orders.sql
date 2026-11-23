@@ -115,3 +115,25 @@ CREATE INDEX live_access_guest
     ON live_guest_access (guest_id, restaurant_id, order_id);
 CREATE INDEX live_payment_order
     ON live_payment_events (restaurant_id, order_id, created_at, id);
+
+-- History is append-only even when a client bypasses a future service API.
+-- Restricting UPDATE/DELETE here is intentionally not a retention/deletion policy.
+CREATE FUNCTION live_reject_history_mutation() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    RAISE EXCEPTION 'live history is immutable: %', TG_TABLE_NAME
+        USING ERRCODE = '23514';
+END;
+$$;
+
+CREATE TRIGGER live_receipts_immutable
+    BEFORE UPDATE OR DELETE ON live_receipts
+    FOR EACH ROW EXECUTE FUNCTION live_reject_history_mutation();
+
+CREATE TRIGGER live_order_events_immutable
+    BEFORE UPDATE OR DELETE ON live_order_events
+    FOR EACH ROW EXECUTE FUNCTION live_reject_history_mutation();
+
+CREATE TRIGGER live_payment_events_immutable
+    BEFORE UPDATE OR DELETE ON live_payment_events
+    FOR EACH ROW EXECUTE FUNCTION live_reject_history_mutation();
