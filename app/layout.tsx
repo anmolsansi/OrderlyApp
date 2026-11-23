@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import './globals.css';
+import { ThemeToggle } from './components/ThemeToggle';
 
 const themeBootstrap = `(function () {
   var theme = 'light';
@@ -25,7 +26,15 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         {/* Runs before body parsing, independent of React hydration and storage availability. */}
         <script dangerouslySetInnerHTML={{ __html: themeBootstrap }} />
       </head>
-      <body>{children}</body>
+      <body>
+        <header aria-label="Appearance" className="live-theme-header">
+          <div className="live-theme-header-inner">
+            <span className="live-theme-identity">OrderlyApp appearance</span>
+            <ThemeToggle />
+          </div>
+        </header>
+        {children}
+      </body>
     </html>
   );
 }
