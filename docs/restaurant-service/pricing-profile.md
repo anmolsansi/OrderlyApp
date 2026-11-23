@@ -109,3 +109,15 @@ The companion fixture records missing approval, missing tax inclusion or taxable
 Once a live API exists: malformed money is `422 invalid_input` or `422 money_out_of_range`; an unknown/foreign resource is `404 not_found` without leaking existence; stale pricing/cart is `409 quote_changed` or the contract-specific stale code; missing profile is `503 pricing_unconfigured`; missing staff identity `401`, denied active membership `403`. Follow the frozen COMMON `{error:{code,message,fields,request_id}}` shape; do not invent success responses, alter shared error discriminants, or trust browser-provided prices/taxes.
 
 Privacy: only synthetic identifiers in source control. No receipts from real customers, staff token, GST registration, address, accountant contact, signed private source, or provider account credential here. Future owner approval and tenant scope must be rechecked at the actual write/read boundary. No database writes or network calls belong to this document ticket.
+
+## 9. RS-15 integration handoff
+
+RS-15 consumes CON-11 (this policy gate), CON-14 canonical cart and RS-01 shapes; it owns actual `backend/app/live_pricing.py` and scoped quote tests/route wiring. The consumer must:
+
+1. Use the **same** strict INR-paise totals shape, receipt/quote identity and exact numerical vectors in the machine-readable fixture. Verify discount floor/cap without floats.
+2. Obtain tax, charges, basis and receipt identity from the **named U1-approved restaurant profile** before enabling any real quote. Unverified profile returns `503 pricing_unconfigured`, not a synthetic zero result.
+3. Bind quote and receipt to `pricing_version`, cart revision, catalog version and quote digest. A version/price change demands revalidation. Preserve immutable snapshots; never retroactively recalculate a paid or accepted receipt.
+4. Check restaurant/verified actor authorization at the provider boundary. The guest session/QR/browser cannot author a production profile or choose a different restaurant's pricing.
+5. Add real validation, PostgreSQL-backed money/immutability, stale/conflict, auth and outage tests in **RS-15 or its actual owning integration ticket**, not by mutating frozen RS-01 fixtures or inventing an RS-11 runtime.
+
+**Interface boundary:** this document/JSON file defines example inputs, expected totals and U1 evidence gates; no additional shared DTO is approved. If an actual tax policy, receipt identity or rounding requirement cannot be expressed by current live-v1 contracts, raise `Needs Architect Decision: contract mismatch` and submit a reviewed contract change before code.
