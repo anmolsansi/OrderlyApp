@@ -196,3 +196,35 @@ def test_primary_keys_uniques_and_fk_delete_policies(db):
                "FOREIGN KEY (restaurant_id, order_id, reverses_id)" in definition
                for src, dst, deletion, definition in fks)
 
+
+def test_guest_cart_revision_defaults_tenant_isolation_and_cascade(db):
+    a, b = add_restaurant(db), add_restaurant(db)
+    guest = add_guest(db)
+    for rid in (a, b):
+        db.execute(
+            "INSERT INTO live_carts (restaurant_id,guest_id) VALUES (%s,%s)",
+            (rid, guest),
+        )
+    assert db.execute(
+        "SELECT revision,items FROM live_carts WHERE restaurant_id=%s AND guest_id=%s",
+        (a, guest),
+    ).fetchone() == (0, [])
+    rejects(
+        db, errors.UniqueViolation,
+        "INSERT INTO live_carts (restaurant_id,guest_id) VALUES (%s,%s)",
+        (a, guest),
+    )
+    rejects(
+        db, errors.CheckViolation,
+        "UPDATE live_carts SET revision=-1 WHERE restaurant_id=%s AND guest_id=%s",
+        (a, guest),
+    )
+    db.execute("DELETE FROM guest_sessions WHERE id=%s", (guest,))
+    assert db.execute(
+        "SELECT COUNT(*) FROM live_carts WHERE guest_id=%s", (guest,)
+    ).fetchone()[0] == 0
+    assert db.execute(
+        "SELECT COUNT(*) FROM live_restaurants WHERE restaurant_id=ANY(%s)",
+        ([a, b],),
+    ).fetchone()[0] == 2
+
