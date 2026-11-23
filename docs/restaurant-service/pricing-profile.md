@@ -44,7 +44,7 @@ Zero tax and charges are **test-only constants**, never a claim that an Indian r
 ## 3. Deterministic synthetic calculation order
 
 1. Derive each `line_minor = unit_minor * quantity` from server-canonical prices. Validate each line and accumulated `subtotal_minor = sum(line_minor)` against integer paise bounds.
-2. For the independently frozen CON-17 synthetic promotion, `raw_discount_minor = floor(subtotal_minor * percent_bps / 10000)`, then `discount_minor = min(raw_discount_minor, max_discount_minor, subtotal_minor)`. All operands are integers. This is **the CON-17 percentage discount rule**, not a restaurant-specific U1 tax-rounding decision.
+2. With **no promotion** (`promotion_code=null`, `offer=null` in the isolated fixture), `discount_minor=0`. For a valid CON-16 promotion (`percent_bps` from 1 to 10,000 and `max_discount_minor` positive), the independently frozen CON-17 calculation is `raw_discount_minor = floor(subtotal_minor * percent_bps / 10000)`, then `discount_minor = min(raw_discount_minor, max_discount_minor, subtotal_minor)`. All operands are integers. This is **the CON-17 percentage discount rule**, not a restaurant-specific U1 tax-rounding decision.
 3. For *these synthetic vectors only*, `tax_minor=0` and `charges_minor=0`. Their actual computation order, per-line vs aggregate rounding, inclusive/exclusive tax treatment, taxable base and fee behavior **require U1**. Do not infer a real result from step 3.
 4. `total_minor = subtotal_minor - discount_minor + tax_minor + charges_minor`. Validate resulting nonnegative integer range and exact receipt-total reconciliation.
 5. Record the `pricing_version` in quote and immutable receipt preview. After any approved pricing change, use a new version and require fresh quote review; never silently reuse the old amount. RS-11 does not create quote digests or persistence.
@@ -57,14 +57,14 @@ All amounts in this table are **paise**, not rupees. The examples are pinned in 
 
 | Case | Canonical line calculation | Promotion calculation | Tax | Charges | Expected total |
 |---|---|---|---:|---:|---:|
-| zero_discount | 1 × 1,200 = 1,200 | 0 bps → 0 | 0 | 0 | **1,200** |
+| zero_discount | 1 × 1,200 = 1,200 | no offer → 0 | 0 | 0 | **1,200** |
 | capped_discount | 1 × 1,200 = 1,200 | floor(1,200 × 2,500 / 10,000) = 300; cap 200 → 200 | 0 | 0 | **1,000** |
 | multiline_capped | (2 × 1,999) + (1 × 501) = 4,499 | floor(4,499 × 1,250 / 10,000) = 562; cap 500 → 500 | 0 | 0 | **3,999** |
 | sub_paise_floor | 1 × 1 = 1 | floor(1 × 5,000 / 10,000) = floor(0.5) = 0 | 0 | 0 | **1** |
 | above_half_paise | 1 × 3 = 3 | floor(3 × 5,000 / 10,000) = floor(1.5) = 1 | 0 | 0 | **2** |
 | exact_integer | 1 × 200 = 200 | floor(200 × 500 / 10,000) = 10 | 0 | 0 | **190** |
 | full_discount | 1 × 1,200 = 1,200 | 10,000 bps, cap 2,147,483,647 → 1,200 | 0 | 0 | **0** |
-| maximum_total | 1 × 2,147,483,647 | 0 bps → 0 | 0 | 0 | **2,147,483,647** |
+| maximum_total | 1 × 2,147,483,647 | no offer → 0 | 0 | 0 | **2,147,483,647** |
 
 The rounding boundary above is **discount floor in paise**. It does not establish tax/GST/invoice rounding. If `sum(line_minor)`, `subtotal_minor + charges_minor`, or a final amount exceeds 2,147,483,647, reject it instead of wrapping or truncating.
 
