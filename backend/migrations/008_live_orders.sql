@@ -25,3 +25,16 @@ CREATE TABLE live_orders (
     updated_at TIMESTAMPTZ NOT NULL,
     PRIMARY KEY (restaurant_id, id)
 );
+
+-- The JSON receipt is a one-per-order snapshot bound to the same tenant/order.
+-- Historical receipts are never joined to a guest_sessions row.
+CREATE TABLE live_receipts (
+    restaurant_id TEXT NOT NULL,
+    id UUID NOT NULL,
+    snapshot JSONB NOT NULL CHECK (jsonb_typeof(snapshot) = 'object'),
+    PRIMARY KEY (restaurant_id, id),
+    FOREIGN KEY (restaurant_id, id)
+        REFERENCES live_orders(restaurant_id, id) ON DELETE RESTRICT,
+    CHECK (snapshot->>'id' = id::text),
+    CHECK (snapshot->>'restaurant_id' = restaurant_id)
+);
