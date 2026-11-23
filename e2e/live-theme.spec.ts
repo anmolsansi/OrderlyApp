@@ -208,3 +208,33 @@ test('approved action, semantic, and link pairs retain readable contrast in both
     await button.click();
   }
 });
+
+test('CON-39 synthetic fixture agrees with local theme defaults and rejects invalid enum', async ({ page }) => {
+  const fixture = JSON.parse(readFileSync(resolve(process.cwd(), 'tests/fixtures/restaurant-service/v1.json'), 'utf8')) as {
+    schema_version: number;
+    synthetic: boolean;
+    contracts: Record<string, {
+      contract: string;
+      schema_version: number;
+      synthetic: boolean;
+      live_provider_verified: boolean;
+      positive: { payload: { theme: string; source: string } };
+      negative: { name: string; path: string; value: string; expected_status: number }[];
+    }>;
+  };
+  const contract = fixture.contracts['CON-39'];
+  expect(fixture.synthetic).toBe(true);
+  expect(fixture.schema_version).toBe(1);
+  expect(contract.contract).toBe('CON-39');
+  expect(contract.schema_version).toBe(1);
+  expect(contract.synthetic).toBe(true);
+  expect(contract.live_provider_verified).toBe(false);
+  expect(contract.positive.payload).toEqual({ theme: 'light', source: 'default' });
+  const invalid = contract.negative.find(candidate => candidate.name === 'invalid_enum');
+  expect(invalid).toMatchObject({ path: 'theme', expected_status: 422 });
+  await page.addInitScript(({ key, value }) => localStorage.setItem(key, value), { key: THEME_KEY, value: invalid!.value });
+  await page.goto('/sign-in');
+  await expectTheme(page, 'light');
+  // The extra-field 422 fixture belongs to the shared HTTP contract, not this local-only toggle.
+  expect(contract.negative.find(candidate => candidate.name === 'unknown_mutation_field')).toMatchObject({ expected_status: 422 });
+});
