@@ -462,6 +462,146 @@
         "use_synthetic_fallback": false
       },
       "runtime_verified": false
+    },
+    {
+      "id": "fractional_money",
+      "case_kind": "INVALID_INPUT",
+      "contract_id": "CON-11",
+      "synthetic": true,
+      "field": "lines[0].unit_minor",
+      "value": 12.5,
+      "expected": {
+        "accepted": false,
+        "reason": "invalid_input",
+        "live_ready": false
+      },
+      "runtime_verified": false
+    },
+    {
+      "id": "string_money",
+      "case_kind": "INVALID_INPUT",
+      "contract_id": "CON-11",
+      "synthetic": true,
+      "field": "lines[0].unit_minor",
+      "value": "1200",
+      "expected": {
+        "accepted": false,
+        "reason": "invalid_input",
+        "live_ready": false
+      },
+      "runtime_verified": false
+    },
+    {
+      "id": "boolean_money",
+      "case_kind": "INVALID_INPUT",
+      "contract_id": "CON-11",
+      "synthetic": true,
+      "field": "lines[0].unit_minor",
+      "value": true,
+      "expected": {
+        "accepted": false,
+        "reason": "invalid_input",
+        "live_ready": false
+      },
+      "runtime_verified": false
+    },
+    {
+      "id": "negative_money",
+      "case_kind": "INVALID_INPUT",
+      "contract_id": "CON-11",
+      "synthetic": true,
+      "field": "lines[0].unit_minor",
+      "value": -1,
+      "expected": {
+        "accepted": false,
+        "reason": "invalid_input",
+        "live_ready": false
+      },
+      "runtime_verified": false
+    },
+    {
+      "id": "money_exceeds_max",
+      "case_kind": "INVALID_INPUT",
+      "contract_id": "CON-11",
+      "synthetic": true,
+      "field": "lines[0].unit_minor",
+      "value": 2147483648,
+      "expected": {
+        "accepted": false,
+        "reason": "money_out_of_range",
+        "live_ready": false
+      },
+      "runtime_verified": false
+    },
+    {
+      "id": "subtotal_overflow",
+      "case_kind": "INVALID_INPUT",
+      "contract_id": "CON-11",
+      "synthetic": true,
+      "field": "subtotal_minor",
+      "value": 2147483648,
+      "expected": {
+        "accepted": false,
+        "reason": "money_out_of_range",
+        "live_ready": false
+      },
+      "runtime_verified": false
+    },
+    {
+      "id": "negative_discount_cap",
+      "case_kind": "INVALID_INPUT",
+      "contract_id": "CON-11",
+      "synthetic": true,
+      "field": "offer.max_discount_minor",
+      "value": -1,
+      "expected": {
+        "accepted": false,
+        "reason": "invalid_input",
+        "live_ready": false
+      },
+      "runtime_verified": false
+    },
+    {
+      "id": "unknown_mutation_field",
+      "case_kind": "INVALID_INPUT",
+      "contract_id": "CON-11",
+      "synthetic": true,
+      "field": "unexpected_field",
+      "value": "unapproved",
+      "expected": {
+        "accepted": false,
+        "reason": "invalid_input",
+        "live_ready": false
+      },
+      "runtime_verified": false
+    },
+    {
+      "id": "unsupported_tax_rule",
+      "case_kind": "INVALID_INPUT",
+      "contract_id": "CON-11",
+      "synthetic": true,
+      "field": "tax_rounding",
+      "value": "unspecified",
+      "expected": {
+        "accepted": false,
+        "reason": "pricing_unconfigured",
+        "live_ready": false
+      },
+      "runtime_verified": false
+    },
+    {
+      "id": "inconsistent_receipt_total",
+      "case_kind": "INVALID_INPUT",
+      "contract_id": "CON-11",
+      "synthetic": true,
+      "field": "receipt_example.totals.total_minor",
+      "value": 1199,
+      "expected": {
+        "accepted": false,
+        "reason": "invalid_input",
+        "live_ready": false
+      },
+      "runtime_verified": false
     }
   ],
   "evidence_gate": {
