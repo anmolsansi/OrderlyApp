@@ -645,7 +645,7 @@
     "consumer": "RS-15",
     "provider_implemented": false,
     "real_u1_approved": false,
-    "postgreSQL_conformance_verified": false,
+    "postgresql_conformance_verified": false,
     "live_quote_verified": false,
     "existing_rs01_fixture_mutated": false,
     "acceptance": {
