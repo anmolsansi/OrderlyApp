@@ -1718,3 +1718,22 @@ h3 {
     flex-direction: column;
   }
 }
+
+/* RS-39: Approved D15-D20 and D28-D30, isolated from the legacy mock palette. */
+html[data-theme='light'] {
+  color-scheme: light;
+  --live-page: #f8fafc;
+  --live-panel: #ffffff;
+  --live-panel-secondary: #f1f5f9;
+  --live-text: #0f172a;
+  --live-muted: #475569;
+  --live-border: #cbd5e1;
+  --live-primary-background: #6d28d9;
+  --live-primary-text: #ffffff;
+  --live-success: #166534;
+  --live-warning: #92400e;
+  --live-error: #b91c1c;
+  --live-focus: #6d28d9;
+  --live-link: #6d28d9;
+  --live-link-visited: #9d174d;
+}
