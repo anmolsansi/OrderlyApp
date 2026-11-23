@@ -40,3 +40,13 @@ The following is an **evidence record**, not a newly approved serialized `live_r
 ```
 
 Zero tax and charges are **test-only constants**, never a claim that an Indian restaurant owes no tax or fees. Empty `business_identity` is allowed only for labeled synthetic examples. No live profile, government registration number, address, formula, fee, invoice wording or policy is inferred.
+
+## 3. Deterministic synthetic calculation order
+
+1. Derive each `line_minor = unit_minor * quantity` from server-canonical prices. Validate each line and accumulated `subtotal_minor = sum(line_minor)` against integer paise bounds.
+2. For the independently frozen CON-17 synthetic promotion, `raw_discount_minor = floor(subtotal_minor * percent_bps / 10000)`, then `discount_minor = min(raw_discount_minor, max_discount_minor, subtotal_minor)`. All operands are integers. This is **the CON-17 percentage discount rule**, not a restaurant-specific U1 tax-rounding decision.
+3. For *these synthetic vectors only*, `tax_minor=0` and `charges_minor=0`. Their actual computation order, per-line vs aggregate rounding, inclusive/exclusive tax treatment, taxable base and fee behavior **require U1**. Do not infer a real result from step 3.
+4. `total_minor = subtotal_minor - discount_minor + tax_minor + charges_minor`. Validate resulting nonnegative integer range and exact receipt-total reconciliation.
+5. Record the `pricing_version` in quote and immutable receipt preview. After any approved pricing change, use a new version and require fresh quote review; never silently reuse the old amount. RS-11 does not create quote digests or persistence.
+
+Use integer division (floor for nonnegative CON-17 promotion products) rather than floating-point `round()`. Non-discount real tax or cash rounding remains `OWNER DECISION REQUIRED`.
