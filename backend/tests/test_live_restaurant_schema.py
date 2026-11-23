@@ -302,3 +302,42 @@ def test_valid_india_hours_and_pricing_profile_round_trip_without_activation(db)
     ).fetchone()
     assert row == ("Café का नाम", "Asia/Kolkata", hours, profile, True, False)
 
+
+def test_007_additive_upgrade_preserves_existing_catalog_and_receipt(db):
+    """Apply 007 to a transaction-local legacy schema, not a real deployed DB."""
+    schema_name = f"rs02_upgrade_{uuid4().hex[:12]}"
+    db.execute(sql.SQL("CREATE SCHEMA {}").format(sql.Identifier(schema_name)))
+    db.execute(sql.SQL("SET LOCAL search_path TO {}").format(sql.Identifier(schema_name)))
+    db.execute("CREATE TABLE restaurants (id TEXT PRIMARY KEY, name TEXT NOT NULL)")
+    db.execute("CREATE TABLE guest_sessions (id TEXT PRIMARY KEY)")
+    db.execute("CREATE TABLE guest_orders (id UUID PRIMARY KEY, snapshot JSONB NOT NULL)")
+    db.execute("CREATE TABLE orders (id TEXT PRIMARY KEY, status TEXT NOT NULL)")
+    restaurant_id, receipt_id = f"legacy-{uuid4().hex}", uuid4()
+    receipt = {"id": str(receipt_id), "kind": "mock-v1", "total_cents": 1192}
+    db.execute(
+        "INSERT INTO restaurants(id,name) VALUES (%s,%s)",
+        (restaurant_id, "Original mock catalog"),
+    )
+    db.execute(
+        "INSERT INTO guest_orders(id,snapshot) VALUES (%s,%s::jsonb)",
+        (receipt_id, json.dumps(receipt)),
+    )
+    db.execute("INSERT INTO orders(id,status) VALUES (%s,%s)", ("legacy-order", "Placed"))
+    db.execute(MIGRATION.read_text(encoding="utf-8"))
+    assert db.execute(
+        "SELECT id,name FROM restaurants WHERE id=%s", (restaurant_id,)
+    ).fetchone() == (restaurant_id, "Original mock catalog")
+    assert db.execute(
+        "SELECT snapshot FROM guest_orders WHERE id=%s", (receipt_id,)
+    ).fetchone() == (receipt,)
+    assert db.execute(
+        "SELECT status FROM orders WHERE id='legacy-order'"
+    ).fetchone() == ("Placed",)
+    assert db.execute("SELECT COUNT(*) FROM live_restaurants").fetchone() == (0,)
+    assert db.execute("SELECT COUNT(*) FROM live_tables").fetchone() == (0,)
+    add_live(db, restaurant_id)
+    assert db.execute(
+        "SELECT ordering_enabled FROM live_restaurants WHERE restaurant_id=%s",
+        (restaurant_id,),
+    ).fetchone() == (False,)
+
