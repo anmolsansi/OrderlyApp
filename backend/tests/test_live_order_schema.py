@@ -113,3 +113,40 @@ def rejects(db, error_type, statement, parameters=()):
         with db.transaction():
             db.execute(statement, parameters)
 
+
+def test_db_b_exact_columns(db):
+    expected = {
+        "live_carts": {
+            "restaurant_id", "guest_id", "revision", "items", "updated_at",
+        },
+        "live_orders": {
+            "restaurant_id", "id", "status", "version", "created_at", "updated_at",
+        },
+        "live_receipts": {"restaurant_id", "id", "snapshot"},
+        "live_guest_access": {
+            "restaurant_id", "order_id", "guest_id", "revoked_at",
+        },
+        "live_order_events": {
+            "restaurant_id", "order_id", "id", "version", "from_status",
+            "to_status", "actor", "reason", "created_at",
+        },
+        "live_payment_events": {
+            "restaurant_id", "order_id", "id", "kind", "reverses_id",
+            "amount_minor", "currency", "method", "actor", "reason",
+            "created_at",
+        },
+        "live_commands": {
+            "restaurant_id", "actor_kind", "actor_id", "key",
+            "payload_sha256", "response", "response_status", "created_at",
+        },
+    }
+    for name, columns in expected.items():
+        actual = {
+            row[0] for row in db.execute(
+                """SELECT column_name FROM information_schema.columns
+                   WHERE table_schema=current_schema() AND table_name=%s""",
+                (name,),
+            ).fetchall()
+        }
+        assert actual == columns, name
+
