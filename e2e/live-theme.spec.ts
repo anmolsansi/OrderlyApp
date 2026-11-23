@@ -246,3 +246,17 @@ test('CON-39 synthetic fixture agrees with local theme defaults and rejects inva
   // The extra-field 422 fixture belongs to the shared HTTP contract, not this local-only toggle.
   expect(contract.negative.find(candidate => candidate.name === 'unknown_mutation_field')).toMatchObject({ expected_status: 422 });
 });
+
+test('IBM Plex Sans is actually self-hosted, with a nonblocking system fallback stack', async ({ page }) => {
+  await page.goto('/sign-in');
+  const actual = await page.locator('.live-theme-header').evaluate(async element => {
+    await document.fonts.ready;
+    return {
+      stack: getComputedStyle(element).fontFamily,
+      loaded: Array.from(document.fonts).some(face => /IBM[_ ]Plex[_ ]Sans/i.test(face.family) && face.status === 'loaded'),
+    };
+  });
+  expect(actual.stack).toMatch(/IBM[_ ]Plex[_ ]Sans/i);
+  expect(actual.loaded).toBe(true);
+  expect(actual.stack).toMatch(/sans-serif/i);
+});
