@@ -128,3 +128,29 @@ def test_primary_keys_uniques_and_on_delete_contract(db):
     assert ("live_restaurants", "guest_sessions", "n") in fks
     assert ("live_tables", "live_restaurants", "r") in fks
 
+
+def test_unconfigured_restaurant_stays_disabled_and_defaults_are_safe(db):
+    rid = mock_restaurant(db)
+    assert db.execute(
+        "SELECT ordering_enabled FROM live_restaurants WHERE restaurant_id = %s",
+        (rid,),
+    ).fetchone() is None
+    add_live(db, rid)
+    row = db.execute(
+        """SELECT version, catalog_version, brand_label, timezone, hours,
+                  ordering_enabled, pricing_version, pricing_profile, synthetic,
+                  demo_owner_id, created_at, updated_at
+           FROM live_restaurants WHERE restaurant_id = %s""",
+        (rid,),
+    ).fetchone()
+    assert row[:5] == (1, 1, "RS-02 Demo", "Asia/Kolkata", [])
+    assert row[5:10] == (False, 1, None, False, None)
+    assert all(value.tzinfo is not None for value in row[10:])
+    assert db.execute(
+        """SELECT COALESCE(ordering_enabled, FALSE)
+           FROM restaurants LEFT JOIN live_restaurants
+           ON restaurants.id = live_restaurants.restaurant_id
+           WHERE restaurants.id = %s""",
+        (rid,),
+    ).fetchone() == (False,)
+
