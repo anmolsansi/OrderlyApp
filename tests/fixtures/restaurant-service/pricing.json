@@ -137,6 +137,64 @@
         "total_minor": 3999
       },
       "hand_calculation": "1999*2+501=4499; floor(4499*1250/10000)=floor(562.375)=562; cap 500; total=3999"
+    },
+    {
+      "id": "sub_paise_floor",
+      "contract_id": "CON-11",
+      "schema_version": 1,
+      "synthetic": true,
+      "pricing_version": 1,
+      "input": {
+        "restaurant_id": "r-demo",
+        "lines": [
+          {
+            "unit_minor": 1,
+            "quantity": 1
+          }
+        ],
+        "offer": {
+          "percent_bps": 5000,
+          "max_discount_minor": 999
+        }
+      },
+      "expected": {
+        "currency": "INR",
+        "subtotal_minor": 1,
+        "discount_minor": 0,
+        "tax_minor": 0,
+        "charges_minor": 0,
+        "total_minor": 1
+      },
+      "hand_calculation": "floor(1*5000/10000)=floor(0.5)=0; total=1"
+    },
+    {
+      "id": "above_half_paise",
+      "contract_id": "CON-11",
+      "schema_version": 1,
+      "synthetic": true,
+      "pricing_version": 1,
+      "input": {
+        "restaurant_id": "r-demo",
+        "lines": [
+          {
+            "unit_minor": 3,
+            "quantity": 1
+          }
+        ],
+        "offer": {
+          "percent_bps": 5000,
+          "max_discount_minor": 999
+        }
+      },
+      "expected": {
+        "currency": "INR",
+        "subtotal_minor": 3,
+        "discount_minor": 1,
+        "tax_minor": 0,
+        "charges_minor": 0,
+        "total_minor": 2
+      },
+      "hand_calculation": "floor(3*5000/10000)=floor(1.5)=1; total=2"
     }
   ],
   "receipt_example": null,
