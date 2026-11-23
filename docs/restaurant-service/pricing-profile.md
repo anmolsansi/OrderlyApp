@@ -121,3 +121,20 @@ RS-15 consumes CON-11 (this policy gate), CON-14 canonical cart and RS-01 shapes
 5. Add real validation, PostgreSQL-backed money/immutability, stale/conflict, auth and outage tests in **RS-15 or its actual owning integration ticket**, not by mutating frozen RS-01 fixtures or inventing an RS-11 runtime.
 
 **Interface boundary:** this document/JSON file defines example inputs, expected totals and U1 evidence gates; no additional shared DTO is approved. If an actual tax policy, receipt identity or rounding requirement cannot be expressed by current live-v1 contracts, raise `Needs Architect Decision: contract mismatch` and submit a reviewed contract change before code.
+
+## 10. Verification, acceptance and rollback
+
+**Owned files only:** `docs/restaurant-service/pricing-profile.md` and `tests/fixtures/restaurant-service/pricing.json`. No migration, UI, runtime API, provider, external call, secret, payment, tax/legal assertion, change to `tests/fixtures/restaurant-service/v1.json`, or update to integrator-owned `development.md`.
+
+**Local verification:** parse the JSON, assert unique scenario IDs and integer/range constraints, recompute each subtotal, floor/capped discount and final total independently, and compare receipt shape and zero-discount preview with RS-01 shared fixture. Run `git diff --check` and check the exact two-path diff. Full CI is applicable for regressions, but no upstream mock test success can prove U1 signed evidence.
+
+**RS-11 ticket acceptance status on 2026-11-23:**
+1. Synthetic hand-calculated vector fixture: **evidence prepared; verify using JSON assertions and PR checks**.
+2. Missing approval implies `live_ready=false`: **documented and fixture-negative, provider runtime not built**.
+3. Approved real sample receipt: **BLOCKED, U1 absent**.
+4. Shared provider/consumer conformance including real invalid/auth/stale behavior: **BLOCKED pending downstream RS-15 provider and real policy**.
+5. Mock regressions: **no mock files changed; execute/check branch CI before any PASS claim**.
+
+**Freeze verdict:** only the **synthetic example/blocked-U1 handoff** is reviewable. **CON-11 must not be described as fully live-ready or production-frozen** until owner/accountant evidence and the actual downstream contract tests pass. RS-15, RS-65 and the integrator own their separate acceptance records.
+
+**Rollback:** revert the isolated RS-11 documentation/fixture commits if the reviewed policy/evidence proves incorrect. Reverting these files does not activate/deactivate a service, alter migrations or modify stored receipts. An integrator can update the roadmap after its own review, not as an unauthorized edit in this ticket.
