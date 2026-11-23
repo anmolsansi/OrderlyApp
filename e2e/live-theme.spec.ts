@@ -157,3 +157,54 @@ test('theme header wraps, remains operable at text zoom, and keeps an unsaved dr
   expect(dimensions.right).toBeLessThanOrEqual(376);
   await expect(name).toHaveValue('Keep during zoom and resize');
 });
+
+function contrastRatio(first: string, second: string): number {
+  function luminance(color: string): number {
+    const values = color.match(/[\\d.]+/g)?.slice(0, 3).map(Number);
+    if (!values || values.length !== 3) throw new Error(`Unsupported CSS color: ${color}`);
+    const [r, g, b] = values.map(channel => {
+      const c = channel / 255;
+      return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  }
+  const a = luminance(first), b = luminance(second);
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
+
+test('approved action, semantic, and link pairs retain readable contrast in both themes', async ({ page }) => {
+  await page.goto('/sign-in');
+  for (const theme of ['light', 'dark'] as const) {
+    await expectTheme(page, theme);
+    const colors = await page.evaluate(() => {
+      const panel = document.createElement('section');
+      panel.className = 'live-task-screen';
+      panel.innerHTML = '<div class="live-panel"><button class="live-primary-action">Save order</button><p class="live-status-success">Order confirmed</p><p class="live-status-warning">Order outcome uncertain</p><p class="live-status-error">Could not save</p><a href="/sign-in">Help with order</a></div>';
+      document.body.appendChild(panel);
+      const color = (selector: string, property: 'color' | 'backgroundColor') => getComputedStyle(panel.querySelector(selector)!).getPropertyValue(property === 'backgroundColor' ? 'background-color' : 'color');
+      const result = {
+        pageBackground: getComputedStyle(panel).backgroundColor,
+        panelBackground: color('.live-panel', 'backgroundColor'),
+        buttonBackground: color('.live-primary-action', 'backgroundColor'),
+        buttonText: color('.live-primary-action', 'color'),
+        success: color('.live-status-success', 'color'),
+        warning: color('.live-status-warning', 'color'),
+        error: color('.live-status-error', 'color'),
+        link: color('a', 'color'),
+      };
+      panel.remove();
+      return result;
+    });
+    expect(contrastRatio(colors.buttonBackground, colors.buttonText)).toBeGreaterThanOrEqual(4.5);
+    for (const textColor of [colors.success, colors.warning, colors.error, colors.link]) {
+      expect(contrastRatio(colors.panelBackground, textColor)).toBeGreaterThanOrEqual(4.5);
+    }
+    expect(contrastRatio(colors.pageBackground, colors.panelBackground)).toBeGreaterThan(1);
+    const button = toggle(page);
+    expect(await button.evaluate(el => getComputedStyle(el).minHeight)).toBe('44px');
+    await button.focus();
+    expect(await button.evaluate(el => getComputedStyle(el).outlineWidth)).toBe('3px');
+    expect(await button.evaluate(el => getComputedStyle(el).outlineOffset)).toBe('3px');
+    await button.click();
+  }
+});
