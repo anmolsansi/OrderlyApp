@@ -43,3 +43,32 @@ test('unknown stored preference cannot select a third theme', async ({ page }) =
   await expectTheme(page, 'dark');
   expect(await page.evaluate(key => localStorage.getItem(key), THEME_KEY)).toBe('dark');
 });
+
+test('a denied localStorage property never prevents manual theme changes', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      get() { throw new Error('Synthetic security denial'); },
+    });
+  });
+  await page.goto('/sign-in');
+  await expectTheme(page, 'light');
+  await toggle(page).click();
+  await expectTheme(page, 'dark');
+  await toggle(page).click();
+  await expectTheme(page, 'light');
+});
+
+test('a denied theme read falls back to light while writes can still succeed', async ({ page }) => {
+  await page.addInitScript(key => {
+    const original = Storage.prototype.getItem;
+    Storage.prototype.getItem = function (name: string) {
+      if (name === key) throw new Error('Synthetic theme read denial');
+      return original.call(this, name);
+    };
+  }, THEME_KEY);
+  await page.goto('/sign-in');
+  await expectTheme(page, 'light');
+  await toggle(page).click();
+  await expectTheme(page, 'dark');
+});
