@@ -228,3 +228,32 @@ def test_guest_cart_revision_defaults_tenant_isolation_and_cascade(db):
         ([a, b],),
     ).fetchone()[0] == 2
 
+
+def test_order_status_version_defaults_and_queue_index(db):
+    rid = add_restaurant(db)
+    oid = add_order(db, rid)
+    assert db.execute(
+        "SELECT status,version FROM live_orders WHERE restaurant_id=%s AND id=%s",
+        (rid, oid),
+    ).fetchone() == ("Submitted", 1)
+    for status in ("Accepted", "Preparing", "Ready", "Completed", "Rejected", "Cancelled"):
+        assert add_order(db, rid, status=status)
+    rejects(
+        db, errors.CheckViolation,
+        "INSERT INTO live_orders(restaurant_id,id,status,created_at,updated_at) "
+        "VALUES (%s,%s,%s,now(),now())",
+        (rid, uuid4(), "Paid"),
+    )
+    rejects(
+        db, errors.CheckViolation,
+        "UPDATE live_orders SET version=0 WHERE restaurant_id=%s AND id=%s",
+        (rid, oid),
+    )
+    indexes = {
+        row[0]: row[1] for row in db.execute(
+            "SELECT indexname,indexdef FROM pg_indexes WHERE schemaname=current_schema()"
+        ).fetchall()
+    }
+    assert "live_orders_queue" in indexes
+    assert "(restaurant_id, status, created_at DESC, id DESC)" in indexes["live_orders_queue"]
+
