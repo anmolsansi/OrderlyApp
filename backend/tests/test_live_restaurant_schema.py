@@ -179,3 +179,32 @@ def test_table_ids_and_labels_are_tenant_scoped(db):
         "SELECT COUNT(*) FROM live_tables WHERE id = %s", (shared_id,)
     ).fetchone()[0] == 2
 
+
+@pytest.mark.parametrize("invalid_label", ["", "x" * 31])
+def test_table_label_length_bounds_reject_invalid_values(db, invalid_label):
+    rid = mock_restaurant(db)
+    add_live(db, rid)
+    rejects(
+        db, errors.CheckViolation,
+        "INSERT INTO live_tables (restaurant_id,id,label) VALUES (%s,%s,%s)",
+        (rid, uuid4(), invalid_label),
+    )
+    assert db.execute(
+        "SELECT COUNT(*) FROM live_tables WHERE restaurant_id = %s", (rid,)
+    ).fetchone()[0] == 0
+
+
+def test_table_defaults_and_maximum_label(db):
+    rid = mock_restaurant(db)
+    add_live(db, rid)
+    tid = add_table(db, rid, "X" * 30)
+    assert db.execute(
+        "SELECT label, active, version FROM live_tables WHERE restaurant_id=%s AND id=%s",
+        (rid, tid),
+    ).fetchone() == ("X" * 30, True, 1)
+    rejects(
+        db, errors.CheckViolation,
+        "INSERT INTO live_tables(restaurant_id,id,label,version) VALUES (%s,%s,%s,%s)",
+        (rid, uuid4(), "T2", 0),
+    )
+
