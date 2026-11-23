@@ -101,3 +101,11 @@ Record a **source date** and **approval date** separately; they need not be the 
 | Future real restaurant with complete signed evidence | separate checks needed | possible | possible | **not asserted by RS-11** |
 
 For an unverified actual restaurant, downstream quote must respond `503 pricing_unconfigured` using the COMMON error envelope, **not** return a zero-tax fixture quote. Deployment, menu access, owner role or path `rid` is not a substitute for this check. Restaurant-specific policy must be actively selected by a verified owner/operator, never inferred from demo data.
+
+## 8. Negative cases, privacy and authority
+
+The companion fixture records missing approval, missing tax inclusion or taxable basis, unknown charges, missing receipt identity, stale `pricing_version`, foreign `restaurant_id`, mismatched receipt line sums, missing source date, fractional/negative/boolean/string paise, out-of-range amounts, and unsupported live tax/rounding policy. They are **contract-level rejected/blocked examples**, not claims that an as-yet-unbuilt provider returned a specific HTTP status.
+
+Once a live API exists: malformed money is `422 invalid_input` or `422 money_out_of_range`; an unknown/foreign resource is `404 not_found` without leaking existence; stale pricing/cart is `409 quote_changed` or the contract-specific stale code; missing profile is `503 pricing_unconfigured`; missing staff identity `401`, denied active membership `403`. Follow the frozen COMMON `{error:{code,message,fields,request_id}}` shape; do not invent success responses, alter shared error discriminants, or trust browser-provided prices/taxes.
+
+Privacy: only synthetic identifiers in source control. No receipts from real customers, staff token, GST registration, address, accountant contact, signed private source, or provider account credential here. Future owner approval and tenant scope must be rechecked at the actual write/read boundary. No database writes or network calls belong to this document ticket.
