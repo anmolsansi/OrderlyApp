@@ -92,3 +92,39 @@ test('denied persistence still toggles within the page but resets after reload',
   await page.reload();
   await expectTheme(page, 'light');
 });
+
+test('theme switch preserves an unsaved form node, its value and existing focus', async ({ page }) => {
+  await page.goto('/sign-in');
+  const name = page.getByLabel('Demo name');
+  await name.fill('Unsubmitted draft, do not replace');
+  await name.evaluate(element => { element.dataset.themeNode = 'original'; });
+  await name.focus();
+  // Programmatic activation checks that switching theme itself never steals form focus.
+  await page.evaluate(() => document.querySelector<HTMLButtonElement>('.live-theme-toggle')?.click());
+  await expectTheme(page, 'dark');
+  await expect(name).toHaveValue('Unsubmitted draft, do not replace');
+  await expect(name).toBeFocused();
+  expect(await name.getAttribute('data-theme-node')).toBe('original');
+  const button = toggle(page);
+  await button.focus();
+  await page.keyboard.press('Enter');
+  await expectTheme(page, 'light');
+  await expect(button).toBeFocused();
+  await expect(name).toHaveValue('Unsubmitted draft, do not replace');
+  expect(await name.getAttribute('data-theme-node')).toBe('original');
+});
+
+test('saved dark restores without a React hydration warning', async ({ page }) => {
+  const hydrationWarnings: string[] = [];
+  page.on('console', message => {
+    if (/hydration|did not match|server rendered html/i.test(message.text())) hydrationWarnings.push(message.text());
+  });
+  page.on('pageerror', error => {
+    if (/hydration|did not match|server rendered html/i.test(error.message)) hydrationWarnings.push(error.message);
+  });
+  await page.addInitScript(key => localStorage.setItem(key, 'dark'), THEME_KEY);
+  await page.goto('/sign-in');
+  await expectTheme(page, 'dark');
+  await expect(page.getByLabel('Demo name')).toBeVisible();
+  expect(hydrationWarnings).toEqual([]);
+});
