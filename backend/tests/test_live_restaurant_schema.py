@@ -249,3 +249,23 @@ def test_unknown_restaurant_or_demo_guest_rejected(db):
         "SELECT COUNT(*) FROM live_tables WHERE restaurant_id=%s", (rid,)
     ).fetchone()[0] == 0
 
+
+def test_parent_deletes_restricted_and_existing_live_rows_survive(db):
+    rid = mock_restaurant(db)
+    add_live(db, rid)
+    tid = add_table(db, rid)
+    rejects(
+        db, errors.ForeignKeyViolation,
+        "DELETE FROM restaurants WHERE id=%s",
+        (rid,),
+    )
+    rejects(
+        db, errors.ForeignKeyViolation,
+        "DELETE FROM live_restaurants WHERE restaurant_id=%s",
+        (rid,),
+    )
+    assert db.execute("SELECT id FROM restaurants WHERE id=%s", (rid,)).fetchone() == (rid,)
+    assert db.execute(
+        "SELECT id FROM live_tables WHERE restaurant_id=%s AND id=%s", (rid, tid)
+    ).fetchone() == (tid,)
+
