@@ -46,7 +46,37 @@
     "real_tax_inclusion": "OWNER DECISION REQUIRED",
     "real_taxable_basis": "OWNER DECISION REQUIRED"
   },
-  "positive_cases": [],
+  "positive_cases": [
+    {
+      "id": "zero_discount",
+      "contract_id": "CON-11",
+      "schema_version": 1,
+      "synthetic": true,
+      "pricing_version": 1,
+      "input": {
+        "restaurant_id": "r-demo",
+        "lines": [
+          {
+            "unit_minor": 1200,
+            "quantity": 1
+          }
+        ],
+        "offer": {
+          "percent_bps": 0,
+          "max_discount_minor": 0
+        }
+      },
+      "expected": {
+        "currency": "INR",
+        "subtotal_minor": 1200,
+        "discount_minor": 0,
+        "tax_minor": 0,
+        "charges_minor": 0,
+        "total_minor": 1200
+      },
+      "hand_calculation": "1 * 1200 = 1200; floor(1200 * 0 / 10000)=0; total=1200-0+0+0=1200"
+    }
+  ],
   "receipt_example": null,
   "negative_cases": [],
   "evidence_gate": {
