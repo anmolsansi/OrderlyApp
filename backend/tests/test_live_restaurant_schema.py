@@ -208,3 +208,20 @@ def test_table_defaults_and_maximum_label(db):
         (rid, uuid4(), "T2", 0),
     )
 
+
+@pytest.mark.parametrize("field, bad", [
+    ("version", 0),
+    ("catalog_version", -1),
+    ("timezone", "UTC"),
+])
+def test_invalid_restaurant_config_is_rejected(db, field, bad):
+    rid = mock_restaurant(db)
+    rejects(
+        db, errors.CheckViolation,
+        f"INSERT INTO live_restaurants (restaurant_id, brand_label, {field}) VALUES (%s,%s,%s)",
+        (rid, "Invalid config", bad),
+    )
+    assert db.execute(
+        "SELECT COUNT(*) FROM live_restaurants WHERE restaurant_id=%s", (rid,)
+    ).fetchone()[0] == 0
+
