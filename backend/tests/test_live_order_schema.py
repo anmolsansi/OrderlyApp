@@ -649,3 +649,21 @@ def test_migration_runner_replay_keeps_checksum_and_no_reseed(postgres_database_
             "       (SELECT COUNT(*) FROM live_payment_events)"
         ).fetchone() == before
 
+
+def test_frozen_rs01_fixture_is_synthetic_inr_and_never_live_activation(db):
+    fixture = json.loads(FROZEN.read_text(encoding="utf-8"))
+    assert fixture["contract_set"] == "restaurant-service/live-v1"
+    assert fixture["schema_version"] == 1
+    assert fixture["synthetic"] is True
+    assert fixture["money_unit"] == "INR paise"
+    assert fixture["live_activation"] is False
+    rid = add_restaurant(db)
+    oid = add_order(db, rid)
+    payload = add_receipt(db, rid, oid)
+    assert payload["schema_version"] == fixture["schema_version"]
+    assert payload["currency"] == "INR"
+    assert db.execute(
+        "SELECT ordering_enabled FROM live_restaurants WHERE restaurant_id=%s",
+        (rid,),
+    ).fetchone() == (False,)
+
