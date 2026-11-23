@@ -574,3 +574,78 @@ def test_legacy_mock_order_tables_remain_separate_and_orders_restrict_delete(db)
         (rid, oid),
     ).fetchone()[0] == 1
 
+
+def test_008_applies_to_isolated_legacy_schema_without_dropping_history(db):
+    """Additive upgrade and app rollback retain both mock and live tables.
+
+    This transaction-local schema is discarded on fixture rollback; it cannot
+    serve as proof of an actual deployed app rollback.
+    """
+    schema = f"rs03_upgrade_{uuid4().hex[:12]}"
+    db.execute(sql.SQL("CREATE SCHEMA {}").format(sql.Identifier(schema)))
+    db.execute(sql.SQL("SET LOCAL search_path TO {}").format(sql.Identifier(schema)))
+    db.execute("CREATE TABLE restaurants (id TEXT PRIMARY KEY, name TEXT NOT NULL)")
+    db.execute("CREATE TABLE guest_sessions (id TEXT PRIMARY KEY)")
+    db.execute("CREATE TABLE guest_orders (id UUID PRIMARY KEY, snapshot JSONB NOT NULL)")
+    legacy_id = f"legacy-{uuid4().hex}"
+    legacy_receipt_id = uuid4()
+    old_receipt = {"id": str(legacy_receipt_id), "kind": "mock-v1", "total_cents": 1200}
+    db.execute("INSERT INTO restaurants(id,name) VALUES (%s,%s)", (legacy_id, "Mock fixture"))
+    db.execute(
+        "INSERT INTO guest_orders(id,snapshot) VALUES (%s,%s::jsonb)",
+        (legacy_receipt_id, json.dumps(old_receipt)),
+    )
+    db.execute((ROOT / "backend/migrations/007_live_restaurants.sql").read_text())
+    db.execute(MIGRATION.read_text(encoding="utf-8"))
+    assert db.execute(
+        "SELECT snapshot FROM guest_orders WHERE id=%s",
+        (legacy_receipt_id,),
+    ).fetchone()[0] == old_receipt
+    assert db.execute("SELECT COUNT(*) FROM live_orders").fetchone() == (0,)
+    assert db.execute("SELECT COUNT(*) FROM live_payment_events").fetchone() == (0,)
+    assert db.execute("SELECT COUNT(*) FROM live_receipts").fetchone() == (0,)
+    assert db.execute("SELECT COUNT(*) FROM live_commands").fetchone() == (0,)
+    # Reverting application code does not invoke a reverse migration or DROP.
+    assert db.execute(
+        "SELECT to_regclass('live_orders') IS NOT NULL, "
+        "to_regclass('guest_orders') IS NOT NULL"
+    ).fetchone() == (True, True)
+
+
+def test_migration_runner_replay_keeps_checksum_and_no_reseed(postgres_database_url):
+    expected = hashlib.sha256(MIGRATION.read_bytes()).hexdigest()
+    with psycopg.connect(postgres_database_url) as connection:
+        assert connection.execute(
+            "SELECT checksum_sha256 FROM schema_migrations WHERE version=%s",
+            (MIGRATION.name,),
+        ).fetchone() == (expected,)
+        before = connection.execute(
+            "SELECT (SELECT COUNT(*) FROM guest_orders),"
+            "       (SELECT COUNT(*) FROM live_orders),"
+            "       (SELECT COUNT(*) FROM live_payment_events)"
+        ).fetchone()
+
+    env = os.environ.copy()
+    env.pop("ORDERLY_FORCE_JSON_STORE", None)
+    env["DATABASE_URL"] = postgres_database_url
+    for _ in range(2):
+        run = subprocess.run(
+            [sys.executable, "backend/scripts/migrate.py"],
+            cwd=ROOT, env=env, capture_output=True, text=True,
+            timeout=45, check=False,
+        )
+        assert run.returncode == 0, "Migration runner must replay cleanly"
+        assert "Migrations complete" in run.stdout
+        assert f"Applied migration {MIGRATION.name}" not in run.stdout
+
+    with psycopg.connect(postgres_database_url) as connection:
+        assert connection.execute(
+            "SELECT checksum_sha256 FROM schema_migrations WHERE version=%s",
+            (MIGRATION.name,),
+        ).fetchone() == (expected,)
+        assert connection.execute(
+            "SELECT (SELECT COUNT(*) FROM guest_orders),"
+            "       (SELECT COUNT(*) FROM live_orders),"
+            "       (SELECT COUNT(*) FROM live_payment_events)"
+        ).fetchone() == before
+
