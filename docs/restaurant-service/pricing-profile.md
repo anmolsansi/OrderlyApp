@@ -67,3 +67,9 @@ All amounts in this table are **paise**, not rupees. The examples are pinned in 
 | maximum_total | 1 × 2,147,483,647 | 0 bps → 0 | 0 | 0 | **2,147,483,647** |
 
 The rounding boundary above is **discount floor in paise**. It does not establish tax/GST/invoice rounding. If `sum(line_minor)`, `subtotal_minor + charges_minor`, or a final amount exceeds 2,147,483,647, reject it instead of wrapping or truncating.
+
+## 5. Receipt snapshot and identity boundary
+
+The synthetic receipt example in `pricing.json` mirrors the frozen RS-01 `LiveOrderReceipt` shape: `schema_version=1`, `kind="live-v1"`, UUID `id`, UTC `created_at`, `payment_instruction="Pay at restaurant"`, `fulfillment`, optional `table_id`/`table_label`, `restaurant_id`, `restaurant_name`, server-validated `items`, `totals`, `pricing_version`, `promotion_code`, `offer_version`, `business_identity`, and `synthetic=true`. No online-payment or tip field is present.
+
+Fixture example: `r-demo`, one pizza line at 1,200 paise, 0 discount, 0 tax, 0 charges, total 1,200 INR paise. `business_identity={}` is valid **only** because the example is synthetic. Actual legal name, address, registration or tax numbers, jurisdiction-specific receipt fields, invoice title/numbering, exemptions, rounding presentation, transaction date/time, mandatory text and evidence must be supplied and approved by the **named restaurant owner/accountant**. Do not guess which fields or wording are legally required.
