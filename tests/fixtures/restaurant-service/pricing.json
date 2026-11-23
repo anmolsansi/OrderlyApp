@@ -608,10 +608,37 @@
     "status": "BLOCKED_U1",
     "live_ready": false,
     "synthetic_vectors_pass_do_not_unblock": true,
-    "required_approvals": [],
+    "required_approvals": [
+      "named_restaurant_id",
+      "named_owner_or_accountant_and_role",
+      "private_source_pointer",
+      "source_date",
+      "approval_date",
+      "pricing_version_and_effective_date",
+      "real_menu_price_list",
+      "tax_inclusion",
+      "tax_basis_after_discount",
+      "tax_rate_and_exemption_policy",
+      "tax_and_cash_rounding",
+      "applicable_charges_and_taxability",
+      "approved_receipt_business_identity",
+      "required_receipt_fields_and_wording",
+      "reconciled_dated_real_receipt_sample",
+      "change_and_rollback_owner"
+    ],
     "source_date": null,
     "approval_date": null,
-    "real_receipt_sample_pointer": null
+    "real_receipt_sample_pointer": null,
+    "blocked_conditions": [
+      "any_required_approval_missing",
+      "synthetic_profile",
+      "source_or_approval_is_stale",
+      "sample_totals_do_not_reconcile",
+      "sample_not_scoped_to_restaurant",
+      "receipt_identity_is_empty",
+      "policy_exceeds_frozen_contract"
+    ],
+    "not_a_runtime_decision_function": true
   },
   "conformance": {
     "source_contract_id": "CON-11",
