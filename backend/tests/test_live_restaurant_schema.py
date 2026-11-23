@@ -281,3 +281,24 @@ def test_guest_deletion_nulls_demo_owner_without_deleting_restaurant(db):
     ).fetchone() == (True, None, False)
     assert db.execute("SELECT id FROM restaurants WHERE id=%s", (rid,)).fetchone() == (rid,)
 
+
+def test_valid_india_hours_and_pricing_profile_round_trip_without_activation(db):
+    rid = mock_restaurant(db)
+    hours = [
+        {"day": 1, "opens_minute": 1380, "closes_minute": 1440},
+        {"day": 2, "opens_minute": 0, "closes_minute": 60},
+    ]
+    profile = {"display_only": "U1 approval required"}
+    db.execute(
+        """INSERT INTO live_restaurants
+           (restaurant_id,brand_label,hours,pricing_profile,synthetic)
+           VALUES (%s,%s,%s::jsonb,%s::jsonb,%s)""",
+        (rid, "Café का नाम", json.dumps(hours), json.dumps(profile), True),
+    )
+    row = db.execute(
+        """SELECT brand_label,timezone,hours,pricing_profile,synthetic,ordering_enabled
+           FROM live_restaurants WHERE restaurant_id=%s""",
+        (rid,),
+    ).fetchone()
+    assert row == ("Café का नाम", "Asia/Kolkata", hours, profile, True, False)
+
