@@ -384,3 +384,28 @@ def test_migration_runner_replay_keeps_checksum_and_rows(postgres_database_url):
                       (SELECT COUNT(*) FROM live_tables)"""
         ).fetchone() == baseline
 
+
+def test_frozen_rs01_fixture_maps_to_disabled_live_restaurant(db):
+    fixture = json.loads(FROZEN_FIXTURE.read_text(encoding="utf-8"))
+    assert fixture["contract_set"] == "restaurant-service/live-v1"
+    assert fixture["schema_version"] == 1
+    assert fixture["synthetic"] is True
+    assert fixture["money_unit"] == "INR paise"
+    assert fixture["live_activation"] is False
+    expected = fixture["core"]["restaurant"]
+    rid = mock_restaurant(db)
+    add_live(
+        db, rid,
+        brand_label=expected["brand_label"],
+        timezone=expected["timezone"],
+        ordering_enabled=expected["ordering_enabled"],
+        synthetic=True,
+    )
+    assert db.execute(
+        """SELECT brand_label,timezone,ordering_enabled,synthetic
+           FROM live_restaurants WHERE restaurant_id=%s""",
+        (rid,),
+    ).fetchone() == (
+        expected["brand_label"], expected["timezone"], False, True
+    )
+
