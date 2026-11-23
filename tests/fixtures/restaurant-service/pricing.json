@@ -284,7 +284,44 @@
       "hand_calculation": "Maximum allowed unit and subtotal=2147483647; no discount, tax or charges; total=2147483647"
     }
   ],
-  "receipt_example": null,
+  "receipt_example": {
+    "fulfillment": "dine_in",
+    "table_id": "00000002-1111-4111-8111-111111111111",
+    "restaurant_id": "r-demo",
+    "restaurant_name": "Synthetic Restaurant",
+    "table_label": "T1",
+    "items": [
+      {
+        "id": "line-one",
+        "restaurant_id": "r-demo",
+        "menu_item_id": "i-one",
+        "quantity": 1,
+        "modifiers": [],
+        "special_instructions": null,
+        "name": "Sample Pizza",
+        "unit_minor": 1200,
+        "line_minor": 1200
+      }
+    ],
+    "totals": {
+      "currency": "INR",
+      "subtotal_minor": 1200,
+      "discount_minor": 0,
+      "tax_minor": 0,
+      "charges_minor": 0,
+      "total_minor": 1200
+    },
+    "pricing_version": 1,
+    "promotion_code": null,
+    "offer_version": null,
+    "business_identity": {},
+    "synthetic": true,
+    "schema_version": 1,
+    "kind": "live-v1",
+    "id": "00000001-1111-4111-8111-111111111111",
+    "created_at": "2026-10-11T09:00:00+00:00",
+    "payment_instruction": "Pay at restaurant"
+  },
   "negative_cases": [],
   "evidence_gate": {
     "status": "BLOCKED_U1",
@@ -303,5 +340,11 @@
     "postgreSQL_conformance_verified": false,
     "live_quote_verified": false,
     "existing_rs01_fixture_mutated": false
+  },
+  "receipt_checks": {
+    "matches_rs01_core_receipt": true,
+    "corresponding_positive_case": "zero_discount",
+    "business_identity_empty_synthetic_only": true,
+    "real_sample_approved": false
   }
 }
