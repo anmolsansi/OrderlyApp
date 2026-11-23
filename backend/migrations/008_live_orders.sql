@@ -38,3 +38,14 @@ CREATE TABLE live_receipts (
     CHECK (snapshot->>'id' = id::text),
     CHECK (snapshot->>'restaurant_id' = restaurant_id)
 );
+
+-- Guest visibility can expire independently of restaurant-owned order history.
+CREATE TABLE live_guest_access (
+    restaurant_id TEXT NOT NULL,
+    order_id UUID NOT NULL,
+    guest_id TEXT NOT NULL REFERENCES guest_sessions(id) ON DELETE CASCADE,
+    revoked_at TIMESTAMPTZ NULL,
+    PRIMARY KEY (restaurant_id, order_id, guest_id),
+    FOREIGN KEY (restaurant_id, order_id)
+        REFERENCES live_orders(restaurant_id, id) ON DELETE RESTRICT
+);
