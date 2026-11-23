@@ -391,3 +391,23 @@ def test_operational_event_version_is_unique_and_not_contiguous(db):
         (rid, oid),
     ).fetchall() == [(first,), (later,)]
 
+
+def test_order_events_are_append_only(db):
+    rid = add_restaurant(db)
+    oid = add_order(db, rid)
+    event_id = add_order_event(db, rid, oid)
+    rejects(
+        db, errors.CheckViolation,
+        "UPDATE live_order_events SET reason='changed' WHERE restaurant_id=%s AND id=%s",
+        (rid, event_id),
+    )
+    rejects(
+        db, errors.CheckViolation,
+        "DELETE FROM live_order_events WHERE restaurant_id=%s AND id=%s",
+        (rid, event_id),
+    )
+    assert db.execute(
+        "SELECT reason FROM live_order_events WHERE restaurant_id=%s AND id=%s",
+        (rid, event_id),
+    ).fetchone() == (None,)
+
