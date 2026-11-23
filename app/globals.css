@@ -1737,3 +1737,21 @@ html[data-theme='light'] {
   --live-link: #6d28d9;
   --live-link-visited: #9d174d;
 }
+
+html[data-theme='dark'] {
+  color-scheme: dark;
+  --live-page: #09090b;
+  --live-panel: #111113;
+  --live-panel-secondary: #18181b;
+  --live-text: #f4f4f5;
+  --live-muted: #a1a1aa;
+  --live-border: #52525b;
+  --live-primary-background: #a78bfa;
+  --live-primary-text: #09090b;
+  --live-success: #86efac;
+  --live-warning: #fcd34d;
+  --live-error: #fca5a5;
+  --live-focus: #a78bfa;
+  --live-link: #c4b5fd;
+  --live-link-visited: #f9a8d4;
+}
