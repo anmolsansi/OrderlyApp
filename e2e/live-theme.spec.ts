@@ -33,3 +33,13 @@ test('saved dark applies before hydration or any external scripts load', async (
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   expect(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe('dark');
 });
+
+test('unknown stored preference cannot select a third theme', async ({ page }) => {
+  await page.addInitScript(key => localStorage.setItem(key, 'system'), THEME_KEY);
+  await page.goto('/sign-in');
+  await expectTheme(page, 'light');
+  expect(await page.evaluate(key => localStorage.getItem(key), THEME_KEY)).toBe('system');
+  await toggle(page).click();
+  await expectTheme(page, 'dark');
+  expect(await page.evaluate(key => localStorage.getItem(key), THEME_KEY)).toBe('dark');
+});
