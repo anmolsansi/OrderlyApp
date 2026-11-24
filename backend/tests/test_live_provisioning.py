@@ -18,6 +18,7 @@ from scripts.provision_live_restaurant import (
     validate_input_object,
     _insert_compatibility_restaurant,
     _insert_live_restaurant,
+    provision_restaurant,
 )
 
 
@@ -342,3 +343,20 @@ def test_live_insert_keeps_ordering_disabled_and_uses_db_a_defaults(db):
         False,
         None,
     )
+
+
+def test_provision_restaurant_creates_both_rows_in_one_transaction(db):
+    restaurant_id = f"rs67-{uuid4().hex}"
+    payload = validate_input_object(valid_input_object(restaurant_id=restaurant_id))
+
+    result = provision_restaurant(db, payload)
+
+    assert result == restaurant_id
+    assert db.execute(
+        "SELECT id FROM restaurants WHERE id=%s", (restaurant_id,)
+    ).fetchone() == (restaurant_id,)
+    assert db.execute(
+        """SELECT restaurant_id,ordering_enabled
+           FROM live_restaurants WHERE restaurant_id=%s""",
+        (restaurant_id,),
+    ).fetchone() == (restaurant_id, False)

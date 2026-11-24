@@ -176,6 +176,13 @@ def _insert_live_restaurant(connection: Any, payload: ProvisioningInput) -> None
     )
 
 
+def provision_restaurant(connection: Any, payload: ProvisioningInput) -> str:
+    with connection.transaction():
+        _insert_compatibility_restaurant(connection, payload)
+        _insert_live_restaurant(connection, payload)
+    return payload.restaurant_id
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Provision a disabled live restaurant from a private JSON file.",
