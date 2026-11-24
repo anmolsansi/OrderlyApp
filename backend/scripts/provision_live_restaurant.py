@@ -16,6 +16,17 @@ class ProvisioningInputError(ValueError):
     pass
 
 
+class ProvisioningError(RuntimeError):
+    pass
+
+
+def require_target_environment() -> str:
+    environment = os.getenv("ORDERLY_ENVIRONMENT", "").strip()
+    if not environment:
+        raise ProvisioningError("ORDERLY_ENVIRONMENT must be set explicitly")
+    return environment
+
+
 class DuplicateJSONKeyError(ValueError):
     pass
 

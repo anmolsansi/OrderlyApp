@@ -248,3 +248,20 @@ def test_hours_schema_enforces_the_fourteen_entry_limit():
         validate_input_object(valid_input_object(hours=fourteen + [
             {"day": 1, "opens_minute": 120, "closes_minute": 180}
         ]))
+
+
+def test_target_environment_requires_an_explicit_value(monkeypatch):
+    from scripts.provision_live_restaurant import ProvisioningError, require_target_environment
+
+    monkeypatch.delenv("ORDERLY_ENVIRONMENT", raising=False)
+
+    with pytest.raises(ProvisioningError, match="ORDERLY_ENVIRONMENT"):
+        require_target_environment()
+
+
+def test_target_environment_returns_the_explicit_name_without_guessing(monkeypatch):
+    from scripts.provision_live_restaurant import require_target_environment
+
+    monkeypatch.setenv("ORDERLY_ENVIRONMENT", "test")
+
+    assert require_target_environment() == "test"
