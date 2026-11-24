@@ -155,6 +155,27 @@ def _insert_compatibility_restaurant(connection: Any, payload: ProvisioningInput
     )
 
 
+def _insert_live_restaurant(connection: Any, payload: ProvisioningInput) -> None:
+    hours_json = json.dumps(
+        [interval.model_dump(mode="json") for interval in payload.hours],
+        separators=(",", ":"),
+    )
+    connection.execute(
+        """
+        INSERT INTO live_restaurants (
+            restaurant_id, brand_label, timezone, hours, ordering_enabled
+        )
+        VALUES (%s, %s, %s, %s::jsonb, false)
+        """,
+        (
+            payload.restaurant_id,
+            payload.brand_label,
+            payload.timezone,
+            hours_json,
+        ),
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Provision a disabled live restaurant from a private JSON file.",

@@ -17,6 +17,7 @@ from scripts.provision_live_restaurant import (
     read_input_text,
     validate_input_object,
     _insert_compatibility_restaurant,
+    _insert_live_restaurant,
 )
 
 
@@ -302,4 +303,42 @@ def test_compatibility_insert_uses_only_the_fixed_non_live_placeholders(db):
         0,
         "",
         [],
+    )
+
+
+def test_live_insert_keeps_ordering_disabled_and_uses_db_a_defaults(db):
+    restaurant_id = f"rs67-{uuid4().hex}"
+    payload = validate_input_object(valid_input_object(
+        restaurant_id=restaurant_id,
+        hours=[
+            {"day": 1, "opens_minute": 540, "closes_minute": 1020},
+            {"day": 2, "opens_minute": 0, "closes_minute": 60},
+        ],
+    ))
+    _insert_compatibility_restaurant(db, payload)
+
+    _insert_live_restaurant(db, payload)
+
+    row = db.execute(
+        """SELECT restaurant_id,brand_label,timezone,hours,ordering_enabled,
+                  version,catalog_version,pricing_version,pricing_profile,
+                  synthetic,demo_owner_id
+           FROM live_restaurants WHERE restaurant_id=%s""",
+        (restaurant_id,),
+    ).fetchone()
+    assert row == (
+        restaurant_id,
+        "Test Brand",
+        "Asia/Kolkata",
+        [
+            {"day": 1, "opens_minute": 540, "closes_minute": 1020},
+            {"day": 2, "opens_minute": 0, "closes_minute": 60},
+        ],
+        False,
+        1,
+        1,
+        1,
+        None,
+        False,
+        None,
     )
