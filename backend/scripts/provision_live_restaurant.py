@@ -7,7 +7,7 @@ from pathlib import Path
 import sys
 from typing import Literal, Optional, Sequence
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 MAX_INPUT_BYTES = 64 * 1024
 
@@ -50,6 +50,20 @@ def parse_input_text(text: str) -> dict:
     return payload
 
 
+class HoursInterval(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    day: int = Field(ge=1, le=7)
+    opens_minute: int = Field(ge=0, le=1439)
+    closes_minute: int = Field(ge=1, le=1440)
+
+    @model_validator(mode="after")
+    def validate_interval_order(self) -> "HoursInterval":
+        if self.opens_minute >= self.closes_minute:
+            raise ValueError("opens_minute must be less than closes_minute")
+        return self
+
+
 class ProvisioningInput(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
@@ -58,7 +72,7 @@ class ProvisioningInput(BaseModel):
     cuisine: str = Field(min_length=1)
     brand_label: str = Field(min_length=1, max_length=60)
     timezone: Literal["Asia/Kolkata"]
-    hours: list[dict] = Field(max_length=14)
+    hours: list[HoursInterval] = Field(max_length=14)
 
     @field_validator("restaurant_id", "name", "cuisine", "brand_label")
     @classmethod

@@ -166,3 +166,45 @@ def test_input_schema_requires_the_frozen_india_timezone(timezone):
 
     with pytest.raises(ProvisioningInputError, match="timezone"):
         validate_input_object(valid_input_object(timezone=timezone))
+
+
+def test_hours_schema_accepts_valid_and_boundary_intervals():
+    from scripts.provision_live_restaurant import validate_input_object
+
+    parsed = validate_input_object(valid_input_object(hours=[
+        {"day": 1, "opens_minute": 0, "closes_minute": 1440},
+        {"day": 2, "opens_minute": 540, "closes_minute": 1320},
+    ]))
+
+    assert parsed.hours[0].opens_minute == 0
+    assert parsed.hours[0].closes_minute == 1440
+
+
+@pytest.mark.parametrize(
+    "interval",
+    [
+        {"day": 0, "opens_minute": 0, "closes_minute": 60},
+        {"day": 8, "opens_minute": 0, "closes_minute": 60},
+        {"day": 1, "opens_minute": -1, "closes_minute": 60},
+        {"day": 1, "opens_minute": 1440, "closes_minute": 1440},
+        {"day": 1, "opens_minute": 60, "closes_minute": 0},
+        {"day": 1, "opens_minute": 120, "closes_minute": 120},
+        {"day": 1, "opens_minute": 180, "closes_minute": 120},
+        {"day": True, "opens_minute": 0, "closes_minute": 60},
+        {"day": 1, "opens_minute": 1.5, "closes_minute": 60},
+    ],
+)
+def test_hours_schema_rejects_invalid_interval_values(interval):
+    from scripts.provision_live_restaurant import validate_input_object
+
+    with pytest.raises(ProvisioningInputError):
+        validate_input_object(valid_input_object(hours=[interval]))
+
+
+def test_hours_schema_rejects_unknown_interval_fields():
+    from scripts.provision_live_restaurant import validate_input_object
+
+    with pytest.raises(ProvisioningInputError):
+        validate_input_object(valid_input_object(hours=[
+            {"day": 1, "opens_minute": 0, "closes_minute": 60, "open": True}
+        ]))
