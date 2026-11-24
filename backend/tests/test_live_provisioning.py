@@ -60,3 +60,33 @@ def test_input_reader_reports_missing_file_without_exposing_path(tmp_path):
 
     assert str(error.value) == "input file cannot be read"
     assert "private-secret-input" not in str(error.value)
+
+
+@pytest.mark.parametrize("text", ["{", '{"restaurant_id":', "not-json"])
+def test_json_parser_rejects_malformed_input(text):
+    from scripts.provision_live_restaurant import parse_input_text
+
+    with pytest.raises(ProvisioningInputError, match="valid JSON"):
+        parse_input_text(text)
+
+
+def test_json_parser_rejects_duplicate_keys_at_any_depth():
+    from scripts.provision_live_restaurant import parse_input_text
+
+    with pytest.raises(ProvisioningInputError, match="duplicate keys"):
+        parse_input_text('{"restaurant_id":"first","nested":{"id":1,"id":2}}')
+
+
+@pytest.mark.parametrize("text", ["[]", "null", '"restaurant"', "17"])
+def test_json_parser_requires_a_top_level_object(text):
+    from scripts.provision_live_restaurant import parse_input_text
+
+    with pytest.raises(ProvisioningInputError, match="JSON object"):
+        parse_input_text(text)
+
+
+def test_json_parser_rejects_non_standard_numeric_constants():
+    from scripts.provision_live_restaurant import parse_input_text
+
+    with pytest.raises(ProvisioningInputError, match="valid JSON"):
+        parse_input_text('{"hours":NaN}')

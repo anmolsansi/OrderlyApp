@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 from pathlib import Path
 import sys
@@ -11,6 +12,40 @@ MAX_INPUT_BYTES = 64 * 1024
 
 class ProvisioningInputError(ValueError):
     pass
+
+
+class DuplicateJSONKeyError(ValueError):
+    pass
+
+
+def _unique_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise DuplicateJSONKeyError("duplicate JSON key")
+        result[key] = value
+    return result
+
+
+def _reject_json_constant(_value: str):
+    raise ValueError("non-standard JSON constant")
+
+
+def parse_input_text(text: str) -> dict:
+    try:
+        payload = json.loads(
+            text,
+            object_pairs_hook=_unique_object,
+            parse_constant=_reject_json_constant,
+        )
+    except DuplicateJSONKeyError:
+        raise ProvisioningInputError("input JSON contains duplicate keys") from None
+    except (json.JSONDecodeError, ValueError):
+        raise ProvisioningInputError("input must be valid JSON") from None
+
+    if not isinstance(payload, dict):
+        raise ProvisioningInputError("input must be a JSON object")
+    return payload
 
 
 def read_input_text(path: Path) -> str:
