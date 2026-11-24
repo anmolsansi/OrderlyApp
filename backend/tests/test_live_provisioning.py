@@ -138,3 +138,31 @@ def test_input_schema_rejects_wrong_field_types(field):
 
     with pytest.raises(ProvisioningInputError):
         validate_input_object(valid_input_object(**{field: 17}))
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("restaurant_id", ""),
+        ("restaurant_id", "r" * 101),
+        ("name", ""),
+        ("name", "n" * 121),
+        ("cuisine", ""),
+        ("brand_label", ""),
+        ("brand_label", "b" * 61),
+        ("name", "   "),
+    ],
+)
+def test_input_schema_enforces_string_bounds_and_nonblank_values(field, value):
+    from scripts.provision_live_restaurant import validate_input_object
+
+    with pytest.raises(ProvisioningInputError):
+        validate_input_object(valid_input_object(**{field: value}))
+
+
+@pytest.mark.parametrize("timezone", ["UTC", "Asia/Calcutta", "asia/kolkata"])
+def test_input_schema_requires_the_frozen_india_timezone(timezone):
+    from scripts.provision_live_restaurant import validate_input_object
+
+    with pytest.raises(ProvisioningInputError, match="timezone"):
+        validate_input_object(valid_input_object(timezone=timezone))

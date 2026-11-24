@@ -7,7 +7,7 @@ from pathlib import Path
 import sys
 from typing import Literal, Optional, Sequence
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 MAX_INPUT_BYTES = 64 * 1024
 
@@ -53,12 +53,19 @@ def parse_input_text(text: str) -> dict:
 class ProvisioningInput(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    restaurant_id: str
-    name: str
-    cuisine: str
-    brand_label: str
+    restaurant_id: str = Field(min_length=1, max_length=100)
+    name: str = Field(min_length=1, max_length=120)
+    cuisine: str = Field(min_length=1)
+    brand_label: str = Field(min_length=1, max_length=60)
     timezone: Literal["Asia/Kolkata"]
     hours: list[dict] = Field(max_length=14)
+
+    @field_validator("restaurant_id", "name", "cuisine", "brand_label")
+    @classmethod
+    def reject_blank_strings(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("must not be blank")
+        return value
 
 
 def validate_input_object(payload: dict) -> ProvisioningInput:
