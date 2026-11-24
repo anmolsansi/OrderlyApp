@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 import json
 import os
+
+import psycopg
 from pathlib import Path
 import sys
 from typing import Any, Literal, Optional, Sequence
@@ -177,9 +179,12 @@ def _insert_live_restaurant(connection: Any, payload: ProvisioningInput) -> None
 
 
 def provision_restaurant(connection: Any, payload: ProvisioningInput) -> str:
-    with connection.transaction():
-        _insert_compatibility_restaurant(connection, payload)
-        _insert_live_restaurant(connection, payload)
+    try:
+        with connection.transaction():
+            _insert_compatibility_restaurant(connection, payload)
+            _insert_live_restaurant(connection, payload)
+    except psycopg.errors.UniqueViolation:
+        raise ProvisioningError("restaurant_id already exists") from None
     return payload.restaurant_id
 
 

@@ -360,3 +360,22 @@ def test_provision_restaurant_creates_both_rows_in_one_transaction(db):
            FROM live_restaurants WHERE restaurant_id=%s""",
         (restaurant_id,),
     ).fetchone() == (restaurant_id, False)
+
+
+def test_duplicate_restaurant_id_is_refused_without_partial_live_row(db):
+    restaurant_id = f"rs67-{uuid4().hex}"
+    payload = validate_input_object(valid_input_object(restaurant_id=restaurant_id))
+    _insert_compatibility_restaurant(db, payload)
+
+    from scripts.provision_live_restaurant import ProvisioningError
+
+    with pytest.raises(ProvisioningError, match="restaurant_id already exists"):
+        provision_restaurant(db, payload)
+
+    assert db.execute(
+        "SELECT COUNT(*) FROM restaurants WHERE id=%s", (restaurant_id,)
+    ).fetchone() == (1,)
+    assert db.execute(
+        "SELECT COUNT(*) FROM live_restaurants WHERE restaurant_id=%s",
+        (restaurant_id,),
+    ).fetchone() == (0,)
