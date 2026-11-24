@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from contextlib import nullcontext
 from pathlib import Path
+import json
 import sys
 from uuid import uuid4
 
@@ -465,3 +467,65 @@ def test_provisioning_does_not_adopt_or_copy_existing_mock_catalog(db):
         "SELECT ordering_enabled FROM live_restaurants WHERE restaurant_id=%s",
         (new_id,),
     ).fetchone() == (False,)
+
+
+def test_cli_success_prints_only_the_new_restaurant_id(db, tmp_path, monkeypatch, capsys):
+    from scripts import provision_live_restaurant as cli
+
+    restaurant_id = f"rs67-{uuid4().hex}"
+    payload = valid_input_object(restaurant_id=restaurant_id)
+    source = tmp_path / "private-restaurant.json"
+    source.write_text(json.dumps(payload), encoding="utf-8")
+    monkeypatch.setenv("ORDERLY_ENVIRONMENT", "test")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://test-only")
+    monkeypatch.delenv("ORDERLY_FORCE_JSON_STORE", raising=False)
+    monkeypatch.setattr(cli, "get_connection", lambda: nullcontext(db))
+
+    exit_code = cli.main(["--input", str(source)])
+
+    output = capsys.readouterr()
+    assert exit_code == 0
+    assert output.out == f"{restaurant_id}\n"
+    assert output.err == ""
+
+
+def test_cli_fails_before_connecting_when_environment_is_missing(tmp_path, monkeypatch, capsys):
+    from scripts import provision_live_restaurant as cli
+
+    source = tmp_path / "restaurant.json"
+    source.write_text(json.dumps(valid_input_object()), encoding="utf-8")
+    monkeypatch.delenv("ORDERLY_ENVIRONMENT", raising=False)
+    monkeypatch.setenv("DATABASE_URL", "postgresql://test-only")
+    monkeypatch.setattr(
+        cli,
+        "get_connection",
+        lambda: pytest.fail("database connection must not be opened"),
+    )
+
+    exit_code = cli.main(["--input", str(source)])
+
+    output = capsys.readouterr()
+    assert exit_code == 2
+    assert output.out == ""
+    assert "ORDERLY_ENVIRONMENT" in output.err
+
+
+def test_cli_fails_when_postgres_url_is_not_explicit(tmp_path, monkeypatch, capsys):
+    from scripts import provision_live_restaurant as cli
+
+    source = tmp_path / "restaurant.json"
+    source.write_text(json.dumps(valid_input_object()), encoding="utf-8")
+    monkeypatch.setenv("ORDERLY_ENVIRONMENT", "test")
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setattr(
+        cli,
+        "get_connection",
+        lambda: pytest.fail("database connection must not be opened"),
+    )
+
+    exit_code = cli.main(["--input", str(source)])
+
+    output = capsys.readouterr()
+    assert exit_code == 2
+    assert output.out == ""
+    assert "DATABASE_URL" in output.err

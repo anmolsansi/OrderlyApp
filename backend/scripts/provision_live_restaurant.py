@@ -11,6 +11,11 @@ from typing import Any, Literal, Optional, Sequence
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from app.database import get_connection
+
 MAX_INPUT_BYTES = 64 * 1024
 
 
@@ -204,9 +209,32 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = build_parser()
-    parser.parse_args(argv)
-    parser.error("restaurant provisioning is not available yet")
-    return 2
+    args = parser.parse_args(argv)
+
+    try:
+        require_target_environment()
+        if not os.getenv("DATABASE_URL", "").strip() or os.getenv("ORDERLY_FORCE_JSON_STORE") == "1":
+            raise ProvisioningError(
+                "PostgreSQL DATABASE_URL must be configured and JSON store mode disabled"
+            )
+        payload = validate_input_object(parse_input_text(read_input_text(args.input)))
+        with get_connection() as connection:
+            restaurant_id = provision_restaurant(connection, payload)
+    except (ProvisioningInputError, ProvisioningError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 2
+    except psycopg.OperationalError:
+        print("error: PostgreSQL is unavailable", file=sys.stderr)
+        return 2
+    except psycopg.Error:
+        print("error: PostgreSQL provisioning failed", file=sys.stderr)
+        return 2
+    except RuntimeError:
+        print("error: PostgreSQL configuration is unavailable", file=sys.stderr)
+        return 2
+
+    print(restaurant_id)
+    return 0
 
 
 if __name__ == "__main__":
