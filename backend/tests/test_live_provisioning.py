@@ -673,3 +673,47 @@ def test_cli_unexpected_failure_is_safe_and_nonzero(tmp_path, monkeypatch, capsy
     assert output.out == ""
     assert output.err == "error: restaurant provisioning failed\n"
     assert "private connection detail" not in output.err
+
+
+def test_input_reader_accepts_a_file_exactly_at_the_64_kib_limit(tmp_path):
+    from scripts.provision_live_restaurant import MAX_INPUT_BYTES
+
+    source = tmp_path / "restaurant.json"
+    raw = b"{}" + (b" " * (MAX_INPUT_BYTES - 2))
+    source.write_bytes(raw)
+
+    assert len(read_input_text(source).encode("utf-8")) == MAX_INPUT_BYTES
+
+
+def test_input_schema_accepts_exact_identity_field_limits():
+    parsed = validate_input_object(valid_input_object(
+        restaurant_id="r" * 100,
+        name="n" * 120,
+        cuisine="c" * 120,
+        brand_label="b" * 60,
+    ))
+
+    assert len(parsed.restaurant_id) == 100
+    assert len(parsed.name) == 120
+    assert len(parsed.brand_label) == 60
+
+
+def test_input_schema_preserves_unicode_and_emoji_text():
+    parsed = validate_input_object(valid_input_object(
+        name="दिल्ली Kitchen 🍕",
+        cuisine="उत्तर भारतीय",
+        brand_label="रसोई 🍛",
+    ))
+
+    assert parsed.name == "दिल्ली Kitchen 🍕"
+    assert parsed.cuisine == "उत्तर भारतीय"
+    assert parsed.brand_label == "रसोई 🍛"
+
+
+def test_target_environment_rejects_whitespace_only_value(monkeypatch):
+    from scripts.provision_live_restaurant import ProvisioningError, require_target_environment
+
+    monkeypatch.setenv("ORDERLY_ENVIRONMENT", "   ")
+
+    with pytest.raises(ProvisioningError, match="ORDERLY_ENVIRONMENT"):
+        require_target_environment()
