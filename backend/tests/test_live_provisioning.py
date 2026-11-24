@@ -529,3 +529,76 @@ def test_cli_fails_when_postgres_url_is_not_explicit(tmp_path, monkeypatch, caps
     assert exit_code == 2
     assert output.out == ""
     assert "DATABASE_URL" in output.err
+
+
+def test_cli_database_failure_does_not_expose_connection_details(tmp_path, monkeypatch, capsys):
+    from scripts import provision_live_restaurant as cli
+
+    source = tmp_path / "restaurant.json"
+    source.write_text(json.dumps(valid_input_object()), encoding="utf-8")
+    monkeypatch.setenv("ORDERLY_ENVIRONMENT", "test")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://hidden")
+    monkeypatch.delenv("ORDERLY_FORCE_JSON_STORE", raising=False)
+
+    def unavailable_connection():
+        raise psycopg.OperationalError(
+            "postgresql://operator:top-secret@db.internal/private"
+        )
+
+    monkeypatch.setattr(cli, "get_connection", unavailable_connection)
+
+    exit_code = cli.main(["--input", str(source)])
+
+    output = capsys.readouterr()
+    assert exit_code == 2
+    assert output.out == ""
+    assert output.err == "error: PostgreSQL is unavailable\n"
+    assert "top-secret" not in output.err
+    assert "db.internal" not in output.err
+
+
+def test_cli_validation_error_does_not_echo_private_input_values(tmp_path, monkeypatch, capsys):
+    from scripts import provision_live_restaurant as cli
+
+    source = tmp_path / "restaurant.json"
+    source.write_text(
+        json.dumps(valid_input_object(api_key="do-not-print-this-value")),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("ORDERLY_ENVIRONMENT", "test")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://test-only")
+    monkeypatch.setattr(
+        cli,
+        "get_connection",
+        lambda: pytest.fail("invalid input must not open the database"),
+    )
+
+    exit_code = cli.main(["--input", str(source)])
+
+    output = capsys.readouterr()
+    assert exit_code == 2
+    assert output.out == ""
+    assert "api_key" in output.err
+    assert "do-not-print-this-value" not in output.err
+
+
+def test_cli_refuses_json_store_mode(tmp_path, monkeypatch, capsys):
+    from scripts import provision_live_restaurant as cli
+
+    source = tmp_path / "restaurant.json"
+    source.write_text(json.dumps(valid_input_object()), encoding="utf-8")
+    monkeypatch.setenv("ORDERLY_ENVIRONMENT", "test")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://test-only")
+    monkeypatch.setenv("ORDERLY_FORCE_JSON_STORE", "1")
+    monkeypatch.setattr(
+        cli,
+        "get_connection",
+        lambda: pytest.fail("JSON store mode must not be used for provisioning"),
+    )
+
+    exit_code = cli.main(["--input", str(source)])
+
+    output = capsys.readouterr()
+    assert exit_code == 2
+    assert output.out == ""
+    assert "JSON store mode disabled" in output.err
