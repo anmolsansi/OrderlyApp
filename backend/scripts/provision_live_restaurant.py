@@ -74,6 +74,20 @@ class ProvisioningInput(BaseModel):
     timezone: Literal["Asia/Kolkata"]
     hours: list[HoursInterval] = Field(max_length=14)
 
+    @field_validator("hours")
+    @classmethod
+    def reject_overlapping_hours(cls, value: list[HoursInterval]) -> list[HoursInterval]:
+        by_day: dict[int, list[HoursInterval]] = {}
+        for interval in value:
+            by_day.setdefault(interval.day, []).append(interval)
+
+        for intervals in by_day.values():
+            ordered = sorted(intervals, key=lambda item: item.opens_minute)
+            for previous, current in zip(ordered, ordered[1:]):
+                if current.opens_minute < previous.closes_minute:
+                    raise ValueError("hours intervals must not overlap")
+        return value
+
     @field_validator("restaurant_id", "name", "cuisine", "brand_label")
     @classmethod
     def reject_blank_strings(cls, value: str) -> str:

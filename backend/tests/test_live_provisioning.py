@@ -208,3 +208,43 @@ def test_hours_schema_rejects_unknown_interval_fields():
         validate_input_object(valid_input_object(hours=[
             {"day": 1, "opens_minute": 0, "closes_minute": 60, "open": True}
         ]))
+
+
+def test_hours_schema_rejects_overlapping_intervals_on_the_same_day():
+    from scripts.provision_live_restaurant import validate_input_object
+
+    with pytest.raises(ProvisioningInputError, match="hours"):
+        validate_input_object(valid_input_object(hours=[
+            {"day": 1, "opens_minute": 540, "closes_minute": 720},
+            {"day": 1, "opens_minute": 700, "closes_minute": 900},
+        ]))
+
+
+def test_hours_schema_accepts_adjacent_and_split_midnight_segments():
+    from scripts.provision_live_restaurant import validate_input_object
+
+    parsed = validate_input_object(valid_input_object(hours=[
+        {"day": 1, "opens_minute": 540, "closes_minute": 720},
+        {"day": 1, "opens_minute": 720, "closes_minute": 900},
+        {"day": 2, "opens_minute": 0, "closes_minute": 60},
+    ]))
+
+    assert len(parsed.hours) == 3
+
+
+def test_hours_schema_enforces_the_fourteen_entry_limit():
+    from scripts.provision_live_restaurant import validate_input_object
+
+    fourteen = [
+        {"day": day, "opens_minute": 0, "closes_minute": 60}
+        for day in range(1, 8)
+    ] + [
+        {"day": day, "opens_minute": 60, "closes_minute": 120}
+        for day in range(1, 8)
+    ]
+    validate_input_object(valid_input_object(hours=fourteen))
+
+    with pytest.raises(ProvisioningInputError):
+        validate_input_object(valid_input_object(hours=fourteen + [
+            {"day": 1, "opens_minute": 120, "closes_minute": 180}
+        ]))
