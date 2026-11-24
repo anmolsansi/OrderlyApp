@@ -414,3 +414,54 @@ def test_failure_after_compatibility_insert_rolls_back_both_rows(db):
         "SELECT COUNT(*) FROM live_restaurants WHERE restaurant_id=%s",
         (restaurant_id,),
     ).fetchone() == (0,)
+
+
+def test_provisioning_does_not_adopt_or_copy_existing_mock_catalog(db):
+    mock_id = f"mock-{uuid4().hex}"
+    new_id = f"rs67-{uuid4().hex}"
+    db.execute(
+        """INSERT INTO restaurants
+           (id,name,cuisine,rating,delivery_minutes,delivery_fee_cents,image_emoji)
+           VALUES (%s,%s,%s,4.5,%s,125,'P')""",
+        (mock_id, "Existing Mock", "Pizza", "20-30 min"),
+    )
+    db.execute(
+        """INSERT INTO menu_items
+           (id,restaurant_id,name,description,price_cents,image_emoji,popular)
+           VALUES (%s,%s,%s,%s,1192,'P',true)""",
+        (f"item-{uuid4().hex}", mock_id, "Mock Pizza", "Existing mock item"),
+    )
+    mock_before = db.execute(
+        """SELECT id,name,cuisine,rating,delivery_minutes,delivery_fee_cents,image_emoji
+           FROM restaurants WHERE id=%s""",
+        (mock_id,),
+    ).fetchone()
+    menu_before = db.execute(
+        """SELECT id,name,description,price_cents
+           FROM menu_items WHERE restaurant_id=%s""",
+        (mock_id,),
+    ).fetchall()
+
+    payload = validate_input_object(valid_input_object(restaurant_id=new_id))
+    provision_restaurant(db, payload)
+
+    assert db.execute(
+        """SELECT id,name,cuisine,rating,delivery_minutes,delivery_fee_cents,image_emoji
+           FROM restaurants WHERE id=%s""",
+        (mock_id,),
+    ).fetchone() == mock_before
+    assert db.execute(
+        """SELECT id,name,description,price_cents
+           FROM menu_items WHERE restaurant_id=%s""",
+        (mock_id,),
+    ).fetchall() == menu_before
+    assert db.execute(
+        "SELECT COUNT(*) FROM menu_items WHERE restaurant_id=%s", (new_id,)
+    ).fetchone() == (0,)
+    assert db.execute(
+        "SELECT COUNT(*) FROM live_restaurants WHERE restaurant_id=%s", (mock_id,)
+    ).fetchone() == (0,)
+    assert db.execute(
+        "SELECT ordering_enabled FROM live_restaurants WHERE restaurant_id=%s",
+        (new_id,),
+    ).fetchone() == (False,)
