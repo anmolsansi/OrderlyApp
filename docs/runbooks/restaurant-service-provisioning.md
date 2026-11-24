@@ -116,7 +116,7 @@ The test fixture requires a real PostgreSQL database in CI. A local run that ski
 Manual check:
 
 1. Use a disposable database with migration 007 applied.
-2. Provision a new synthetic test ID and verify one row exists in each table.
+2. Provision a new test-only restaurant ID and verify one row exists in each table.
 3. Verify `ordering_enabled=false` and that no menu item was created for the new ID.
 4. Run the same input again and verify the command refuses the duplicate without changing either row.
 5. Verify an existing mock restaurant and its menu rows are unchanged.
