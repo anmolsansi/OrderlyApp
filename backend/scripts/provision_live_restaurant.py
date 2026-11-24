@@ -232,6 +232,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     except RuntimeError:
         print("error: PostgreSQL configuration is unavailable", file=sys.stderr)
         return 2
+    except Exception:
+        print("error: restaurant provisioning failed", file=sys.stderr)
+        return 2
 
     print(restaurant_id)
     return 0

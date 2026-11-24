@@ -467,6 +467,9 @@ def test_provisioning_does_not_adopt_or_copy_existing_mock_catalog(db):
         "SELECT ordering_enabled FROM live_restaurants WHERE restaurant_id=%s",
         (new_id,),
     ).fetchone() == (False,)
+    assert db.execute(
+        "SELECT COUNT(*) FROM live_tables WHERE restaurant_id=%s", (new_id,)
+    ).fetchone() == (0,)
 
 
 def test_cli_success_prints_only_the_new_restaurant_id(db, tmp_path, monkeypatch, capsys):
@@ -567,6 +570,7 @@ def test_cli_validation_error_does_not_echo_private_input_values(tmp_path, monke
     )
     monkeypatch.setenv("ORDERLY_ENVIRONMENT", "test")
     monkeypatch.setenv("DATABASE_URL", "postgresql://test-only")
+    monkeypatch.delenv("ORDERLY_FORCE_JSON_STORE", raising=False)
     monkeypatch.setattr(
         cli,
         "get_connection",
@@ -602,3 +606,70 @@ def test_cli_refuses_json_store_mode(tmp_path, monkeypatch, capsys):
     assert exit_code == 2
     assert output.out == ""
     assert "JSON store mode disabled" in output.err
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("owner_id", "operator"),
+        ("ordering_enabled", True),
+        ("synthetic", True),
+        ("menu_items", []),
+        ("pricing_profile", {}),
+    ],
+)
+def test_input_schema_rejects_owner_activation_and_catalog_controls(field, value):
+    with pytest.raises(ProvisioningInputError):
+        validate_input_object(valid_input_object(**{field: value}))
+
+
+def test_cli_duplicate_id_is_safe_and_does_not_create_live_configuration(
+    db, tmp_path, monkeypatch, capsys
+):
+    from scripts import provision_live_restaurant as cli
+
+    restaurant_id = f"rs67-{uuid4().hex}"
+    payload = valid_input_object(restaurant_id=restaurant_id)
+    _insert_compatibility_restaurant(
+        db, validate_input_object(payload)
+    )
+    source = tmp_path / "restaurant.json"
+    source.write_text(json.dumps(payload), encoding="utf-8")
+    monkeypatch.setenv("ORDERLY_ENVIRONMENT", "test")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://test-only")
+    monkeypatch.delenv("ORDERLY_FORCE_JSON_STORE", raising=False)
+    monkeypatch.setattr(cli, "get_connection", lambda: nullcontext(db))
+
+    exit_code = cli.main(["--input", str(source)])
+
+    output = capsys.readouterr()
+    assert exit_code == 2
+    assert output.out == ""
+    assert output.err == "error: restaurant_id already exists\n"
+    assert db.execute(
+        "SELECT COUNT(*) FROM live_restaurants WHERE restaurant_id=%s",
+        (restaurant_id,),
+    ).fetchone() == (0,)
+
+
+def test_cli_unexpected_failure_is_safe_and_nonzero(tmp_path, monkeypatch, capsys):
+    from scripts import provision_live_restaurant as cli
+
+    source = tmp_path / "restaurant.json"
+    source.write_text(json.dumps(valid_input_object()), encoding="utf-8")
+    monkeypatch.setenv("ORDERLY_ENVIRONMENT", "test")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://test-only")
+    monkeypatch.delenv("ORDERLY_FORCE_JSON_STORE", raising=False)
+
+    def unexpected_failure():
+        raise ValueError("private connection detail must not appear")
+
+    monkeypatch.setattr(cli, "get_connection", unexpected_failure)
+
+    exit_code = cli.main(["--input", str(source)])
+
+    output = capsys.readouterr()
+    assert exit_code == 2
+    assert output.out == ""
+    assert output.err == "error: restaurant provisioning failed\n"
+    assert "private connection detail" not in output.err
