@@ -5,6 +5,7 @@ import sys
 from uuid import uuid4
 
 import psycopg
+from psycopg import sql
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -375,6 +376,40 @@ def test_duplicate_restaurant_id_is_refused_without_partial_live_row(db):
     assert db.execute(
         "SELECT COUNT(*) FROM restaurants WHERE id=%s", (restaurant_id,)
     ).fetchone() == (1,)
+    assert db.execute(
+        "SELECT COUNT(*) FROM live_restaurants WHERE restaurant_id=%s",
+        (restaurant_id,),
+    ).fetchone() == (0,)
+
+
+def test_failure_after_compatibility_insert_rolls_back_both_rows(db):
+    restaurant_id = f"rs67-{uuid4().hex}"
+    payload = validate_input_object(valid_input_object(restaurant_id=restaurant_id))
+    function_name = f"rs67_fail_{uuid4().hex}"
+    trigger_name = f"rs67_fail_{uuid4().hex}"
+
+    db.execute(sql.SQL(
+        """
+        CREATE FUNCTION {}() RETURNS trigger LANGUAGE plpgsql AS $function$
+        BEGIN
+            RAISE EXCEPTION 'simulated RS-67 second-write failure';
+        END;
+        $function$
+        """
+    ).format(sql.Identifier(function_name)))
+    db.execute(sql.SQL(
+        """
+        CREATE TRIGGER {} BEFORE INSERT ON live_restaurants
+        FOR EACH ROW EXECUTE FUNCTION {}()
+        """
+    ).format(sql.Identifier(trigger_name), sql.Identifier(function_name)))
+
+    with pytest.raises(psycopg.errors.RaiseException):
+        provision_restaurant(db, payload)
+
+    assert db.execute(
+        "SELECT COUNT(*) FROM restaurants WHERE id=%s", (restaurant_id,)
+    ).fetchone() == (0,)
     assert db.execute(
         "SELECT COUNT(*) FROM live_restaurants WHERE restaurant_id=%s",
         (restaurant_id,),
