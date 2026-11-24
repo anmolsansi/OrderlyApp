@@ -5,7 +5,7 @@ import json
 import os
 from pathlib import Path
 import sys
-from typing import Literal, Optional, Sequence
+from typing import Any, Literal, Optional, Sequence
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
@@ -134,6 +134,25 @@ def read_input_text(path: Path) -> str:
         return raw.decode("utf-8")
     except UnicodeDecodeError:
         raise ProvisioningInputError("input file must be UTF-8") from None
+
+
+def _insert_compatibility_restaurant(connection: Any, payload: ProvisioningInput) -> None:
+    connection.execute(
+        """
+        INSERT INTO restaurants (
+            id, name, cuisine, rating, delivery_minutes,
+            delivery_fee_cents, image_emoji, tags
+        )
+        VALUES (%s, %s, %s, 0, %s, 0, %s, '[]'::jsonb)
+        """,
+        (
+            payload.restaurant_id,
+            payload.name,
+            payload.cuisine,
+            "Not offered",
+            "",
+        ),
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:

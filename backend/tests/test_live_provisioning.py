@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 import sys
+from uuid import uuid4
 
+import psycopg
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -13,6 +15,8 @@ from scripts.provision_live_restaurant import (
     build_parser,
     main,
     read_input_text,
+    validate_input_object,
+    _insert_compatibility_restaurant,
 )
 
 
@@ -265,3 +269,37 @@ def test_target_environment_returns_the_explicit_name_without_guessing(monkeypat
     monkeypatch.setenv("ORDERLY_ENVIRONMENT", "test")
 
     assert require_target_environment() == "test"
+
+
+@pytest.fixture
+def db(postgres_database_url):
+    with psycopg.connect(postgres_database_url) as connection:
+        connection.execute("SELECT 1")
+        try:
+            yield connection
+        finally:
+            connection.rollback()
+
+
+def test_compatibility_insert_uses_only_the_fixed_non_live_placeholders(db):
+    restaurant_id = f"rs67-{uuid4().hex}"
+    payload = validate_input_object(valid_input_object(restaurant_id=restaurant_id))
+
+    _insert_compatibility_restaurant(db, payload)
+
+    row = db.execute(
+        """SELECT id,name,cuisine,rating,delivery_minutes,delivery_fee_cents,
+                  image_emoji,tags
+           FROM restaurants WHERE id=%s""",
+        (restaurant_id,),
+    ).fetchone()
+    assert row == (
+        restaurant_id,
+        "Test Restaurant",
+        "Indian",
+        0,
+        "Not offered",
+        0,
+        "",
+        [],
+    )
