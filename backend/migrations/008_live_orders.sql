@@ -1,0 +1,139 @@
+-- RS-03 / CON-03: additive restaurant-owned order, receipt and command schema.
+-- Existing guest/mock catalog, cart, order, receipt and idempotency storage is untouched.
+-- No live tenant, money flow, provider or endpoint is enabled by this migration.
+-- Only guest-scoped cart/access may be removed on guest deletion.
+
+CREATE TABLE live_carts (
+    restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,
+    guest_id TEXT NOT NULL REFERENCES guest_sessions(id) ON DELETE CASCADE,
+    revision BIGINT NOT NULL DEFAULT 0 CHECK (revision >= 0),
+    items JSONB NOT NULL DEFAULT '[]'::jsonb,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (restaurant_id, guest_id)
+);
+
+-- Operational orders are durable restaurant-owned history, not guest-owned mock orders.
+CREATE TABLE live_orders (
+    restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,
+    id UUID NOT NULL,
+    status TEXT NOT NULL CHECK (status IN (
+        'Submitted', 'Accepted', 'Preparing', 'Ready',
+        'Completed', 'Rejected', 'Cancelled'
+    )),
+    version BIGINT NOT NULL DEFAULT 1 CHECK (version > 0),
+    created_at TIMESTAMPTZ NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (restaurant_id, id)
+);
+
+-- The JSON receipt is a one-per-order snapshot bound to the same tenant/order.
+-- Historical receipts are never joined to a guest_sessions row.
+CREATE TABLE live_receipts (
+    restaurant_id TEXT NOT NULL,
+    id UUID NOT NULL,
+    snapshot JSONB NOT NULL CHECK (jsonb_typeof(snapshot) = 'object'),
+    PRIMARY KEY (restaurant_id, id),
+    FOREIGN KEY (restaurant_id, id)
+        REFERENCES live_orders(restaurant_id, id) ON DELETE RESTRICT,
+    CHECK (snapshot->>'id' = id::text),
+    CHECK (snapshot->>'restaurant_id' = restaurant_id)
+);
+
+-- Guest visibility can expire independently of restaurant-owned order history.
+CREATE TABLE live_guest_access (
+    restaurant_id TEXT NOT NULL,
+    order_id UUID NOT NULL,
+    guest_id TEXT NOT NULL REFERENCES guest_sessions(id) ON DELETE CASCADE,
+    revoked_at TIMESTAMPTZ NULL,
+    PRIMARY KEY (restaurant_id, order_id, guest_id),
+    FOREIGN KEY (restaurant_id, order_id)
+        REFERENCES live_orders(restaurant_id, id) ON DELETE RESTRICT
+);
+
+-- Operational events are append-only and versions are unique per restaurant/order.
+-- Payment actions may also advance an order version, so event versions need not
+-- be contiguous.
+CREATE TABLE live_order_events (
+    restaurant_id TEXT NOT NULL,
+    order_id UUID NOT NULL,
+    id UUID NOT NULL,
+    version BIGINT NOT NULL,
+    from_status TEXT NULL,
+    to_status TEXT NOT NULL,
+    actor TEXT NOT NULL,
+    reason TEXT NULL,
+    created_at TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (restaurant_id, id),
+    UNIQUE (restaurant_id, order_id, version),
+    FOREIGN KEY (restaurant_id, order_id)
+        REFERENCES live_orders(restaurant_id, id) ON DELETE RESTRICT
+);
+
+-- Payment ledger is a record of at-restaurant payments, not online settlement.
+-- A reversal must refer to an event for the SAME restaurant and SAME order.
+-- Full-payment and reversal eligibility are later service-level locked-order checks.
+CREATE TABLE live_payment_events (
+    restaurant_id TEXT NOT NULL,
+    order_id UUID NOT NULL,
+    id UUID NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN ('recorded', 'reversed')),
+    reverses_id UUID NULL,
+    amount_minor INTEGER NOT NULL CHECK (amount_minor >= 0),
+    currency TEXT NOT NULL CHECK (currency = 'INR'),
+    method TEXT NULL CHECK (method IN ('cash', 'upi', 'card', 'other')),
+    actor TEXT NOT NULL,
+    reason TEXT NULL,
+    created_at TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (restaurant_id, id),
+    UNIQUE (restaurant_id, order_id, id),
+    UNIQUE (restaurant_id, reverses_id),
+    FOREIGN KEY (restaurant_id, order_id)
+        REFERENCES live_orders(restaurant_id, id) ON DELETE RESTRICT,
+    FOREIGN KEY (restaurant_id, order_id, reverses_id)
+        REFERENCES live_payment_events(restaurant_id, order_id, id) ON DELETE RESTRICT
+);
+
+-- Durable idempotency response record scoped to a verified restaurant/actor.
+-- Store only a digest and actor identity, never the guest cookie or bearer token.
+-- A future service hashes a guest's internal session ID before writing actor_id.
+CREATE TABLE live_commands (
+    restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,
+    actor_kind TEXT NOT NULL,
+    actor_id TEXT NOT NULL,
+    key UUID NOT NULL,
+    payload_sha256 TEXT NOT NULL,
+    response JSONB NOT NULL,
+    response_status INTEGER NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (restaurant_id, actor_kind, actor_id, key)
+);
+
+-- Access patterns are tenant-first; no global cross-tenant order scans.
+CREATE INDEX live_orders_queue
+    ON live_orders (restaurant_id, status, created_at DESC, id DESC);
+CREATE INDEX live_access_guest
+    ON live_guest_access (guest_id, restaurant_id, order_id);
+CREATE INDEX live_payment_order
+    ON live_payment_events (restaurant_id, order_id, created_at, id);
+
+-- History is append-only even when a client bypasses a future service API.
+-- Restricting UPDATE/DELETE here is intentionally not a retention/deletion policy.
+CREATE FUNCTION live_reject_history_mutation() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    RAISE EXCEPTION 'live history is immutable: %', TG_TABLE_NAME
+        USING ERRCODE = '23514';
+END;
+$$;
+
+CREATE TRIGGER live_receipts_immutable
+    BEFORE UPDATE OR DELETE ON live_receipts
+    FOR EACH ROW EXECUTE FUNCTION live_reject_history_mutation();
+
+CREATE TRIGGER live_order_events_immutable
+    BEFORE UPDATE OR DELETE ON live_order_events
+    FOR EACH ROW EXECUTE FUNCTION live_reject_history_mutation();
+
+CREATE TRIGGER live_payment_events_immutable
+    BEFORE UPDATE OR DELETE ON live_payment_events
+    FOR EACH ROW EXECUTE FUNCTION live_reject_history_mutation();
