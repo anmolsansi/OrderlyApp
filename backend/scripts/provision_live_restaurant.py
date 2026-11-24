@@ -5,7 +5,9 @@ import json
 import os
 from pathlib import Path
 import sys
-from typing import Optional, Sequence
+from typing import Literal, Optional, Sequence
+
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 MAX_INPUT_BYTES = 64 * 1024
 
@@ -46,6 +48,30 @@ def parse_input_text(text: str) -> dict:
     if not isinstance(payload, dict):
         raise ProvisioningInputError("input must be a JSON object")
     return payload
+
+
+class ProvisioningInput(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    restaurant_id: str
+    name: str
+    cuisine: str
+    brand_label: str
+    timezone: Literal["Asia/Kolkata"]
+    hours: list[dict] = Field(max_length=14)
+
+
+def validate_input_object(payload: dict) -> ProvisioningInput:
+    try:
+        return ProvisioningInput.model_validate(payload)
+    except ValidationError as error:
+        fields = sorted({
+            ".".join(str(part) for part in item["loc"]) or "input"
+            for item in error.errors()
+        })
+        raise ProvisioningInputError(
+            "invalid input fields: " + ", ".join(fields)
+        ) from None
 
 
 def read_input_text(path: Path) -> str:

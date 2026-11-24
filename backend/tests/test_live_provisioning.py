@@ -90,3 +90,51 @@ def test_json_parser_rejects_non_standard_numeric_constants():
 
     with pytest.raises(ProvisioningInputError, match="valid JSON"):
         parse_input_text('{"hours":NaN}')
+
+
+def valid_input_object(**changes):
+    value = {
+        "restaurant_id": "r-test",
+        "name": "Test Restaurant",
+        "cuisine": "Indian",
+        "brand_label": "Test Brand",
+        "timezone": "Asia/Kolkata",
+        "hours": [],
+    }
+    value.update(changes)
+    return value
+
+
+def test_input_schema_accepts_the_documented_fields():
+    from scripts.provision_live_restaurant import validate_input_object
+
+    parsed = validate_input_object(valid_input_object())
+
+    assert parsed.restaurant_id == "r-test"
+    assert parsed.name == "Test Restaurant"
+    assert parsed.cuisine == "Indian"
+    assert parsed.brand_label == "Test Brand"
+    assert parsed.timezone == "Asia/Kolkata"
+    assert parsed.hours == []
+
+
+def test_input_schema_rejects_missing_required_fields():
+    from scripts.provision_live_restaurant import validate_input_object
+
+    with pytest.raises(ProvisioningInputError, match="restaurant_id"):
+        validate_input_object({"name": "Test Restaurant"})
+
+
+def test_input_schema_rejects_unknown_fields():
+    from scripts.provision_live_restaurant import validate_input_object
+
+    with pytest.raises(ProvisioningInputError, match="unexpected"):
+        validate_input_object(valid_input_object(unexpected="must not be accepted"))
+
+
+@pytest.mark.parametrize("field", ["restaurant_id", "name", "cuisine", "brand_label", "timezone", "hours"])
+def test_input_schema_rejects_wrong_field_types(field):
+    from scripts.provision_live_restaurant import validate_input_object
+
+    with pytest.raises(ProvisioningInputError):
+        validate_input_object(valid_input_object(**{field: 17}))
