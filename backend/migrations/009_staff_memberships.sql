@@ -9,3 +9,23 @@ CREATE TABLE live_memberships (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (restaurant_id, clerk_user_id)
 );
+
+-- Membership history belongs to the restaurant, not a guest session.
+CREATE TABLE live_membership_audit (
+    id UUID PRIMARY KEY,
+    restaurant_id TEXT NOT NULL REFERENCES live_restaurants(restaurant_id) ON DELETE RESTRICT,
+    subject TEXT NOT NULL,
+    actor TEXT NOT NULL,
+    old_role TEXT NULL,
+    new_role TEXT NOT NULL,
+    old_active BOOLEAN NULL,
+    new_active BOOLEAN NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX live_membership_audit_restaurant
+    ON live_membership_audit (restaurant_id, created_at, id);
+
+CREATE TRIGGER live_membership_audit_immutable
+    BEFORE UPDATE OR DELETE ON live_membership_audit
+    FOR EACH ROW EXECUTE FUNCTION live_reject_history_mutation();
