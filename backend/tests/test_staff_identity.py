@@ -158,3 +158,79 @@ def test_missing_invalid_and_duplicate_authorization(transport, signers):
     ):
         denied(req)
     assert transport["calls"] == []
+
+
+def test_cache_reuse_and_unknown_kid_rotation(transport, signers):
+    one = request(make_token(signers))
+    two = request(make_token(signers, kid="two"))
+    assert identity.verify_staff_token(one).sub == SUBJECT
+    assert identity.verify_staff_token(one).sub == SUBJECT
+    assert len(transport["calls"]) == 1
+    transport["payload"] = {"keys": [jwk(signers, "two")]}
+    assert identity.verify_staff_token(two).sub == SUBJECT
+    assert len(transport["calls"]) == 2
+    denied(one)
+    assert len(transport["calls"]) == 3
+
+
+def test_unknown_kid_cold_cache_refreshes_only_once(transport, signers):
+    denied(request(make_token(signers, kid="two")))
+    assert transport["calls"] == [(JWKS_URL, 5)]
+
+
+def test_cache_expiry_and_outage_never_use_stale_keys(transport, signers, monkeypatch):
+    clock = [1000.0]
+    monkeypatch.setattr(identity, "monotonic", lambda: clock[0])
+    req = request(make_token(signers))
+    assert identity.verify_staff_token(req).sub == SUBJECT
+    clock[0] += 299
+    assert identity.verify_staff_token(req).sub == SUBJECT
+    assert len(transport["calls"]) == 1
+    clock[0] += 1
+    transport["outage"] = True
+    denied(req, 503, "identity_unavailable")
+    assert len(transport["calls"]) == 2
+    denied(req, 503, "identity_unavailable")
+    assert len(transport["calls"]) == 3
+    transport["outage"] = False
+    assert identity.verify_staff_token(req).sub == SUBJECT
+
+
+def test_rotation_outage_invalidates_cached_keys(transport, signers):
+    one = request(make_token(signers))
+    assert identity.verify_staff_token(one).sub == SUBJECT
+    transport["outage"] = True
+    denied(request(make_token(signers, kid="two")), 503, "identity_unavailable")
+    denied(one, 503, "identity_unavailable")
+
+
+@pytest.mark.parametrize("payload", [{}, {"keys": []}, {"keys": [None]}, {"keys": [{}] * 65}, {"keys": [{"kty": "RSA", "kid": "one"}]}])
+def test_invalid_jwks_is_unavailable(transport, signers, payload):
+    transport["payload"] = payload
+    denied(request(make_token(signers)), 503, "identity_unavailable")
+
+
+def test_duplicate_jwks_key_id_rejected(transport, signers):
+    transport["payload"] = {"keys": [jwk(signers, "one"), jwk(signers, "one")]}
+    denied(request(make_token(signers)), 503, "identity_unavailable")
+
+
+def test_jwks_size_cap(transport, signers):
+    transport["payload"] = {"keys": [jwk(signers, "one")], "padding": "a" * 65536}
+    denied(request(make_token(signers)), 503, "identity_unavailable")
+
+
+@pytest.mark.parametrize("name,value", [
+    ("ORDERLY_CLERK_ISSUER", ""),
+    ("ORDERLY_CLERK_JWKS_URL", "http://clerk.example.test/jwks"),
+    ("ORDERLY_CLERK_AUTHORIZED_PARTIES", ""),
+    ("ORDERLY_CLERK_AUTHORIZED_PARTIES", "*"),
+])
+def test_invalid_config_fails_closed_without_fetch(transport, signers, monkeypatch, name, value):
+    monkeypatch.setenv(name, value)
+    denied(request(make_token(signers)), 503, "identity_unavailable")
+    assert transport["calls"] == []
+
+
+def test_redirect_handler_refuses_redirect():
+    assert identity._NoRedirect().redirect_request(None, None, 302, "", {}, "https://attacker.example.test") is None
