@@ -10,4 +10,4 @@ pip-audit==2.10.1
 pip==26.2
 
 # RS-05: same JWT verifier for runtime and synthetic signature tests.
-PyJWT[crypto]==2.13.0
+PyJWT[crypto]==2.15.0
