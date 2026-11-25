@@ -319,3 +319,40 @@ def test_audit_failure_rolls_back_membership_insert(db):
         cli.bootstrap_owner(db, rid, SUBJECT)
     assert memberships(db, rid) == audits(db, rid) == []
     assert_disabled(db, rid)
+
+
+def test_cli_returns_only_safe_ids(db, target, monkeypatch, capsys):
+    rid = provision(db)
+    monkeypatch.setattr(cli, "get_connection", lambda: nullcontext(db))
+    assert cli.main(args_for(rid)) == 0
+    output = capsys.readouterr()
+    assert json.loads(output.out) == {"restaurant_id": rid, "clerk_user_id": SUBJECT}
+    assert output.err == ""
+    assert len(memberships(db, rid)) == len(audits(db, rid)) == 1
+
+
+def test_cli_unknown_restaurant_is_nonzero_and_safe(db, target, monkeypatch, capsys):
+    rid = f"missing-{uuid4().hex}"
+    monkeypatch.setattr(cli, "get_connection", lambda: nullcontext(db))
+    assert cli.main(args_for(rid)) == 2
+    output = capsys.readouterr()
+    assert output.out == ""
+    assert output.err == "error: live restaurant not found\n"
+    assert memberships(db, rid) == audits(db, rid) == []
+
+
+def test_cli_does_not_report_success_on_failed_connection_exit(db, target, monkeypatch, capsys):
+    rid = provision(db)
+
+    @contextmanager
+    def failed_commit():
+        with db.transaction():
+            yield db
+            raise psycopg.OperationalError("private commit failure")
+
+    monkeypatch.setattr(cli, "get_connection", failed_commit)
+    assert cli.main(args_for(rid)) == 2
+    output = capsys.readouterr()
+    assert output.out == ""
+    assert output.err == "error: PostgreSQL is unavailable\n"
+    assert memberships(db, rid) == audits(db, rid) == []
