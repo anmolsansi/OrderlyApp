@@ -8,3 +8,6 @@ pip-audit==2.10.1
 
 # Audit the installer too; pip 26.2 fixes package extraction/index URL advisories.
 pip==26.2
+
+# RS-05: same JWT verifier for runtime and synthetic signature tests.
+PyJWT[crypto]==2.13.0
