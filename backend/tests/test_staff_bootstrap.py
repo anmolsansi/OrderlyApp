@@ -218,3 +218,104 @@ def test_subject_can_have_membership_in_independent_restaurants(db):
     assert len(audits(db, first)) == len(audits(db, second)) == 1
     assert_disabled(db, first)
     assert_disabled(db, second)
+
+
+def test_schema_columns_and_defaults_match_db_c(db):
+    for table, expected in {
+        "live_memberships": {
+            "restaurant_id", "clerk_user_id", "role", "active", "version", "updated_at",
+        },
+        "live_membership_audit": {
+            "id", "restaurant_id", "subject", "actor", "old_role", "new_role",
+            "old_active", "new_active", "created_at",
+        },
+    }.items():
+        rows = db.execute(
+            """SELECT column_name FROM information_schema.columns
+               WHERE table_schema=current_schema() AND table_name=%s""", (table,),
+        ).fetchall()
+        assert {row["column_name"] for row in rows} == expected
+
+    rid = provision(db)
+    for role in ("owner", "order_staff", "cashier"):
+        db.execute(
+            """INSERT INTO live_memberships (restaurant_id, clerk_user_id, role)
+               VALUES (%s,%s,%s)""", (rid, role, role),
+        )
+    assert {row["role"] for row in memberships(db, rid)} == {"owner", "order_staff", "cashier"}
+    assert all(row["active"] is True and row["version"] == 1 for row in memberships(db, rid))
+
+
+@pytest.mark.parametrize("role,version,error", [
+    ("admin", 1, psycopg.errors.CheckViolation),
+    ("owner", 0, psycopg.errors.CheckViolation),
+    ("owner", -1, psycopg.errors.CheckViolation),
+])
+def test_database_rejects_invalid_role_and_version(db, role, version, error):
+    rid = provision(db)
+    with pytest.raises(error), db.transaction():
+        db.execute(
+            """INSERT INTO live_memberships (restaurant_id,clerk_user_id,role,version)
+               VALUES (%s,%s,%s,%s)""", (rid, SUBJECT, role, version),
+        )
+    assert memberships(db, rid) == []
+
+
+def test_membership_primary_key_and_foreign_keys(db):
+    rid = provision(db)
+    cli.bootstrap_owner(db, rid, SUBJECT)
+    with pytest.raises(psycopg.errors.UniqueViolation), db.transaction():
+        db.execute(
+            """INSERT INTO live_memberships (restaurant_id,clerk_user_id,role)
+               VALUES (%s,%s,'cashier')""", (rid, SUBJECT),
+        )
+    missing = f"missing-{uuid4().hex}"
+    with pytest.raises(psycopg.errors.ForeignKeyViolation), db.transaction():
+        db.execute(
+            """INSERT INTO live_memberships (restaurant_id,clerk_user_id,role)
+               VALUES (%s,%s,'owner')""", (missing, SUBJECT),
+        )
+    with pytest.raises(psycopg.errors.ForeignKeyViolation), db.transaction():
+        db.execute(
+            """INSERT INTO live_membership_audit
+               (id,restaurant_id,subject,actor,new_role,new_active)
+               VALUES (%s,%s,%s,'operator:bootstrap','owner',true)""",
+            (uuid4(), missing, SUBJECT),
+        )
+    with pytest.raises(psycopg.errors.ForeignKeyViolation), db.transaction():
+        db.execute("DELETE FROM live_restaurants WHERE restaurant_id=%s", (rid,))
+    assert len(memberships(db, rid)) == len(audits(db, rid)) == 1
+
+
+def test_membership_audit_cannot_be_updated_or_deleted(db):
+    rid = provision(db)
+    cli.bootstrap_owner(db, rid, SUBJECT)
+    before = audits(db, rid)
+    with pytest.raises(psycopg.errors.CheckViolation), db.transaction():
+        db.execute(
+            "UPDATE live_membership_audit SET new_role='cashier' WHERE restaurant_id=%s", (rid,),
+        )
+    with pytest.raises(psycopg.errors.CheckViolation), db.transaction():
+        db.execute("DELETE FROM live_membership_audit WHERE restaurant_id=%s", (rid,))
+    assert audits(db, rid) == before
+
+
+def test_audit_failure_rolls_back_membership_insert(db):
+    rid = provision(db)
+    name = sql.Identifier(f"rs04_fail_{uuid4().hex}")
+    db.execute(sql.SQL("""
+        CREATE FUNCTION {}() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN
+            RAISE EXCEPTION 'synthetic audit failure';
+        END;
+        $$
+    """).format(name))
+    db.execute(sql.SQL("""
+        CREATE TRIGGER {} BEFORE INSERT ON live_membership_audit
+        FOR EACH ROW EXECUTE FUNCTION {}()
+    """).format(name, name))
+
+    with pytest.raises(psycopg.errors.RaiseException):
+        cli.bootstrap_owner(db, rid, SUBJECT)
+    assert memberships(db, rid) == audits(db, rid) == []
+    assert_disabled(db, rid)
