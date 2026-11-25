@@ -126,3 +126,95 @@ def assert_disabled(db, rid):
     assert db.execute(
         "SELECT ordering_enabled FROM live_restaurants WHERE restaurant_id=%s", (rid,),
     ).fetchone() == {"ordering_enabled": False}
+
+
+def test_first_bootstrap_matches_frozen_membership_contract(db):
+    rid = provision(db)
+    fixture = json.loads((ROOT / "tests/fixtures/restaurant-service/v1.json").read_text())
+    expected = dict(fixture["contracts"]["CON-04"]["positive"]["payload"])
+    expected["restaurant_id"] = rid
+    assert cli.bootstrap_owner(db, rid, SUBJECT) == {
+        "restaurant_id": rid, "clerk_user_id": SUBJECT,
+    }
+    assert memberships(db, rid) == [expected]
+    assert audits(db, rid) == [{
+        "restaurant_id": rid, "subject": SUBJECT, "actor": "operator:bootstrap",
+        "old_role": None, "new_role": "owner", "old_active": None, "new_active": True,
+    }]
+    assert_disabled(db, rid)
+
+
+def test_identical_bootstrap_is_a_true_noop(db):
+    rid = provision(db)
+    cli.bootstrap_owner(db, rid, SUBJECT)
+    before = db.execute(
+        "SELECT * FROM live_memberships WHERE restaurant_id=%s", (rid,),
+    ).fetchall()
+    audit_before = db.execute(
+        "SELECT * FROM live_membership_audit WHERE restaurant_id=%s", (rid,),
+    ).fetchall()
+    assert cli.bootstrap_owner(db, rid, SUBJECT) == {
+        "restaurant_id": rid, "clerk_user_id": SUBJECT,
+    }
+    assert db.execute(
+        "SELECT * FROM live_memberships WHERE restaurant_id=%s", (rid,),
+    ).fetchall() == before
+    assert db.execute(
+        "SELECT * FROM live_membership_audit WHERE restaurant_id=%s", (rid,),
+    ).fetchall() == audit_before
+
+
+def test_different_owner_cannot_replace_initial_owner(db):
+    rid = provision(db)
+    cli.bootstrap_owner(db, rid, SUBJECT)
+    before = memberships(db, rid)
+    with pytest.raises(cli.BootstrapError, match="conflicting"):
+        cli.bootstrap_owner(db, rid, "clerk-other")
+    assert memberships(db, rid) == before
+    assert len(audits(db, rid)) == 1
+    assert_disabled(db, rid)
+
+
+@pytest.mark.parametrize("role,active,existing_subject", [
+    ("order_staff", True, SUBJECT), ("cashier", True, SUBJECT),
+    ("owner", False, SUBJECT), ("owner", False, "clerk-other"),
+])
+def test_incompatible_membership_not_elevated_or_reactivated(db, role, active, existing_subject):
+    rid = provision(db)
+    db.execute(
+        """INSERT INTO live_memberships (restaurant_id, clerk_user_id, role, active)
+           VALUES (%s,%s,%s,%s)""", (rid, existing_subject, role, active),
+    )
+    before = memberships(db, rid)
+    with pytest.raises(cli.BootstrapError, match="conflicting"):
+        cli.bootstrap_owner(db, rid, SUBJECT)
+    assert memberships(db, rid) == before
+    assert audits(db, rid) == []
+
+
+def test_unknown_restaurant_fails_without_writes(db):
+    rid = f"missing-{uuid4().hex}"
+    with pytest.raises(cli.BootstrapError, match="not found"):
+        cli.bootstrap_owner(db, rid, SUBJECT)
+    assert memberships(db, rid) == audits(db, rid) == []
+
+
+@pytest.mark.parametrize("enabled,synthetic", [(True, False), (False, True)])
+def test_bootstrap_refuses_enabled_or_demo_restaurant(db, enabled, synthetic):
+    rid = provision(db, enabled=enabled, synthetic=synthetic)
+    with pytest.raises(cli.BootstrapError, match="disabled non-demo"):
+        cli.bootstrap_owner(db, rid, SUBJECT)
+    assert memberships(db, rid) == audits(db, rid) == []
+    assert db.execute(
+        "SELECT ordering_enabled, synthetic FROM live_restaurants WHERE restaurant_id=%s", (rid,),
+    ).fetchone() == {"ordering_enabled": enabled, "synthetic": synthetic}
+
+
+def test_subject_can_have_membership_in_independent_restaurants(db):
+    first, second = provision(db), provision(db)
+    cli.bootstrap_owner(db, first, SUBJECT)
+    cli.bootstrap_owner(db, second, SUBJECT)
+    assert len(memberships(db, first)) == len(memberships(db, second)) == 1
+    assert len(audits(db, first)) == len(audits(db, second)) == 1
+    assert_disabled(db, first)
+    assert_disabled(db, second)
