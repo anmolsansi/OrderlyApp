@@ -31,12 +31,13 @@ const ALLOWED_ROUTES: AllowedRoute[] = [
 type LiveRoute = { pattern: RegExp; method: string; authority: 'staff' | 'guest' | 'token'; query: readonly string[]; command: boolean };
 const liveRoutes: LiveRoute[] = [];
 const segment = '[A-Za-z0-9._~-]+';
+const uuid = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
 const rid = 'restaurants/' + segment;
 const staff = 'staff/' + rid;
 function live(path: string, methods: string[], authority: LiveRoute['authority'], query: readonly string[] = [], command = false) {
   for (const method of methods) liveRoutes.push({ pattern: new RegExp('^live/' + path + '(status: number, code: string, message: string): NextResponse {
   return NextResponse.json(
-    { error: { code, message, request_id: crypto.randomUUID(), fields: [] } },
+    { error: { code, message, request_id: crypto.randomUUID(), fields } },
     { status, headers: { 'cache-control': 'no-store' } },
   );
 }
@@ -189,7 +190,7 @@ async function proxy(request: NextRequest, context: RouteContext): Promise<NextR
     const seen = new Set<string>();
     for (const [name, value] of request.nextUrl.searchParams) {
       if (!matchedLive.query.includes(name) || seen.has(name)) {
-        return errorResponse(422, 'invalid_input', 'Check highlighted fields');
+        return errorResponse(422, 'invalid_input', 'Check highlighted fields', [name]);
       }
       seen.add(name);
       target.searchParams.set(name, value);
@@ -227,10 +228,13 @@ async function proxy(request: NextRequest, context: RouteContext): Promise<NextR
     }
 
     const setCookie = upstream.headers.get('set-cookie');
-    if (setCookie && (!matchedLive || (matchedLive.authority === 'guest' && setCookie.startsWith('orderly_guest=') && !setCookie.includes(',')))) {
+    const liveCookies = matchedLive?.authority === 'guest'
+      ? upstream.headers.getSetCookie().filter(value => value.startsWith('orderly_guest=')) : [];
+    const permittedCookie = matchedLive ? (liveCookies.length === 1 ? liveCookies[0] : null) : setCookie;
+    if (permittedCookie) {
       responseHeaders.append(
         'set-cookie',
-        rewriteGuestCookie(setCookie, new URL(publicOrigin).protocol === 'https:'),
+        rewriteGuestCookie(permittedCookie, new URL(publicOrigin).protocol === 'https:'),
       );
     }
 
@@ -271,7 +275,7 @@ live(rid + '/cart', ['GET', 'PUT', 'DELETE'], 'guest');
 live(rid + '/quote', ['POST'], 'guest');
 live(rid + '/orders', ['GET'], 'guest', ['limit', 'cursor']);
 live(rid + '/orders', ['POST'], 'guest', [], true);
-live(rid + '/orders/' + segment, ['GET'], 'guest');
+live(rid + '/orders/' + uuid, ['GET'], 'guest');
 live(rid + '/consents', ['POST'], 'guest');
 live('unsubscribe/[A-Za-z0-9_-]{43}', ['GET', 'POST'], 'token');
 live('staff/memberships', ['GET'], 'staff');
@@ -282,21 +286,21 @@ live(staff + '/menu', ['GET'], 'staff');
 live(staff + '/menu/' + segment, ['PUT'], 'staff');
 live(staff + '/menu/' + segment + '/availability', ['PUT'], 'staff');
 live(staff + '/tables', ['GET'], 'staff');
-live(staff + '/tables/' + segment, ['GET', 'PUT'], 'staff');
+live(staff + '/tables/' + uuid, ['GET', 'PUT'], 'staff');
 live(staff + '/offers', ['GET'], 'staff', ['limit', 'cursor']);
-live(staff + '/offers/' + segment, ['GET', 'PUT'], 'staff');
+live(staff + '/offers/' + uuid, ['GET', 'PUT'], 'staff');
 live(staff + '/orders', ['GET'], 'staff', ['view', 'limit', 'cursor']);
-live(staff + '/orders/' + segment, ['GET'], 'staff');
+live(staff + '/orders/' + uuid, ['GET'], 'staff');
 for (const suffix of ['transitions', 'payments', 'payment-reversals']) {
-  live(staff + '/orders/' + segment + '/' + suffix, ['POST'], 'staff', [], true);
+  live(staff + '/orders/' + uuid + '/' + suffix, ['POST'], 'staff', [], true);
 }
 live(staff + '/campaigns', ['GET', 'POST'], 'staff');
-live(staff + '/campaigns/' + segment, ['GET', 'PUT'], 'staff');
-live(staff + '/campaigns/' + segment + '/preview', ['POST'], 'staff');
+live(staff + '/campaigns/' + uuid, ['GET', 'PUT'], 'staff');
+live(staff + '/campaigns/' + uuid + '/preview', ['POST'], 'staff');
 for (const suffix of ['approve', 'pause', 'resume']) {
-  live(staff + '/campaigns/' + segment + '/' + suffix, ['POST'], 'staff', [], true);
+  live(staff + '/campaigns/' + uuid + '/' + suffix, ['POST'], 'staff', [], true);
 }
-live(staff + '/campaigns/' + segment + '/deliveries', ['GET'], 'staff');
+live(staff + '/campaigns/' + uuid + '/deliveries', ['GET'], 'staff');
 live(staff + '/reconcile', ['POST'], 'staff');
 live(staff + '/messaging-setup', ['GET'], 'staff');
 live(staff + '/summary', ['GET'], 'staff', ['from', 'to']);
@@ -305,7 +309,7 @@ function liveRoute(path: string, method: string): LiveRoute | undefined {
   return liveRoutes.find(route => route.method === method && route.pattern.test(path));
 }
 
-function errorResponse(status: number, code: string, message: string): NextResponse {
+function errorResponse(status: number, code: string, message: string, fields: string[] = []): NextResponse {
   return NextResponse.json(
     { error: { code, message, request_id: crypto.randomUUID(), fields: [] } },
     { status },
