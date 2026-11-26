@@ -37,7 +37,7 @@ function live(path: string, methods: string[], authority: LiveRoute['authority']
   for (const method of methods) liveRoutes.push({ pattern: new RegExp('^live/' + path + '(status: number, code: string, message: string): NextResponse {
   return NextResponse.json(
     { error: { code, message, request_id: crypto.randomUUID(), fields: [] } },
-    { status },
+    { status, headers: { 'cache-control': 'no-store' } },
   );
 }
 
@@ -108,7 +108,7 @@ async function boundedBody(request: NextRequest): Promise<ArrayBuffer | undefine
   return data.byteLength > 0 ? data : undefined;
 }
 
-function upstreamHeaders(request: NextRequest, publicOrigin: string, path: string): Headers {
+function upstreamHeaders(request: NextRequest, publicOrigin: string, path: string, live?: LiveRoute): Headers {
   const headers = new Headers();
   const accept = request.headers.get('accept');
   const contentType = request.headers.get('content-type');
@@ -117,8 +117,15 @@ function upstreamHeaders(request: NextRequest, publicOrigin: string, path: strin
 
   if (accept) headers.set('accept', accept);
   if (contentType) headers.set('content-type', contentType);
-  if (cookie) headers.set('cookie', cookie);
-  if (path === 'orders' && request.method === 'POST' && idempotencyKey) {
+  if (!live && cookie) headers.set('cookie', cookie);
+  if (live?.authority === 'guest' && cookie) {
+    const guests = cookie.split(';').map(part => part.trim()).filter(part => part.startsWith('orderly_guest='));
+    // Ambiguous duplicate session cookies must not be resolved by the gateway.
+    if (guests.length === 1) headers.set('cookie', guests[0]);
+  }
+  const authorization = request.headers.get('authorization');
+  if (live?.authority === 'staff' && authorization) headers.set('authorization', authorization);
+  if ((live?.command || (!live && path === 'orders' && request.method === 'POST')) && idempotencyKey) {
     headers.set('idempotency-key', idempotencyKey);
   }
 
@@ -178,7 +185,16 @@ async function proxy(request: NextRequest, context: RouteContext): Promise<NextR
     return errorResponse(503, 'invalid_config', 'API gateway is not configured');
   }
 
-  if (path === 'restaurants' || path.startsWith('restaurants/')) {
+  if (matchedLive) {
+    const seen = new Set<string>();
+    for (const [name, value] of request.nextUrl.searchParams) {
+      if (!matchedLive.query.includes(name) || seen.has(name)) {
+        return errorResponse(422, 'invalid_input', 'Check highlighted fields');
+      }
+      seen.add(name);
+      target.searchParams.set(name, value);
+    }
+  } else if (path === 'restaurants' || path.startsWith('restaurants/')) {
     target.search = request.nextUrl.search;
   } else if (path === 'orders' && request.method === 'GET') {
     for (const name of ['limit', 'cursor']) {
@@ -193,7 +209,7 @@ async function proxy(request: NextRequest, context: RouteContext): Promise<NextR
   try {
     const upstream = await fetch(target, {
       method: request.method,
-      headers: upstreamHeaders(request, publicOrigin, path),
+      headers: upstreamHeaders(request, publicOrigin, path, matchedLive),
       body,
       cache: 'no-store',
       redirect: 'manual',
@@ -211,7 +227,7 @@ async function proxy(request: NextRequest, context: RouteContext): Promise<NextR
     }
 
     const setCookie = upstream.headers.get('set-cookie');
-    if (setCookie) {
+    if (setCookie && (!matchedLive || (matchedLive.authority === 'guest' && setCookie.startsWith('orderly_guest=') && !setCookie.includes(',')))) {
       responseHeaders.append(
         'set-cookie',
         rewriteGuestCookie(setCookie, new URL(publicOrigin).protocol === 'https:'),
