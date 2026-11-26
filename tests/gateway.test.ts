@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import liveFixture from './fixtures/restaurant-service/v1.json';
 import { NextRequest } from 'next/server';
-import { DELETE, GET, POST, PUT } from '../app/api/orderly/[...path]/route';
+import { DELETE, GET, POST, PUT, PATCH, OPTIONS } from '../app/api/orderly/[...path]/route';
 
 type Handler = typeof GET | typeof POST | typeof PUT | typeof DELETE;
 type GatewayRequestInit = { headers?: HeadersInit; body?: BodyInit };
@@ -347,5 +347,22 @@ describe('CON-07 shared wire fixture transport', () => {
     const result = await handlers[vector.method](request(vector.method, path), context(...segments));
     expect(result.status).toBe(200);
     expect(String(spy.mock.calls[0][0])).toBe('https://api.orderly.test' + vector.path);
+  });
+});
+
+
+describe('CON-07 unsupported browser methods', () => {
+  afterEach(() => vi.restoreAllMocks());
+  it('denies live PATCH, OPTIONS and HEAD without network, preserves mock method behavior', async () => {
+    const spy = vi.spyOn(globalThis, 'fetch');
+    const path = 'live/staff/restaurants/r-demo/settings';
+    expect((await call(PATCH, 'PATCH', path)).status).toBe(404);
+    expect((await call(OPTIONS, 'OPTIONS', path)).status).toBe(404);
+    expect((await call(GET, 'HEAD', path)).status).toBe(404);
+    expect((await call(PATCH, 'PATCH', 'cart')).status).toBe(405);
+    const options = await call(OPTIONS, 'OPTIONS', 'cart');
+    expect(options.status).toBe(204);
+    expect(options.headers.get('allow')).toBe('DELETE, GET, HEAD, OPTIONS, POST, PUT');
+    expect(spy).not.toHaveBeenCalled();
   });
 });
