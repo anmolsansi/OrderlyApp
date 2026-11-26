@@ -1,6 +1,6 @@
 # OrderlyApp — current development roadmap
 
-**Updated:** November 22, 2026. **Scope:** restaurant-service implementation planning and delivery, without confusing the earlier mock demo with a real restaurant product. This guide was split by RF-05 from the [preserved 9,014-line historical guide](docs/plans/orderly-history.md). It is the entrypoint for **status, priority, decision summary, and release gates**, not a copy of every ticket's SQL and DTOs.
+**Updated:** November 26, 2026. **Scope:** restaurant-service implementation planning and delivery, without confusing the earlier mock demo with a real restaurant product. This guide was split by RF-05 from the [preserved 9,014-line historical guide](docs/plans/orderly-history.md). It is the entrypoint for **status, priority, decision summary, and release gates**, not a copy of every ticket's SQL and DTOs.
 
 ## How to read and execute the project
 
@@ -36,6 +36,8 @@ This legacy deep link now points to the [original full baseline commands and fai
 
 **RS-02–RS-67, DS-01–DS-06 and live integration/hosted pilot gates:** not claimed completed; read actual merged source and recorded evidence at execution before changing a status. The old 0/67 planning number is not an implementation metric after RS-01 merged. Treat remaining implementation as **66 RS packets**, plus independent DS/INT and release work, subject to dependency checks. No paid customer acceptance is on record.
 
+**RS-05 / RS-06:** Implementation merged in PR #87 at `3d138f817ff4eaee3ef98a4d3a1758259c76fdeb`; the owner-supplied independent review passed exact head `99bcc29a7a7d35009cc7b4fbbc491f5899a75819` for synthetic scope. [Post-merge CI](https://github.com/anmolsansi/OrderlyApp/actions/runs/45863431986) passed all seven jobs (420 backend tests, no skips, one warning). The documentation-only closeout becomes effective upon owner acceptance and merge; live activation remains disabled. See [final acceptance](docs/contracts/restaurant-service-v1.md#final-synthetic-acceptance-record--2026-11-26). RS-07 is next in the serial sequence, subject to the exact gateway allowlist/fixture intake; RS-09 requires explicit conflict and settings-grant decisions.
+
 ## Readiness and release gates
 
 | Gate | Required observable evidence | Current claim |
@@ -69,8 +71,8 @@ Follow the **[79-node/258-edge RF-01 graph and 30-wave schedule](docs/contracts/
 | <a id="rs-02"></a>[RS-02](docs/tickets/restaurant-service/RS-02.md) | Add live restaurant configuration and table storage | Not completed | [CON-02](docs/contracts/restaurant-service-v1.md) |
 | <a id="rs-03"></a>[RS-03](docs/tickets/restaurant-service/RS-03.md) | Add restaurant-owned order, receipt and action ledgers | Not completed | [CON-03](docs/contracts/restaurant-service-v1.md) |
 | <a id="rs-04"></a>[RS-04](docs/tickets/restaurant-service/RS-04.md) | Add memberships and an explicit initial-owner bootstrap | Not completed | [CON-04](docs/contracts/restaurant-service-v1.md) |
-| <a id="rs-05"></a>[RS-05](docs/tickets/restaurant-service/RS-05.md) | Verify Clerk session tokens in the backend | Awaiting independent security approval ([review evidence](docs/tickets/restaurant-service/RS-05-security-review.md)) | [CON-05](docs/contracts/restaurant-service-v1.md) |
-| <a id="rs-06"></a>[RS-06](docs/tickets/restaurant-service/RS-06.md) | Authorize restaurant roles and revoke staff membership | Merged; conformance and independent security approval pending ([review evidence](docs/tickets/restaurant-service/RS-06-security-review.md)) | [CON-06](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-05"></a>[RS-05](docs/tickets/restaurant-service/RS-05.md) | Verify Clerk session tokens in the backend | Synthetic closeout on owner merge ([review evidence](docs/tickets/restaurant-service/RS-05-security-review.md)) | [CON-05](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-06"></a>[RS-06](docs/tickets/restaurant-service/RS-06.md) | Authorize restaurant roles and revoke staff membership | Synthetic closeout on owner merge ([review evidence](docs/tickets/restaurant-service/RS-06-security-review.md)) | [CON-06](docs/contracts/restaurant-service-v1.md) |
 | <a id="rs-07"></a>[RS-07](docs/tickets/restaurant-service/RS-07.md) | Extend the same-origin gateway for explicit live routes | Not completed | [CON-07](docs/contracts/restaurant-service-v1.md) |
 | <a id="rs-08"></a>[RS-08](docs/tickets/restaurant-service/RS-08.md) | Provide staff sign-in and active restaurant selection | Not completed | [CON-08](docs/contracts/restaurant-service-v1.md) |
 | <a id="rs-09"></a>[RS-09](docs/tickets/restaurant-service/RS-09.md) | Read and update restaurant branding and ordering hours | Not completed | [CON-09](docs/contracts/restaurant-service-v1.md) |

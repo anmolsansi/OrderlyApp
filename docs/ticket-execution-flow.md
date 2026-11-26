@@ -577,30 +577,30 @@ All boxes start unchecked. This guide records planned work, not a new acceptance
 <a id="run-rs-05"></a>
 #### Step 11 — RS-05: Verify Clerk session tokens in the backend
 
-**Source:** [Full ticket / gate](tickets/restaurant-service/RS-05.md). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-05.md). **Status:** Synthetic closeout effective on owner acceptance and merge. See [final evidence](contracts/restaurant-service-v1.md#final-synthetic-acceptance-record--2026-11-26).
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-04
 
-- [ ] **RS-05.01** — Add maintained JWT verification dependency and lock its resolved version; do not implement RSA primitives.
-- [ ] **RS-05.02** — Validate issuer, algorithm, time claims and configured azp against fixed trusted URLs; reject token-supplied jwks/jku URLs.
-- [ ] **RS-05.03** — Use 5-second JWKS timeout and fail closed without stale unbounded keys; expose only verified sub to membership lookup.
-- [ ] **RS-05.04** — Add the required cases below in this ticket’s test files; record command/output and request/schema versions. Supply the documentation delta and diff review before marking complete.
-- [ ] **RS-05.05** — Verify all numbered acceptance criteria and required evidence in the source packet; review/merge under the applicable authorization, record source SHA and handoff, then update completion status. Unrun or blocked checks are not passes.
+- [x] **RS-05.01** — Add maintained JWT verification dependency and lock its resolved version; do not implement RSA primitives.
+- [x] **RS-05.02** — Validate issuer, algorithm, time claims and configured azp against fixed trusted URLs; reject token-supplied jwks/jku URLs.
+- [x] **RS-05.03** — Use 5-second JWKS timeout and fail closed without stale unbounded keys; expose only verified sub to membership lookup.
+- [x] **RS-05.04** — Add the required cases below in this ticket’s test files; record command/output and request/schema versions. Supply the documentation delta and diff review before marking complete.
+- [x] **RS-05.05** — Verify all numbered acceptance criteria and required evidence in the source packet; review/merge under the applicable authorization, record source SHA and handoff, then update completion status. Unrun or blocked checks are not passes.
 
 **Then:** proceed to [RS-06](#run-rs-06) when ready, or choose another dependency-ready task while blocked.
 
 <a id="run-rs-06"></a>
 #### Step 12 — RS-06: Authorize restaurant roles and revoke staff membership
 
-**Source:** [Full ticket / gate](tickets/restaurant-service/RS-06.md). **Status:** Not completed.
+**Source:** [Full ticket / gate](tickets/restaurant-service/RS-06.md). **Status:** Synthetic closeout effective on owner acceptance and merge. See [final evidence](contracts/restaurant-service-v1.md#final-synthetic-acceptance-record--2026-11-26).
 
 **Prerequisites in this serial plan:** RF-05, RS-01, RS-05
 
-- [ ] **RS-06.01** — Read verified identity from CON-05; never trust role or restaurant in token/browser.
-- [ ] **RS-06.02** — Scope queries by restaurant; lock restaurant/membership for updates and preserve at least one owner.
-- [ ] **RS-06.03** — Mount additive router once in main.py; serialize later router edits through this owner.
-- [ ] **RS-06.04** — Add the required cases below in this ticket’s test files; record command/output and request/schema versions. Supply the documentation delta and diff review before marking complete.
-- [ ] **RS-06.05** — Verify all numbered acceptance criteria and required evidence in the source packet; review/merge under the applicable authorization, record source SHA and handoff, then update completion status. Unrun or blocked checks are not passes.
+- [x] **RS-06.01** — Read verified identity from CON-05; never trust role or restaurant in token/browser.
+- [x] **RS-06.02** — Scope queries by restaurant; lock restaurant/membership for updates and preserve at least one owner.
+- [x] **RS-06.03** — Mount additive router once in main.py; serialize later router edits through this owner.
+- [x] **RS-06.04** — Add the required cases below in this ticket’s test files; record command/output and request/schema versions. Supply the documentation delta and diff review before marking complete.
+- [x] **RS-06.05** — Verify all numbered acceptance criteria and required evidence in the source packet; review/merge under the applicable authorization, record source SHA and handoff, then update completion status. Unrun or blocked checks are not passes.
 
 **Then:** proceed to [RS-07](#run-rs-07) when ready, or choose another dependency-ready task while blocked.
 

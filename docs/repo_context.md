@@ -305,3 +305,10 @@ CI runs dependency security, web quality, backend/recovery and Chromium runtime.
 - U1 pricing/tax/receipt, U2 retention/deletion/export policy, U3 provider account/budget/configuration/support and U4 actual pilot/device/language inputs remain open. No invented production settings.
 - MSG91 callback authenticity is not established by the inspected public documentation; a callback claiming delivered is not trusted proof. U3 must settle authenticated reconciliation before SMS live activation.
 - Working tree contains unrelated QA/graph artifacts. Never stage those as ticket implementation.
+
+
+## RS-05/06 synthetic staff boundary (2026-11-26)
+
+Implementation merged in PR #87 at `3d138f817ff4eaee3ef98a4d3a1758259c76fdeb`; the owner-supplied independent review passed exact head `99bcc29a7a7d35009cc7b4fbbc491f5899a75819` for synthetic scope. [Post-merge CI](https://github.com/anmolsansi/OrderlyApp/actions/runs/45863431986) passed all seven jobs (420 backend tests, no skips, one warning). The documentation-only closeout becomes effective upon owner acceptance and merge; live activation remains disabled.
+
+Staff principal contains only the verified Clerk subject, with fresh DB role checks, separate enrollment and version-bound reactivation approvals, restricted runtime role and READ COMMITTED locked mutations. Migration 010 extends append-only audit protection. Future downstream writers must preserve the accepted transaction boundary and obtain explicit settings-write grant approval; existing mock authority remains separate. See the [maintained acceptance record](contracts/restaurant-service-v1.md#final-synthetic-acceptance-record--2026-11-26).
