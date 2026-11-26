@@ -428,3 +428,24 @@ def test_staff_connection_forces_read_committed(tenants, postgres_database_url, 
     monkeypatch.setattr(staff_routes, "get_connection", repeatable_read)
     with staff_routes.staff_connection() as conn:
         assert conn.execute("SHOW transaction_isolation").fetchone()["transaction_isolation"] == "read committed"
+
+
+def test_reactivation_requires_current_operator_approval(client, auth, tenants, postgres_database_url, monkeypatch):
+    t = tenants
+    target = path(t["a"], t["staff"])
+    owner_token = auth(t["owner"])
+    original_token = auth(t["staff"])
+    assert client.put(target, headers=owner_token, json=update(1, "order_staff", False)).status_code == 200
+    before = state(postgres_database_url, t["a"])
+    assert client.get("/v1/live/staff/memberships", headers=original_token).json() == {"memberships": []}
+    error(client.put(target, headers=owner_token, json=update(2, "order_staff")), 404, "not_found")
+    error(client.put(target, headers=original_token, json=update(2, "owner")), 404, "not_found")
+    assert state(postgres_database_url, t["a"]) == before
+    monkeypatch.setenv(members.VERIFIED_SUBJECTS_ENV, json.dumps({t["a"]: [t["staff"]]}))
+    error(client.put(target, headers=owner_token, json=update(1, "order_staff")), 409, "version_conflict")
+    restored = client.put(target, headers=owner_token, json=update(2, "order_staff"))
+    assert restored.status_code == 200 and restored.json()["version"] == 3
+    assert client.get("/v1/live/staff/memberships", headers=original_token).json() == {
+        "memberships": [{"restaurant_id": t["a"], "role": "order_staff", "version": 3}]}
+    _, audit = state(postgres_database_url, t["a"])
+    assert len(audit) == 2 and audit[-1]["old_active"] is False and audit[-1]["new_active"] is True

@@ -247,6 +247,10 @@ def put_member(conn: Any, principal: StaffPrincipal, rid: str, subject: str,
                 return before, False
             if before.version == MAX_VERSION:
                 raise _version_conflict()
+            # Revocation is reversible only with current operator approval.
+            # Removing allowlist entries does not itself revoke active rows.
+            if not before.active and change.active and not operator_verified(rid, subject):
+                raise not_found()
             if (before.role == "owner" and before.active
                     and (change.role != "owner" or not change.active)):
                 other = conn.execute(
