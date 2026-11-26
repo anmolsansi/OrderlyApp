@@ -492,3 +492,30 @@ def test_runtime_role_cannot_erase_or_alter_audit(client, auth, tenants, staff_r
 def test_privileged_runtime_identity_fails_closed(client, auth, tenants, postgres_database_url, monkeypatch):
     monkeypatch.setenv("DATABASE_URL", postgres_database_url)
     error(client.get("/v1/live/staff/memberships", headers=auth(tenants["owner"])), 503, "storage_unavailable", [])
+
+
+def test_duplicate_member_mutation_fields_rejected(client, auth, tenants, postgres_database_url):
+    t = tenants
+    before = state(postgres_database_url, t["a"])
+    error(client.put(path(t["a"], t["staff"]), headers=auth(t["owner"]),
+                     content=b'{"expected_version":1,"role":"cashier","role":"owner","active":true}'),
+          422, "invalid_input", ["body"])
+    assert state(postgres_database_url, t["a"]) == before
+
+
+def test_foreign_caller_denied_without_tenant_lock(client, auth, tenants, postgres_database_url):
+    t = tenants
+    with psycopg.connect(postgres_database_url) as holder:
+        holder.execute("SELECT restaurant_id FROM live_restaurants WHERE restaurant_id=%s FOR UPDATE", (t["a"],))
+        error(client.get(path(t["a"]), headers=auth(t["foreign"])), 404, "not_found")
+        error(client.put(path(t["a"], t["staff"]), headers=auth(t["foreign"]), json=update(1, "owner")), 404, "not_found")
+
+
+def test_lock_timeout_is_safe_and_does_not_write(client, auth, tenants, postgres_database_url):
+    t = tenants
+    before = state(postgres_database_url, t["a"])
+    with psycopg.connect(postgres_database_url) as holder:
+        holder.execute("SELECT restaurant_id FROM live_restaurants WHERE restaurant_id=%s FOR UPDATE", (t["a"],))
+        error(client.put(path(t["a"], t["staff"]), headers=auth(t["owner"]), json=update(1, "cashier")),
+              503, "storage_unavailable", [])
+    assert state(postgres_database_url, t["a"]) == before

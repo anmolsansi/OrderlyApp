@@ -1,7 +1,10 @@
 """Additive CON-06 staff API; live mode is disabled by default."""
 from __future__ import annotations
 
+import json
 import os
+
+from anyio import fail_after
 from contextlib import contextmanager
 
 import psycopg
@@ -80,17 +83,29 @@ def restaurant_member(rid: str, subject: str, response: Response,
         return get_member(conn, principal, rid, subject)
 
 
+def _unique_json_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON field")
+        result[key] = value
+    return result
+
+
 async def _read_update(request: Request) -> MembershipUpdate:
     # Stream-limit the direct backend too; do not rely on the future gateway.
     body = bytearray()
     try:
-        async for chunk in request.stream():
-            if len(body) + len(chunk) > MAX_BODY_BYTES:
-                raise invalid(["body"])
-            body.extend(chunk)
-    except ClientDisconnect:
+        with fail_after(5):
+            async for chunk in request.stream():
+                if len(body) + len(chunk) > MAX_BODY_BYTES:
+                    raise invalid(["body"])
+                body.extend(chunk)
+    except (ClientDisconnect, TimeoutError):
         raise invalid(["body"]) from None
     try:
+        # Reject duplicate fields before the strict DTO sees the document.
+        json.loads(bytes(body), object_pairs_hook=_unique_json_object)
         return MembershipUpdate.model_validate_json(bytes(body))
     except ValidationError as exc:
         fields = list(dict.fromkeys(
@@ -98,6 +113,8 @@ async def _read_update(request: Request) -> MembershipUpdate:
             for error in exc.errors()
         ))
         raise invalid(fields) from None
+    except (ValueError, UnicodeError, RecursionError):
+        raise invalid(["body"]) from None
 
 
 def _write(principal: StaffPrincipal, rid: str, subject: str, change: MembershipUpdate):
