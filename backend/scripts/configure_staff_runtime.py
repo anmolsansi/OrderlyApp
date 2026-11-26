@@ -1,7 +1,7 @@
 """Operator-only grants for an already-created, dedicated login role.
 
-Use migration-owner DATABASE_URL. Never run in the API process. Additional
-mock/runtime permissions are provisioned separately by the deployment operator.
+Use migration-owner DATABASE_URL. Never run in the API process. Grant the existing mock API baseline as well as current staff rights. Future
+live write permissions require explicit review.
 """
 from __future__ import annotations
 
@@ -28,6 +28,9 @@ def grant_staff_runtime(conn, role: str):
             raise ValueError("dedicated unprivileged login required")
         for template in (
             "GRANT USAGE ON SCHEMA public TO {}",
+            "GRANT SELECT ON public.schema_migrations, public.restaurants, public.menu_items TO {}",
+            "GRANT SELECT, INSERT, UPDATE, DELETE ON public.guest_sessions, public.guest_carts TO {}",
+            "GRANT SELECT, INSERT ON public.guest_orders, public.order_idempotency TO {}",
             "GRANT SELECT, UPDATE ON public.live_restaurants TO {}",
             "GRANT SELECT, INSERT, UPDATE ON public.live_memberships TO {}",
             "REVOKE ALL ON public.live_membership_audit FROM {}",

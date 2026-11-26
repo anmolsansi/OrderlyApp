@@ -28,7 +28,7 @@ services:
       dockerfile: backend/Dockerfile
     command: python scripts/migrate.py
     environment:
-      DATABASE_URL: ${ORDERLY_COMPOSE_DATABASE_URL:-postgresql://orderly:orderly@postgres:5432/orderlyapp}
+      DATABASE_URL: ${ORDERLY_COMPOSE_RUNTIME_DATABASE_URL:-${ORDERLY_COMPOSE_DATABASE_URL:-postgresql://orderly:orderly@postgres:5432/orderlyapp}}
       ORDERLY_ENVIRONMENT: ${ORDERLY_ENVIRONMENT:-development}
     depends_on:
       postgres:

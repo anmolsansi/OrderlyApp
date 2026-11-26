@@ -53,6 +53,7 @@ def staff_connection():
             # is REPEATABLE READ. Establish before the first SQL statement.
             conn.isolation_level = psycopg.IsolationLevel.READ_COMMITTED
             with conn.transaction():
+                conn.execute("SET LOCAL search_path = pg_catalog, public, pg_temp")
                 conn.execute("SET LOCAL lock_timeout = '2s'")
                 conn.execute("SET LOCAL statement_timeout = '4s'")
                 assert_staff_runtime_role(conn)
