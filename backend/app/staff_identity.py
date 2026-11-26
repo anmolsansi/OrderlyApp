@@ -247,6 +247,9 @@ class _KeyCache:
             return key
 
 
+_CACHE_LOCK = Lock()
+
+
 @lru_cache(maxsize=1)
 def _cache(settings: StaffSettings) -> _KeyCache:
     return _KeyCache(settings.jwks_url)
@@ -257,7 +260,10 @@ def verify_staff_token(request: Request) -> StaffPrincipal:
     token = _bearer(request)
     kid = _key_id(token)
     settings = load_staff_settings()
-    key = _cache(settings).get(kid)
+    # lru_cache alone allows duplicate concurrent misses; publish one cache.
+    with _CACHE_LOCK:
+        cache = _cache(settings)
+    key = cache.get(kid)
     try:
         claims = jwt.decode(
             token, key.key, algorithms=["RS256"], issuer=settings.issuer,
