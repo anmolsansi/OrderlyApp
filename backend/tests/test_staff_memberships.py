@@ -14,6 +14,8 @@ import psycopg
 from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi.testclient import TestClient
 from psycopg.rows import dict_row
+from psycopg import sql
+from psycopg.conninfo import make_conninfo
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -22,6 +24,8 @@ sys.path.insert(0, str(ROOT / "backend"))
 from app import staff_identity as identity
 from app import staff_memberships as members
 from app import staff_routes
+from app.staff_db_security import assert_staff_runtime_role
+from scripts.configure_staff_runtime import grant_staff_runtime
 from app.main import app
 from scripts.provision_live_restaurant import provision_restaurant, validate_input_object
 
@@ -77,10 +81,25 @@ def insert_member(conn, rid, subject, role, active=True):
 
 
 @pytest.fixture
-def tenants(postgres_database_url, monkeypatch):
+def staff_runtime_url(postgres_database_url):
+    role = "rs06_runtime_" + uuid4().hex
+    password = uuid4().hex
+    with psycopg.connect(postgres_database_url, row_factory=dict_row) as admin:
+        admin.execute(sql.SQL("CREATE ROLE {} LOGIN PASSWORD {}").format(sql.Identifier(role), sql.Literal(password)))
+        grant_staff_runtime(admin, role)
+    try:
+        yield make_conninfo(postgres_database_url, user=role, password=password)
+    finally:
+        with psycopg.connect(postgres_database_url) as admin:
+            admin.execute(sql.SQL("DROP OWNED BY {}").format(sql.Identifier(role)))
+            admin.execute(sql.SQL("DROP ROLE {}").format(sql.Identifier(role)))
+
+
+@pytest.fixture
+def tenants(postgres_database_url, staff_runtime_url, monkeypatch):
     # Committed rows with unique IDs are necessary for independent HTTP/concurrency
     # connections. Audit history is immutable; use only the isolated test database.
-    monkeypatch.setenv("DATABASE_URL", postgres_database_url)
+    monkeypatch.setenv("DATABASE_URL", staff_runtime_url)
     monkeypatch.delenv("ORDERLY_FORCE_JSON_STORE", raising=False)
     suffix = uuid4().hex
     data = {name: f"rs06-{name}-{suffix}" for name in
@@ -418,11 +437,11 @@ def test_nondefault_isolation_is_rejected_by_direct_writer(tenants, postgres_dat
     assert state(postgres_database_url, t["a"]) == before
 
 
-def test_staff_connection_forces_read_committed(tenants, postgres_database_url, monkeypatch):
+def test_staff_connection_forces_read_committed(tenants, staff_runtime_url, monkeypatch):
     from contextlib import contextmanager
     @contextmanager
     def repeatable_read(**kwargs):
-        with psycopg.connect(postgres_database_url, row_factory=dict_row) as conn:
+        with psycopg.connect(staff_runtime_url, row_factory=dict_row) as conn:
             conn.isolation_level = psycopg.IsolationLevel.REPEATABLE_READ
             yield conn
     monkeypatch.setattr(staff_routes, "get_connection", repeatable_read)
@@ -449,3 +468,27 @@ def test_reactivation_requires_current_operator_approval(client, auth, tenants, 
         "memberships": [{"restaurant_id": t["a"], "role": "order_staff", "version": 3}]}
     _, audit = state(postgres_database_url, t["a"])
     assert len(audit) == 2 and audit[-1]["old_active"] is False and audit[-1]["new_active"] is True
+
+
+def test_runtime_role_cannot_erase_or_alter_audit(client, auth, tenants, staff_runtime_url, postgres_database_url):
+    t = tenants
+    assert client.put(path(t["a"], t["new"]), headers=auth(t["owner"]), json=update(0, "cashier")).status_code == 201
+    before = state(postgres_database_url, t["a"])
+    with psycopg.connect(staff_runtime_url, row_factory=dict_row) as runtime:
+        assert_staff_runtime_role(runtime)
+        for statement in (
+            "UPDATE live_membership_audit SET new_role='owner'",
+            "DELETE FROM live_membership_audit",
+            "TRUNCATE live_membership_audit",
+            "ALTER TABLE live_membership_audit DISABLE TRIGGER ALL",
+            "DROP TABLE live_membership_audit",
+            "CREATE TABLE public.rs06_unauthorized_ddl (id int)",
+        ):
+            with pytest.raises(psycopg.errors.InsufficientPrivilege), runtime.transaction():
+                runtime.execute(statement)
+    assert state(postgres_database_url, t["a"]) == before
+
+
+def test_privileged_runtime_identity_fails_closed(client, auth, tenants, postgres_database_url, monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", postgres_database_url)
+    error(client.get("/v1/live/staff/memberships", headers=auth(tenants["owner"])), 503, "storage_unavailable", [])

@@ -12,6 +12,7 @@ from starlette.requests import ClientDisconnect
 
 from .database import database_url, get_connection
 from .staff_identity import StaffPrincipal, verify_staff_token
+from .staff_db_security import assert_staff_runtime_role
 from .staff_memberships import (
     Membership, MembershipSummary, MembershipUpdate, get_member, invalid,
     list_members, list_own_memberships, put_member, unavailable,
@@ -51,6 +52,7 @@ def staff_connection():
             with conn.transaction():
                 conn.execute("SET LOCAL lock_timeout = '2s'")
                 conn.execute("SET LOCAL statement_timeout = '4s'")
+                assert_staff_runtime_role(conn)
                 yield conn
     except psycopg.Error:
         raise unavailable() from None
