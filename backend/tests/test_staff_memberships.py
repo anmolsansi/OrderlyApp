@@ -268,3 +268,96 @@ def test_stale_version_and_oversized_body_do_not_write(client, auth, tenants, po
     error(client.put(target, headers=headers, json=update(0, "cashier")), 409, "version_conflict")
     error(client.put(target, headers=headers, content=b"x" * (65536 + 1)), 422, "invalid_input", ["body"])
     assert state(postgres_database_url, t["a"]) == before
+
+
+def test_fresh_role_matrix_and_revocation(client, auth, tenants, postgres_database_url):
+    t = tenants
+    with psycopg.connect(postgres_database_url, row_factory=dict_row) as conn:
+        for key, role in (("owner", "owner"), ("staff", "order_staff"), ("cashier", "cashier")):
+            principal = identity.StaffPrincipal(t[key])
+            assert members.require_role(conn, principal, t["a"], {role}).role == role
+            with pytest.raises(members.MembershipError) as exc:
+                members.require_role(conn, principal, t["a"], members.ROLES - {role})
+            assert exc.value.code == "permission_denied"
+    staff_token = auth(t["staff"])
+    assert client.get("/v1/live/staff/memberships", headers=staff_token).json()["memberships"]
+    result = client.put(path(t["a"], t["staff"]), headers=auth(t["owner"]), json=update(1, "order_staff", False))
+    assert result.status_code == 200
+    assert client.get("/v1/live/staff/memberships", headers=staff_token).json() == {"memberships": []}
+    with psycopg.connect(postgres_database_url, row_factory=dict_row) as conn:
+        with pytest.raises(members.MembershipError) as exc:
+            members.require_role(conn, identity.StaffPrincipal(t["staff"]), t["a"], members.ROLES)
+        assert exc.value.code == "not_found"
+
+
+@pytest.mark.parametrize("role,active", [("cashier", True), ("owner", False)])
+def test_last_owner_cannot_be_removed(client, auth, tenants, postgres_database_url, role, active):
+    t = tenants
+    headers = auth(t["foreign"])
+    before = state(postgres_database_url, t["b"])
+    error(client.put(path(t["b"], t["foreign"]), headers=headers, json=update(1, role, active)),
+          409, "last_owner")
+    assert state(postgres_database_url, t["b"]) == before
+
+
+def test_concurrent_owner_removal_keeps_one_owner(tenants, postgres_database_url):
+    t = tenants
+    barrier = Barrier(2)
+
+    def remove_self(subject):
+        try:
+            with psycopg.connect(postgres_database_url, row_factory=dict_row) as conn:
+                conn.execute("SET LOCAL lock_timeout = '5s'")
+                barrier.wait(timeout=5)
+                membership, created = members.put_member(
+                    conn, identity.StaffPrincipal(subject), t["a"], subject,
+                    members.MembershipUpdate(**update(1, "owner", False)),
+                )
+                assert not created and not membership.active
+            return "accepted"
+        except members.MembershipError as exc:
+            return exc.code
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(remove_self, [t["owner"], t["second"]]))
+    assert sorted(results) == ["accepted", "last_owner"]
+    rows, audit = state(postgres_database_url, t["a"])
+    assert sum(row["active"] and row["role"] == "owner" for row in rows) == 1
+    assert len(audit) == 1
+
+
+def test_database_audit_failure_rolls_back_entire_write(client, auth, tenants, postgres_database_url, monkeypatch):
+    t = tenants
+    before = state(postgres_database_url, t["a"])
+
+    def fail_audit(conn, actor, previous, after):
+        # Real PostgreSQL constraint failure after the membership row was written.
+        conn.execute(
+            """INSERT INTO live_membership_audit
+               (id,restaurant_id,subject,actor,new_role,new_active)
+               VALUES (%s,%s,%s,NULL,%s,%s)""",
+            (uuid4(), after.restaurant_id, after.clerk_user_id, after.role, after.active),
+        )
+
+    monkeypatch.setattr(members, "_audit", fail_audit)
+    response = client.put(path(t["a"], t["new"]), headers=auth(t["owner"]), json=update(0, "cashier"))
+    error(response, 503, "storage_unavailable", [])
+    assert "NULL" not in response.text and "audit" not in response.text
+    assert state(postgres_database_url, t["a"]) == before
+
+
+def test_database_outage_is_redacted(client, auth, monkeypatch):
+    monkeypatch.setattr(staff_routes, "database_url", lambda: "synthetic")
+    def unavailable_connection(**kwargs):
+        raise psycopg.OperationalError("postgresql://private:secret@hidden/db")
+    monkeypatch.setattr(staff_routes, "get_connection", unavailable_connection)
+    response = client.get("/v1/live/staff/memberships", headers=auth("staff"))
+    error(response, 503, "storage_unavailable", [])
+    assert "secret" not in response.text
+
+
+def test_existing_mock_health_remains_unchanged(client):
+    response = client.get("/health/live")
+    assert response.status_code == 200
+    assert response.json()["live"] is True
+    assert response.json()["schema_version"] == 1
