@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from app.database import get_connection
+from app.staff_identity import MAX_SUBJECT_LENGTH
 
 
 class BootstrapError(RuntimeError):
@@ -27,6 +28,7 @@ def validate_identity(restaurant_id: str, clerk_user_id: str) -> None:
         raise BootstrapError("restaurant_id must contain 1 to 100 characters")
     for value, field in ((restaurant_id, "restaurant_id"), (clerk_user_id, "clerk_user_id")):
         if (not isinstance(value, str) or not value.strip()
+                or len(value) > MAX_SUBJECT_LENGTH
                 or any(not char.isprintable() for char in value)):
             raise BootstrapError(f"{field} must be a nonblank printable identifier")
 
@@ -57,6 +59,8 @@ def bootstrap_owner(connection: Any, restaurant_id: str, clerk_user_id: str) -> 
     """
     validate_identity(restaurant_id, clerk_user_id)
     with connection.transaction():
+        if connection.execute("SHOW transaction_isolation").fetchone()["transaction_isolation"] != "read committed":
+            raise BootstrapError("owner bootstrap requires READ COMMITTED")
         restaurant = connection.execute(
             """SELECT ordering_enabled, synthetic FROM live_restaurants
                WHERE restaurant_id = %s FOR UPDATE""",
@@ -102,6 +106,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         validate_identity(args.restaurant_id, args.clerk_user_id)
         require_target()
         with get_connection() as connection:
+            if connection.info.transaction_status == psycopg.pq.TransactionStatus.IDLE:
+                connection.isolation_level = psycopg.IsolationLevel.READ_COMMITTED
             result = bootstrap_owner(connection, args.restaurant_id, args.clerk_user_id)
     except BootstrapError as error:
         print(f"error: {error}", file=sys.stderr)

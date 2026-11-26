@@ -356,3 +356,10 @@ def test_cli_does_not_report_success_on_failed_connection_exit(db, target, monke
     assert output.out == ""
     assert output.err == "error: PostgreSQL is unavailable\n"
     assert memberships(db, rid) == audits(db, rid) == []
+
+
+def test_bootstrap_rejects_unsupported_transaction_isolation(postgres_database_url):
+    with psycopg.connect(postgres_database_url, row_factory=dict_row) as conn:
+        conn.isolation_level = psycopg.IsolationLevel.REPEATABLE_READ
+        with pytest.raises(cli.BootstrapError, match="READ COMMITTED"):
+            cli.bootstrap_owner(conn, "synthetic-restaurant", SUBJECT)

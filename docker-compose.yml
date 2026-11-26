@@ -58,7 +58,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL: ${ORDERLY_COMPOSE_DATABASE_URL:-postgresql://orderly:orderly@postgres:5432/orderlyapp}
+      DATABASE_URL: ${ORDERLY_COMPOSE_RUNTIME_DATABASE_URL:-${ORDERLY_COMPOSE_DATABASE_URL:-postgresql://orderly:orderly@postgres:5432/orderlyapp}}
       REDIS_URL: ${ORDERLY_COMPOSE_REDIS_URL:-redis://redis:6379}
       ORDERLY_DATA_MODE: api
       ORDERLY_ENVIRONMENT: ${ORDERLY_ENVIRONMENT:-development}

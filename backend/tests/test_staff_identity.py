@@ -36,7 +36,8 @@ def jwk(signers, kid):
 
 def make_token(signers, *, kid="one", changes=None, headers=None, missing=None):
     now = int(time())
-    claims = {"iss": ISSUER, "azp": PARTY, "sub": SUBJECT, "exp": now + 120, "nbf": now - 5}
+    claims = {"iss": ISSUER, "azp": PARTY, "sub": SUBJECT, "exp": now + 120, "nbf": now - 5,
+              "iat": now, "sid": "sess_Synthetic123", "v": 2}
     claims.update(changes or {})
     if missing:
         claims.pop(missing)
@@ -129,7 +130,7 @@ def test_invalid_verified_claims(transport, signers, changes):
     denied(request(make_token(signers, changes=changes)))
 
 
-@pytest.mark.parametrize("missing", ["iss", "azp", "exp", "nbf", "sub"])
+@pytest.mark.parametrize("missing", ["iss", "azp", "exp", "nbf", "sub", "iat", "sid", "v"])
 def test_required_claims(transport, signers, missing):
     denied(request(make_token(signers, missing=missing)))
 
@@ -345,3 +346,16 @@ def test_provider_matches_shared_authentication_failure_contract(
     assert error.message == expected["error"]["message"]
     assert expected["no_write"] is True and expected["synthetic"] is True
     # No principal was returned, so consumers must not proceed to membership lookup.
+
+
+@pytest.mark.parametrize("changes", [
+    {"sts": "pending"}, {"sts": "ended"}, {"sts": None}, {"v": 1}, {"v": True},
+    {"sid": "template"}, {"sid": "sess_"}, {"sid": 1}, {"act": {"sub": "impersonator"}},
+    {"iat": 1}, {"iat": True}, {"exp": 4102444800}, {"sub": "u" * 257},
+])
+def test_signed_wrong_session_profile_rejected(transport, signers, changes):
+    denied(request(make_token(signers, changes=changes)))
+
+
+def test_explicit_active_status_accepted(transport, signers):
+    assert identity.verify_staff_token(request(make_token(signers, changes={"sts": "active"}))).sub == SUBJECT

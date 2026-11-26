@@ -11,13 +11,14 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .staff_identity import StaffPrincipal
+from .staff_identity import MAX_SUBJECT_LENGTH, StaffPrincipal
 
 Role = Literal["owner", "order_staff", "cashier"]
 ROLES = frozenset({"owner", "order_staff", "cashier"})
 OWNER_ONLY = frozenset({"owner"})
 MAX_VERSION = 9223372036854775807
 VERIFIED_SUBJECTS_ENV = "ORDERLY_OPERATOR_VERIFIED_STAFF_SUBJECTS"
+VERIFIED_REACTIVATIONS_ENV = "ORDERLY_OPERATOR_VERIFIED_STAFF_REACTIVATIONS"
 _COLUMNS = "restaurant_id, clerk_user_id, role, active, version"
 
 
@@ -74,7 +75,7 @@ class MembershipUpdate(BaseModel):
 
 def _identifier(value: str, *, restaurant: bool = False) -> bool:
     return (isinstance(value, str) and bool(value.strip()) and value.isprintable()
-            and (not restaurant or len(value) <= 100))
+            and len(value) <= (100 if restaurant else MAX_SUBJECT_LENGTH))
 
 
 def validate_identifiers(rid: str, subject: str | None = None) -> None:
@@ -115,7 +116,37 @@ def operator_verified(rid: str, subject: str) -> bool:
                     or any(not _identifier(value) for value in values)):
                 raise ValueError("invalid configuration")
         return subject in entries.get(rid, [])
-    except (ValueError, TypeError, UnicodeError):
+    except (ValueError, TypeError, UnicodeError, RecursionError):
+        raise MembershipError(503, "identity_unavailable", "Staff identity unavailable") from None
+
+
+def operator_verified_reactivation(rid: str, subject: str, version: int) -> bool:
+    """A separate, exact inactive-version approval cannot authorize later revocations."""
+    raw = os.getenv(VERIFIED_REACTIVATIONS_ENV)
+    if not raw:
+        return False
+    try:
+        if len(raw.encode("utf-8")) > 65536:
+            raise ValueError("oversized configuration")
+        def unique_pairs(pairs):
+            result = {}
+            for key, value in pairs:
+                if key in result:
+                    raise ValueError("duplicate approval")
+                result[key] = value
+            return result
+        entries = json.loads(raw, object_pairs_hook=unique_pairs)
+        if not isinstance(entries, dict):
+            raise ValueError("invalid configuration")
+        for restaurant_id, subjects in entries.items():
+            if not _identifier(restaurant_id, restaurant=True) or not isinstance(subjects, dict):
+                raise ValueError("invalid configuration")
+            for subject_id, approved_version in subjects.items():
+                if (not _identifier(subject_id) or type(approved_version) is not int
+                        or not 1 <= approved_version <= MAX_VERSION):
+                    raise ValueError("invalid configuration")
+        return entries.get(rid, {}).get(subject) == version
+    except (ValueError, TypeError, UnicodeError, RecursionError):
         raise MembershipError(503, "identity_unavailable", "Staff identity unavailable") from None
 
 
@@ -151,6 +182,12 @@ def list_own_memberships(conn: Any, principal: StaffPrincipal) -> list[Membershi
     return [MembershipSummary.model_validate(row) for row in rows]
 
 
+def require_read_committed(conn: Any) -> None:
+    # Reject unsupported transaction snapshots even for direct/legacy callers.
+    if conn.execute("SHOW transaction_isolation").fetchone()["transaction_isolation"] != "read committed":
+        raise unavailable()
+
+
 def _lock_restaurant(conn: Any, rid: str, *, write: bool) -> None:
     # Fixed SQL clauses only; never interpolate a request value.
     lock = "FOR UPDATE" if write else "FOR SHARE"
@@ -164,6 +201,8 @@ def _lock_restaurant(conn: Any, rid: str, *, write: bool) -> None:
 def list_members(conn: Any, principal: StaffPrincipal, rid: str) -> list[Membership]:
     validate_identifiers(rid)
     with conn.transaction():
+        require_read_committed(conn)
+        require_role(conn, principal, rid, OWNER_ONLY)
         _lock_restaurant(conn, rid, write=False)
         require_role(conn, principal, rid, OWNER_ONLY)
         rows = conn.execute(
@@ -176,6 +215,8 @@ def list_members(conn: Any, principal: StaffPrincipal, rid: str) -> list[Members
 def get_member(conn: Any, principal: StaffPrincipal, rid: str, subject: str) -> Membership:
     validate_identifiers(rid, subject)
     with conn.transaction():
+        require_read_committed(conn)
+        require_role(conn, principal, rid, OWNER_ONLY)
         _lock_restaurant(conn, rid, write=False)
         require_role(conn, principal, rid, OWNER_ONLY)
         row = conn.execute(
@@ -208,6 +249,8 @@ def put_member(conn: Any, principal: StaffPrincipal, rid: str, subject: str,
     """Return membership and created flag after one atomic, tenant-locked write."""
     validate_identifiers(rid, subject)
     with conn.transaction():
+        require_read_committed(conn)
+        require_role(conn, principal, rid, OWNER_ONLY)
         # All membership writers, including RS-04 bootstrap, lock parent first.
         # Reauthorize only AFTER obtaining the lock, not at screen entry.
         _lock_restaurant(conn, rid, write=True)
@@ -235,6 +278,11 @@ def put_member(conn: Any, principal: StaffPrincipal, rid: str, subject: str,
                 return before, False
             if before.version == MAX_VERSION:
                 raise _version_conflict()
+            # Revocation is reversible only with current operator approval.
+            # Removing allowlist entries does not itself revoke active rows.
+            if (not before.active and change.active
+                    and not operator_verified_reactivation(rid, subject, before.version)):
+                raise not_found()
             if (before.role == "owner" and before.active
                     and (change.role != "owner" or not change.active)):
                 other = conn.execute(

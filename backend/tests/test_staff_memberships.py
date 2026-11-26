@@ -14,6 +14,8 @@ import psycopg
 from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi.testclient import TestClient
 from psycopg.rows import dict_row
+from psycopg import sql
+from psycopg.conninfo import make_conninfo
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -22,6 +24,8 @@ sys.path.insert(0, str(ROOT / "backend"))
 from app import staff_identity as identity
 from app import staff_memberships as members
 from app import staff_routes
+from app.staff_db_security import assert_staff_runtime_role
+from scripts.configure_staff_runtime import grant_staff_runtime
 from app.main import app
 from scripts.provision_live_restaurant import provision_restaurant, validate_input_object
 
@@ -39,12 +43,14 @@ def auth(monkeypatch):
     monkeypatch.setenv("ORDERLY_CLERK_JWKS_URL", ISSUER + "/jwks")
     monkeypatch.setenv("ORDERLY_CLERK_AUTHORIZED_PARTIES", PARTY)
     monkeypatch.delenv(members.VERIFIED_SUBJECTS_ENV, raising=False)
+    monkeypatch.delenv(members.VERIFIED_REACTIVATIONS_ENV, raising=False)
     identity._cache.cache_clear()
     monkeypatch.setattr(identity, "_fetch_keys", lambda url: {"rs06": key})
 
     def headers(subject, **changes):
         now = int(time())
-        claims = {"iss": ISSUER, "azp": PARTY, "sub": subject, "exp": now + 120, "nbf": now - 5}
+        claims = {"iss": ISSUER, "azp": PARTY, "sub": subject, "exp": now + 120, "nbf": now - 5,
+              "iat": now, "sid": "sess_Synthetic123", "v": 2}
         claims.update(changes)
         token = jwt.encode(claims, signer, algorithm="RS256", headers={"kid": "rs06"})
         return {"Authorization": "Bearer " + token}
@@ -76,10 +82,25 @@ def insert_member(conn, rid, subject, role, active=True):
 
 
 @pytest.fixture
-def tenants(postgres_database_url, monkeypatch):
+def staff_runtime_url(postgres_database_url):
+    role = "rs06_runtime_" + uuid4().hex
+    password = uuid4().hex
+    with psycopg.connect(postgres_database_url, row_factory=dict_row) as admin:
+        admin.execute(sql.SQL("CREATE ROLE {} LOGIN PASSWORD {}").format(sql.Identifier(role), sql.Literal(password)))
+        grant_staff_runtime(admin, role)
+    try:
+        yield make_conninfo(postgres_database_url, user=role, password=password)
+    finally:
+        with psycopg.connect(postgres_database_url) as admin:
+            admin.execute(sql.SQL("DROP OWNED BY {}").format(sql.Identifier(role)))
+            admin.execute(sql.SQL("DROP ROLE {}").format(sql.Identifier(role)))
+
+
+@pytest.fixture
+def tenants(postgres_database_url, staff_runtime_url, monkeypatch):
     # Committed rows with unique IDs are necessary for independent HTTP/concurrency
     # connections. Audit history is immutable; use only the isolated test database.
-    monkeypatch.setenv("DATABASE_URL", postgres_database_url)
+    monkeypatch.setenv("DATABASE_URL", staff_runtime_url)
     monkeypatch.delenv("ORDERLY_FORCE_JSON_STORE", raising=False)
     suffix = uuid4().hex
     data = {name: f"rs06-{name}-{suffix}" for name in
@@ -395,3 +416,240 @@ def test_shared_membership_negative_vectors(client, auth, tenants, postgres_data
         assert case["no_write"] is True
     assert state(postgres_database_url, t["a"]) == before_a
     assert state(postgres_database_url, t["b"]) == before_b
+
+
+@pytest.mark.parametrize("claims", [{"sts": "pending"}, {"sid": None}, {"v": None}, {"act": {"sub": "operator"}}])
+def test_wrong_session_profile_cannot_open_database(client, auth, monkeypatch, claims):
+    monkeypatch.setattr(staff_routes, "database_url", lambda: "synthetic-test")
+    monkeypatch.setattr(staff_routes, "get_connection", lambda **kwargs: pytest.fail("invalid session reached DB"))
+    error(client.get("/v1/live/staff/memberships", headers=auth("synthetic", **claims)), 401, "staff_auth_required", [])
+
+
+
+def test_nondefault_isolation_is_rejected_by_direct_writer(tenants, postgres_database_url):
+    t = tenants
+    before = state(postgres_database_url, t["a"])
+    with psycopg.connect(postgres_database_url, row_factory=dict_row) as conn:
+        conn.isolation_level = psycopg.IsolationLevel.REPEATABLE_READ
+        with pytest.raises(members.MembershipError) as exc:
+            members.put_member(conn, identity.StaffPrincipal(t["owner"]), t["a"], t["staff"],
+                               members.MembershipUpdate(**update(1, "cashier")))
+        assert exc.value.code == "storage_unavailable"
+    assert state(postgres_database_url, t["a"]) == before
+
+
+def test_staff_connection_forces_read_committed(tenants, staff_runtime_url, monkeypatch):
+    from contextlib import contextmanager
+    @contextmanager
+    def repeatable_read(**kwargs):
+        with psycopg.connect(staff_runtime_url, row_factory=dict_row) as conn:
+            conn.isolation_level = psycopg.IsolationLevel.REPEATABLE_READ
+            yield conn
+    monkeypatch.setattr(staff_routes, "get_connection", repeatable_read)
+    with staff_routes.staff_connection() as conn:
+        assert conn.execute("SHOW transaction_isolation").fetchone()["transaction_isolation"] == "read committed"
+
+
+def test_reactivation_requires_current_operator_approval(client, auth, tenants, postgres_database_url, monkeypatch):
+    t = tenants
+    target = path(t["a"], t["staff"])
+    owner_token = auth(t["owner"])
+    original_token = auth(t["staff"])
+    assert client.put(target, headers=owner_token, json=update(1, "order_staff", False)).status_code == 200
+    before = state(postgres_database_url, t["a"])
+    assert client.get("/v1/live/staff/memberships", headers=original_token).json() == {"memberships": []}
+    error(client.put(target, headers=owner_token, json=update(2, "order_staff")), 404, "not_found")
+    error(client.put(target, headers=original_token, json=update(2, "owner")), 404, "not_found")
+    assert state(postgres_database_url, t["a"]) == before
+    monkeypatch.setenv(members.VERIFIED_SUBJECTS_ENV, json.dumps({t["a"]: [t["staff"]]}))
+    error(client.put(target, headers=owner_token, json=update(2, "order_staff")), 404, "not_found")
+    monkeypatch.setenv(members.VERIFIED_REACTIVATIONS_ENV, json.dumps({t["b"]: {t["staff"]: 2}}))
+    error(client.put(target, headers=owner_token, json=update(2, "order_staff")), 404, "not_found")
+    monkeypatch.setenv(members.VERIFIED_REACTIVATIONS_ENV, json.dumps({t["a"]: {t["staff"]: True}}))
+    error(client.put(target, headers=owner_token, json=update(2, "order_staff")), 503, "identity_unavailable")
+    monkeypatch.setenv(members.VERIFIED_REACTIVATIONS_ENV, json.dumps({t["a"]: {t["staff"]: 2}}))
+    error(client.put(target, headers=owner_token, json=update(1, "order_staff")), 409, "version_conflict")
+    restored = client.put(target, headers=owner_token, json=update(2, "order_staff"))
+    assert restored.status_code == 200 and restored.json()["version"] == 3
+    assert client.get("/v1/live/staff/memberships", headers=original_token).json() == {
+        "memberships": [{"restaurant_id": t["a"], "role": "order_staff", "version": 3}]}
+    _, audit = state(postgres_database_url, t["a"])
+    assert len(audit) == 2 and audit[-1]["old_active"] is False and audit[-1]["new_active"] is True
+    assert client.put(target, headers=owner_token, json=update(3, "order_staff", False)).status_code == 200
+    error(client.put(target, headers=owner_token, json=update(4, "order_staff")), 404, "not_found")
+    assert client.get("/v1/live/staff/memberships", headers=original_token).json() == {"memberships": []}
+    monkeypatch.setenv(members.VERIFIED_REACTIVATIONS_ENV, json.dumps({t["a"]: {t["staff"]: 4}}))
+    assert client.put(target, headers=owner_token, json=update(4, "order_staff")).status_code == 200
+    _, audit = state(postgres_database_url, t["a"])
+    assert len(audit) == 4
+
+
+def test_runtime_role_cannot_erase_or_alter_audit(client, auth, tenants, staff_runtime_url, postgres_database_url):
+    t = tenants
+    assert client.put(path(t["a"], t["new"]), headers=auth(t["owner"]), json=update(0, "cashier")).status_code == 201
+    before = state(postgres_database_url, t["a"])
+    with psycopg.connect(staff_runtime_url, row_factory=dict_row) as runtime:
+        assert_staff_runtime_role(runtime)
+        for statement in (
+            "UPDATE live_membership_audit SET new_role='owner'",
+            "DELETE FROM live_membership_audit",
+            "TRUNCATE live_membership_audit",
+            "ALTER TABLE live_membership_audit DISABLE TRIGGER ALL",
+            "DROP TABLE live_membership_audit",
+            "CREATE TABLE public.rs06_unauthorized_ddl (id int)",
+        ):
+            with pytest.raises(psycopg.errors.InsufficientPrivilege), runtime.transaction():
+                runtime.execute(statement)
+    assert state(postgres_database_url, t["a"]) == before
+
+
+def test_privileged_runtime_identity_fails_closed(client, auth, tenants, postgres_database_url, monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", postgres_database_url)
+    error(client.get("/v1/live/staff/memberships", headers=auth(tenants["owner"])), 503, "storage_unavailable", [])
+
+
+def test_duplicate_member_mutation_fields_rejected(client, auth, tenants, postgres_database_url):
+    t = tenants
+    before = state(postgres_database_url, t["a"])
+    error(client.put(path(t["a"], t["staff"]), headers=auth(t["owner"]),
+                     content=b'{"expected_version":1,"role":"cashier","role":"owner","active":true}'),
+          422, "invalid_input", ["body"])
+    assert state(postgres_database_url, t["a"]) == before
+
+
+def test_foreign_caller_denied_without_tenant_lock(client, auth, tenants, postgres_database_url):
+    t = tenants
+    with psycopg.connect(postgres_database_url) as holder:
+        holder.execute("SELECT restaurant_id FROM live_restaurants WHERE restaurant_id=%s FOR UPDATE", (t["a"],))
+        error(client.get(path(t["a"]), headers=auth(t["foreign"])), 404, "not_found")
+        error(client.put(path(t["a"], t["staff"]), headers=auth(t["foreign"]), json=update(1, "owner")), 404, "not_found")
+
+
+def test_lock_timeout_is_safe_and_does_not_write(client, auth, tenants, postgres_database_url):
+    t = tenants
+    before = state(postgres_database_url, t["a"])
+    with psycopg.connect(postgres_database_url) as holder:
+        holder.execute("SELECT restaurant_id FROM live_restaurants WHERE restaurant_id=%s FOR UPDATE", (t["a"],))
+        error(client.put(path(t["a"], t["staff"]), headers=auth(t["owner"]), json=update(1, "cashier")),
+              503, "storage_unavailable", [])
+    assert state(postgres_database_url, t["a"]) == before
+
+
+def test_queued_owner_write_rechecks_revocation(tenants, staff_runtime_url, postgres_database_url, monkeypatch):
+    from threading import Event
+    t = tenants
+    queued = Event()
+    original = members._lock_restaurant
+
+    def observe(conn, rid, *, write):
+        queued.set()
+        return original(conn, rid, write=write)
+
+    def queued_mutation():
+        try:
+            with staff_routes.staff_connection() as conn:
+                members.put_member(conn, identity.StaffPrincipal(t["owner"]), t["a"], t["staff"],
+                                   members.MembershipUpdate(**update(1, "cashier")))
+        except members.MembershipError as exc:
+            return exc.code
+        return "unexpected success"
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        with psycopg.connect(postgres_database_url, row_factory=dict_row) as holder:
+            # Hold the parent, revoke the actor, but keep the revocation uncommitted.
+            holder.execute("SELECT restaurant_id FROM live_restaurants WHERE restaurant_id=%s FOR UPDATE", (t["a"],))
+            members.put_member(holder, identity.StaffPrincipal(t["second"]), t["a"], t["owner"],
+                               members.MembershipUpdate(**update(1, "owner", False)))
+            monkeypatch.setattr(members, "_lock_restaurant", observe)
+            pending = pool.submit(queued_mutation)
+            assert queued.wait(1.5)
+        assert pending.result(timeout=5) == "not_found"
+    rows, audit = state(postgres_database_url, t["a"])
+    assert next(row for row in rows if row["clerk_user_id"] == t["staff"])["role"] == "order_staff"
+    assert len(audit) == 1
+
+
+def test_two_owner_race_with_nondefault_connection_setting(tenants, staff_runtime_url, postgres_database_url, monkeypatch):
+    from contextlib import contextmanager
+    t = tenants
+    @contextmanager
+    def nondefault(**kwargs):
+        with psycopg.connect(staff_runtime_url, row_factory=dict_row) as conn:
+            conn.isolation_level = psycopg.IsolationLevel.REPEATABLE_READ
+            yield conn
+    monkeypatch.setattr(staff_routes, "get_connection", nondefault)
+    barrier = Barrier(2)
+
+    def remove_self(subject):
+        try:
+            with staff_routes.staff_connection() as conn:
+                barrier.wait(timeout=5)
+                members.put_member(conn, identity.StaffPrincipal(subject), t["a"], subject,
+                                   members.MembershipUpdate(**update(1, "owner", False)))
+            return "accepted"
+        except members.MembershipError as exc:
+            return exc.code
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        assert sorted(pool.map(remove_self, [t["owner"], t["second"]])) == ["accepted", "last_owner"]
+    rows, audit = state(postgres_database_url, t["a"])
+    assert sum(row["active"] and row["role"] == "owner" for row in rows) == 1
+    assert len(audit) == 1
+
+
+def test_runtime_restaurant_lock_privilege_cannot_change_scope(
+    client, auth, tenants, staff_runtime_url, postgres_database_url
+):
+    t = tenants
+    rid = t["a"]
+    # Both HTTP read and mutation paths use the actual restricted login.
+    assert client.get(path(rid), headers=auth(t["owner"])).status_code == 200
+    assert client.put(path(rid, t["new"]), headers=auth(t["owner"]), json=update(0, "cashier")).status_code == 201
+    with psycopg.connect(staff_runtime_url, row_factory=dict_row) as runtime:
+        assert_staff_runtime_role(runtime)
+        before = runtime.execute(
+            "SELECT ordering_enabled, synthetic FROM live_restaurants WHERE restaurant_id=%s", (rid,)
+        ).fetchone()
+        assert before == {"ordering_enabled": False, "synthetic": False}
+        for clause in ("FOR SHARE", "FOR UPDATE"):
+            assert runtime.execute(
+                "SELECT restaurant_id FROM live_restaurants WHERE restaurant_id=%s " + clause, (rid,)
+            ).fetchone()["restaurant_id"] == rid
+        for column in ("ordering_enabled", "synthetic"):
+            with pytest.raises(psycopg.errors.InsufficientPrivilege), runtime.transaction():
+                runtime.execute(sql.SQL("UPDATE live_restaurants SET {}=true WHERE restaurant_id=%s").format(
+                    sql.Identifier(column)), (rid,))
+        assert runtime.execute(
+            "SELECT ordering_enabled, synthetic FROM live_restaurants WHERE restaurant_id=%s", (rid,)
+        ).fetchone() == before
+
+
+def test_regrant_removes_previous_broad_restaurant_update(
+    client, auth, tenants, staff_runtime_url, postgres_database_url
+):
+    from psycopg.conninfo import conninfo_to_dict
+    role = sql.Identifier(conninfo_to_dict(staff_runtime_url)["user"])
+    with psycopg.connect(postgres_database_url, row_factory=dict_row) as admin:
+        admin.execute(sql.SQL("GRANT UPDATE ON public.live_restaurants TO {}").format(role))
+        admin.execute(sql.SQL("GRANT UPDATE (ordering_enabled, synthetic) ON public.live_restaurants TO {}").format(role))
+    error(client.get("/v1/live/staff/memberships", headers=auth(tenants["owner"])), 503, "storage_unavailable", [])
+    with psycopg.connect(postgres_database_url, row_factory=dict_row) as admin:
+        grant_staff_runtime(admin, conninfo_to_dict(staff_runtime_url)["user"])
+    with psycopg.connect(staff_runtime_url, row_factory=dict_row) as runtime:
+        assert_staff_runtime_role(runtime)
+        for column in ("ordering_enabled", "synthetic"):
+            assert runtime.execute(
+                "SELECT has_column_privilege(current_user, 'public.live_restaurants', %s, 'UPDATE') AS allowed",
+                (column,)
+            ).fetchone()["allowed"] is False
+    assert client.get(path(tenants["a"]), headers=auth(tenants["owner"])).status_code == 200
+
+
+def test_runtime_guard_rejects_column_only_scope_grant(
+    client, auth, tenants, staff_runtime_url, postgres_database_url
+):
+    from psycopg.conninfo import conninfo_to_dict
+    role = sql.Identifier(conninfo_to_dict(staff_runtime_url)["user"])
+    with psycopg.connect(postgres_database_url, row_factory=dict_row) as admin:
+        admin.execute(sql.SQL("GRANT UPDATE (synthetic) ON public.live_restaurants TO {}").format(role))
+    error(client.get("/v1/live/staff/memberships", headers=auth(tenants["owner"])), 503, "storage_unavailable", [])

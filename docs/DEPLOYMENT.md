@@ -200,3 +200,21 @@ If a release candidate fails:
 4. restore from a transaction-consistent backup only when actually required and verified;
 5. keep the failed evidence in the acceptance record;
 6. never recover by enabling hidden fixture/JSON authority, disabling ownership checks/rate limits, reseeding production on startup, or inventing new idempotency keys for unresolved attempts.
+
+
+## Live staff database isolation (CON-06 security amendment, pending review)
+
+Keep live service disabled. Use a dedicated login role with no superuser, role/database creation, replication, BYPASSRLS, inherited memberships, schema creation, or ownership of database/audit objects. The migration/schema owner is a separate trusted administrative identity; do not put its connection string in the serving process for live staff. Existing mock-only deployments remain unchanged.
+
+1. Against an explicitly selected isolated database, apply migrations as its migration owner.
+2. Have the database administrator create a fresh restricted LOGIN role with a private credential through the approved secret-management process. Do not commit credentials or use the migration owner as the login.
+3. Run `ORDERLY_ENVIRONMENT=test python backend/scripts/configure_staff_runtime.py --role <runtime-role>` with the migration-owner DATABASE_URL. The command grants the current mock/staff baseline only, not future live writes. Review existing PUBLIC and role grants independently.
+4. For Compose, set `ORDERLY_COMPOSE_RUNTIME_DATABASE_URL` privately to the restricted login, and retain `ORDERLY_COMPOSE_DATABASE_URL` for migration/seed operations. For a hosted API, set its DATABASE_URL to the restricted login and keep migration/seed credentials out of that runtime. Do not change a real deployment as part of this synthetic review.
+5. Verify actual login permissions and staff HTTP tests using that role. The staff boundary refuses privileged/unsafe identities, explicitly uses READ COMMITTED, sets lock and statement deadlines and pins the search path. Migration010 adds a TRUNCATE trigger without modifying migration009. Audit grants permit INSERT only; runtime cannot alter/drop the audit table or disable its trigger. Trusted administrators remain outside this guarantee.
+6. Before live enablement separately verify Clerk instance token claims, ingress/rate limits, DB TLS, role grants, egress trust, runtime image inventory and operational recovery. No live activation is implied by these instructions.
+
+### Restricted restaurant lock privileges (review follow-up)
+
+The resolved Compose configuration must assign the migration-owner DSN to both migrate and seed, and the restricted runtime DSN to api. With no restricted DSN, the existing mock-only fallback is preserved; the staff guard rejects an unsafe owner connection. The automated Compose regression resolves the actual model with synthetic credentials and checks both configured and fallback cases without starting services.
+
+Re-run the grant tool as migration owner if the prior candidate's table-wide UPDATE privilege was installed. It removes that grant and the activation/synthetic column grants, then allows SELECT and UPDATE(updated_at) on live_restaurants solely for PostgreSQL row locking. The restricted login must not be able to change ordering_enabled or synthetic. The guard rejects additional effective UPDATE column grants, INSERT, DELETE, TRUNCATE, TRIGGER and table ownership. Future live-settings permissions require explicit review and a revised contract; do not broaden these grants to enable later tickets. The timestamp is mutable with this grant; no timestamp-integrity guarantee is claimed.
