@@ -403,3 +403,28 @@ def test_wrong_session_profile_cannot_open_database(client, auth, monkeypatch, c
     monkeypatch.setattr(staff_routes, "database_url", lambda: "synthetic-test")
     monkeypatch.setattr(staff_routes, "get_connection", lambda **kwargs: pytest.fail("invalid session reached DB"))
     error(client.get("/v1/live/staff/memberships", headers=auth("synthetic", **claims)), 401, "staff_auth_required", [])
+
+
+
+def test_nondefault_isolation_is_rejected_by_direct_writer(tenants, postgres_database_url):
+    t = tenants
+    before = state(postgres_database_url, t["a"])
+    with psycopg.connect(postgres_database_url, row_factory=dict_row) as conn:
+        conn.isolation_level = psycopg.IsolationLevel.REPEATABLE_READ
+        with pytest.raises(members.MembershipError) as exc:
+            members.put_member(conn, identity.StaffPrincipal(t["owner"]), t["a"], t["staff"],
+                               members.MembershipUpdate(**update(1, "cashier")))
+        assert exc.value.code == "storage_unavailable"
+    assert state(postgres_database_url, t["a"]) == before
+
+
+def test_staff_connection_forces_read_committed(tenants, postgres_database_url, monkeypatch):
+    from contextlib import contextmanager
+    @contextmanager
+    def repeatable_read(**kwargs):
+        with psycopg.connect(postgres_database_url, row_factory=dict_row) as conn:
+            conn.isolation_level = psycopg.IsolationLevel.REPEATABLE_READ
+            yield conn
+    monkeypatch.setattr(staff_routes, "get_connection", repeatable_read)
+    with staff_routes.staff_connection() as conn:
+        assert conn.execute("SHOW transaction_isolation").fetchone()["transaction_isolation"] == "read committed"

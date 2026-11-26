@@ -45,7 +45,13 @@ def staff_connection():
     try:
         # Commit errors also propagate through this boundary before returning success.
         with get_connection(connect_timeout_seconds=2) as conn:
-            yield conn
+            # Force a fresh statement snapshot even if the DSN/database default
+            # is REPEATABLE READ. Establish before the first SQL statement.
+            conn.isolation_level = psycopg.IsolationLevel.READ_COMMITTED
+            with conn.transaction():
+                conn.execute("SET LOCAL lock_timeout = '2s'")
+                conn.execute("SET LOCAL statement_timeout = '4s'")
+                yield conn
     except psycopg.Error:
         raise unavailable() from None
 

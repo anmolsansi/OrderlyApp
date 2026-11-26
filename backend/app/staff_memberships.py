@@ -11,7 +11,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .staff_identity import StaffPrincipal
+from .staff_identity import MAX_SUBJECT_LENGTH, StaffPrincipal
 
 Role = Literal["owner", "order_staff", "cashier"]
 ROLES = frozenset({"owner", "order_staff", "cashier"})
@@ -74,7 +74,7 @@ class MembershipUpdate(BaseModel):
 
 def _identifier(value: str, *, restaurant: bool = False) -> bool:
     return (isinstance(value, str) and bool(value.strip()) and value.isprintable()
-            and (not restaurant or len(value) <= 100))
+            and len(value) <= (100 if restaurant else MAX_SUBJECT_LENGTH))
 
 
 def validate_identifiers(rid: str, subject: str | None = None) -> None:
@@ -151,6 +151,12 @@ def list_own_memberships(conn: Any, principal: StaffPrincipal) -> list[Membershi
     return [MembershipSummary.model_validate(row) for row in rows]
 
 
+def require_read_committed(conn: Any) -> None:
+    # Reject unsupported transaction snapshots even for direct/legacy callers.
+    if conn.execute("SHOW transaction_isolation").fetchone()["transaction_isolation"] != "read committed":
+        raise unavailable()
+
+
 def _lock_restaurant(conn: Any, rid: str, *, write: bool) -> None:
     # Fixed SQL clauses only; never interpolate a request value.
     lock = "FOR UPDATE" if write else "FOR SHARE"
@@ -164,6 +170,8 @@ def _lock_restaurant(conn: Any, rid: str, *, write: bool) -> None:
 def list_members(conn: Any, principal: StaffPrincipal, rid: str) -> list[Membership]:
     validate_identifiers(rid)
     with conn.transaction():
+        require_read_committed(conn)
+        require_role(conn, principal, rid, OWNER_ONLY)
         _lock_restaurant(conn, rid, write=False)
         require_role(conn, principal, rid, OWNER_ONLY)
         rows = conn.execute(
@@ -176,6 +184,8 @@ def list_members(conn: Any, principal: StaffPrincipal, rid: str) -> list[Members
 def get_member(conn: Any, principal: StaffPrincipal, rid: str, subject: str) -> Membership:
     validate_identifiers(rid, subject)
     with conn.transaction():
+        require_read_committed(conn)
+        require_role(conn, principal, rid, OWNER_ONLY)
         _lock_restaurant(conn, rid, write=False)
         require_role(conn, principal, rid, OWNER_ONLY)
         row = conn.execute(
@@ -208,6 +218,8 @@ def put_member(conn: Any, principal: StaffPrincipal, rid: str, subject: str,
     """Return membership and created flag after one atomic, tenant-locked write."""
     validate_identifiers(rid, subject)
     with conn.transaction():
+        require_read_committed(conn)
+        require_role(conn, principal, rid, OWNER_ONLY)
         # All membership writers, including RS-04 bootstrap, lock parent first.
         # Reauthorize only AFTER obtaining the lock, not at screen entry.
         _lock_restaurant(conn, rid, write=True)
