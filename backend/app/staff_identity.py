@@ -3,9 +3,9 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
-from threading import Lock
+from threading import Event, Lock, Thread
 from time import monotonic
 from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, Request as URLRequest, build_opener
@@ -15,6 +15,7 @@ from fastapi import Request
 
 JWKS_TIMEOUT_SECONDS = 5
 JWKS_TTL_SECONDS = 300
+JWKS_REFRESH_COOLDOWN_SECONDS = 30
 MAX_JWKS_BYTES = 65536
 MAX_JWKS_KEYS = 64
 MAX_TOKEN_LENGTH = 16384
@@ -151,23 +152,95 @@ def _fetch_keys(url: str) -> dict[str, jwt.PyJWK]:
         raise _unavailable() from None
 
 
+@dataclass
+class _Refresh:
+    started: float
+    requested_kid: str
+    done: Event = field(default_factory=Event)
+    succeeded: bool = False
+    abandoned: bool = False
+
+
 class _KeyCache:
+    """Single-flight refresh; bound caller latency even if DNS/TLS/body I/O stalls.
+
+    A timed-out daemon is never replaced until it exits, and its late result
+    cannot publish keys. At most one refresh runs per configured cache.
+    """
+
     def __init__(self, url: str) -> None:
         self.url = url
         self.keys: dict[str, jwt.PyJWK] = {}
         self.expires_at = 0.0
+        self.unknown_after = 0.0
+        self.retry_after = 0.0
+        self.flight: _Refresh | None = None
         self.lock = Lock()
+
+    def _clear(self) -> None:
+        self.keys = {}
+        self.expires_at = 0.0
+
+    def _refresh(self, flight: _Refresh) -> None:
+        try:
+            keys = _fetch_keys(self.url)
+        except Exception:
+            keys = {}
+        with self.lock:
+            now = monotonic()
+            if keys and not flight.abandoned and now < flight.started + JWKS_TIMEOUT_SECONDS:
+                self.keys = keys
+                self.expires_at = flight.started + JWKS_TTL_SECONDS
+                self.retry_after = 0.0
+                if flight.requested_kid not in keys:
+                    self.unknown_after = max(self.unknown_after, now + JWKS_REFRESH_COOLDOWN_SECONDS)
+                flight.succeeded = True
+            else:
+                self._clear()
+                self.retry_after = now + JWKS_REFRESH_COOLDOWN_SECONDS
+            self.flight = None
+            flight.done.set()
 
     def get(self, kid: str) -> jwt.PyJWK:
         with self.lock:
-            if monotonic() >= self.expires_at or kid not in self.keys:
-                # Refresh at most once per lookup, including a cold/expired cache.
-                # Invalidate first so a failed refresh cannot retain stale keys.
-                self.keys = {}
-                self.expires_at = 0.0
-                started = monotonic()
-                self.keys = _fetch_keys(self.url)
-                self.expires_at = started + JWKS_TTL_SECONDS
+            now = monotonic()
+            flight = self.flight
+            if flight is not None and now >= flight.started + JWKS_TIMEOUT_SECONDS:
+                flight.abandoned = True
+                self._clear()
+                raise _unavailable()
+            fresh = now < self.expires_at
+            if fresh and kid in self.keys:
+                return self.keys[kid]
+            if flight is None:
+                if now < self.retry_after:
+                    raise _unavailable()
+                if fresh and now < self.unknown_after:
+                    raise _invalid()
+                if fresh:
+                    self.unknown_after = now + JWKS_REFRESH_COOLDOWN_SECONDS
+                flight = _Refresh(now, kid)
+                self.flight = flight
+                try:
+                    Thread(target=self._refresh, args=(flight,), daemon=True).start()
+                except Exception:
+                    self.flight = None
+                    self._clear()
+                    self.retry_after = now + JWKS_REFRESH_COOLDOWN_SECONDS
+                    raise _unavailable() from None
+        # Never hold the state lock across transport or wait for a new deadline
+        # when joining an existing refresh. No stale fallback on timeout/outage.
+        remaining = max(0.0, flight.started + JWKS_TIMEOUT_SECONDS - monotonic())
+        if not flight.done.wait(remaining):
+            with self.lock:
+                if self.flight is flight:
+                    flight.abandoned = True
+                    self._clear()
+            raise _unavailable()
+        with self.lock:
+            if (not flight.succeeded or monotonic() >= flight.started + JWKS_TIMEOUT_SECONDS
+                    or monotonic() >= self.expires_at):
+                raise _unavailable()
             key = self.keys.get(kid)
             if key is None:
                 raise _invalid()
