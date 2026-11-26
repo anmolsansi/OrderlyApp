@@ -498,7 +498,13 @@ def test_malformed_wire_requests_and_protocol_negatives_fail_closed() -> None:
         errors = validate(SCHEMAS[item["request_schema"]], request)
         assert field in errors, (case_id, field, errors)
     protocol = fixture["protocol_negative_cases"]
-    assert [item["expected_status"] for item in protocol] == [401, 403, 404, 409, 409, 404, 503]
+    assert [item["expected_status"] for item in protocol] == [401, 403, 404, 409, 409, 404, 503, 401, 401, 503]
+    assert [(item["name"], item["expected_status"], item["code"]) for item in protocol
+            if item["contract"] == "CON-05"] == [
+        ("missing_staff_token", 401, "staff_auth_required"),
+        ("invalid_staff_token", 401, "staff_auth_required"),
+        ("staff_jwks_unavailable", 503, "identity_unavailable"),
+    ]
     for item in protocol:
         assert item["no_write"] is True
         assert item["synthetic"] is True

@@ -489,7 +489,12 @@ describe('RS-01 live-v1 synthetic contract readers', () => {
       const wire = byId(id);
       expect(validate(schemas[wire.request_schema as string], mutated(wire.request, change)), id + '/' + change.name).toContain(change.expected_field);
     }
-    expect(bundle.protocol_negative_cases.map(c => c.expected_status)).toEqual([401, 403, 404, 409, 409, 404, 503]);
+    expect(bundle.protocol_negative_cases.map(c => c.expected_status)).toEqual([401, 403, 404, 409, 409, 404, 503, 401, 401, 503]);
+    expect(bundle.protocol_negative_cases.filter(c => c.contract === "CON-05").map(c => [c.name, c.expected_status, c.code])).toEqual([
+      ["missing_staff_token", 401, "staff_auth_required"],
+      ["invalid_staff_token", 401, "staff_auth_required"],
+      ["staff_jwks_unavailable", 503, "identity_unavailable"],
+    ]);
     for (const caseRecord of bundle.protocol_negative_cases) {
       expect(caseRecord.no_write).toBe(true);
       expect(caseRecord.synthetic).toBe(true);
