@@ -239,3 +239,98 @@ describe('same-origin Orderly API gateway', () => {
     expect(response.headers.has('location')).toBe(false);
   });
 });
+
+describe('CON-07 live transport', () => {
+  const oid = '00000001-1111-4111-8111-111111111111';
+  const staff = 'live/staff/restaurants/r-demo';
+  const guest = 'live/restaurants/r-demo';
+  const headers = {
+    authorization: 'Bearer synthetic-token',
+    cookie: 'clerk_cookie=private; orderly_guest=signed-token; analytics=private',
+    'idempotency-key': oid,
+    'x-user-id': 'forged',
+  };
+  afterEach(() => {
+    vi.restoreAllMocks();
+    delete process.env.ORDERLY_API_ORIGIN;
+  });
+
+  it('accepts exact method/path, rejects wrong method before network', async () => {
+    process.env.ORDERLY_API_ORIGIN = 'https://api.orderly.test';
+    const spy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'));
+    expect((await call(GET, 'GET', staff + '/settings')).status).toBe(200);
+    expect((await call(POST, 'POST', staff + '/settings')).status).toBe(404);
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(String(spy.mock.calls[0][0])).toBe('https://api.orderly.test/v1/' + staff + '/settings');
+  });
+
+  it.each([
+    [GET, 'GET', staff + '/settings', 'Bearer synthetic-token', null, null],
+    [GET, 'GET', guest + '/menu', null, 'orderly_guest=signed-token', null],
+    [POST, 'POST', guest + '/orders', null, 'orderly_guest=signed-token', oid],
+    [POST, 'POST', staff + '/orders/' + oid + '/payment-reversals', 'Bearer synthetic-token', null, oid],
+    [PUT, 'PUT', staff + '/settings', 'Bearer synthetic-token', null, null],
+    [POST, 'POST', staff + '/campaigns/' + oid + '/preview', 'Bearer synthetic-token', null, null],
+  ] as const)('isolates credentials for %s %s %s', async (handler, method, path, bearer, cookie, key) => {
+    process.env.ORDERLY_API_ORIGIN = 'https://api.orderly.test';
+    const spy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'));
+    expect((await call(handler, method, path, { headers })).status).toBe(200);
+    const sent = new Headers(spy.mock.calls[0][1]?.headers);
+    expect(sent.get('authorization')).toBe(bearer);
+    expect(sent.get('cookie')).toBe(cookie);
+    expect(sent.get('idempotency-key')).toBe(key);
+    expect(sent.has('x-user-id')).toBe(false);
+  });
+
+  it('forwards only documented query keys and rejects duplicates', async () => {
+    process.env.ORDERLY_API_ORIGIN = 'https://api.orderly.test';
+    const spy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'));
+    const path = staff + '/orders';
+    const invoke = (query: string) => GET(request('GET', path + query), context(...path.split('/')));
+    expect((await invoke('?view=active&limit=25&cursor=opaque')).status).toBe(200);
+    expect(String(spy.mock.calls[0][0])).toBe('https://api.orderly.test/v1/' + path + '?view=active&limit=25&cursor=opaque');
+    expect((await invoke('?owner_id=other')).status).toBe(422);
+    expect((await invoke('?limit=1&limit=2')).status).toBe(422);
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    staff + '/orders/' + oid + '/reversals',
+    'live/demo/restaurants/r-demo/orders/' + oid + '/payment-reversals',
+    'live/demo/session',
+    'live/webhooks/sendgrid/alias',
+    staff + '/orders/../payments',
+    staff + '/orders/%2f/payments',
+    staff + '/orders/not-a-uuid/payments',
+  ])('rejects unowned or malformed route %s', async path => {
+    const spy = vi.spyOn(globalThis, 'fetch');
+    expect((await call(POST, 'POST', path)).status).toBe(404);
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('rejects foreign origin and oversized live mutation without transport', async () => {
+    const spy = vi.spyOn(globalThis, 'fetch');
+    expect((await call(PUT, 'PUT', staff + '/settings', { headers: { origin: 'https://evil.example' } })).status).toBe(403);
+    expect((await call(PUT, 'PUT', staff + '/settings', { body: 'x'.repeat(65537) })).status).toBe(413);
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('classifies upstream abort as 504 and preserves no-store', async () => {
+    process.env.ORDERLY_API_ORIGIN = 'https://api.orderly.test';
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new DOMException('aborted', 'AbortError'));
+    const response = await call(POST, 'POST', guest + '/orders', { headers });
+    expect(response.status).toBe(504);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(await response.json()).toMatchObject({ error: { code: 'upstream_timeout' } });
+  });
+
+  it('never forwards staff response cookies or redirects', async () => {
+    process.env.ORDERLY_API_ORIGIN = 'https://api.orderly.test';
+    const spy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response('{}', { headers: { 'set-cookie': 'orderly_guest=unexpected' } })).mockResolvedValueOnce(new Response(null, { status: 307, headers: { location: 'https://evil.example' } }));
+    expect((await call(GET, 'GET', staff + '/settings')).headers.has('set-cookie')).toBe(false);
+    const response = await call(GET, 'GET', guest + '/menu');
+    expect(response.status).toBe(502);
+    expect(response.headers.has('location')).toBe(false);
+    expect(spy.mock.calls[1][1]?.redirect).toBe('manual');
+  });
+});
