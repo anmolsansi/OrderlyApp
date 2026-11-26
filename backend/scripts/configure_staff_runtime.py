@@ -1,7 +1,6 @@
 """Operator-only grants for an already-created, dedicated login role.
 
-Use migration-owner DATABASE_URL. Never run in the API process. Grant the existing mock API baseline as well as current staff rights. Future
-live write permissions require explicit review.
+Use migration-owner DATABASE_URL. Never run in the API process. Grant the existing mock API baseline as well as current staff rights. CON-09 adds only reviewed settings columns; activation, pricing and scope remain denied.
 """
 from __future__ import annotations
 
@@ -26,15 +25,27 @@ def grant_staff_runtime(conn, role: str):
             """, (role,)).fetchone()
         if not row or not row["safe"]:
             raise ValueError("dedicated unprivileged login required")
+        # Remove any old table-wide or column-level UPDATE grant before applying
+        # the exact reviewed allowlist; effective inherited/PUBLIC rights are
+        # independently checked by the actual-login guard.
+        for table in ("restaurants", "live_restaurants"):
+            columns = conn.execute("""
+                SELECT attname FROM pg_attribute
+                WHERE attrelid = %s::regclass AND attnum > 0 AND NOT attisdropped
+                ORDER BY attnum
+                """, ("public." + table,)).fetchall()
+            qualified = sql.Identifier("public", table)
+            conn.execute(sql.SQL("REVOKE UPDATE, INSERT, DELETE, TRUNCATE, TRIGGER ON {} FROM {}").format(qualified, identity))
+            for column in columns:
+                conn.execute(sql.SQL("REVOKE UPDATE ({}), INSERT ({}) ON {} FROM {}").format(
+                    sql.Identifier(column["attname"]), sql.Identifier(column["attname"]), qualified, identity))
         for template in (
             "GRANT USAGE ON SCHEMA public TO {}",
             "GRANT SELECT ON public.schema_migrations, public.restaurants, public.menu_items TO {}",
             "GRANT SELECT, INSERT, UPDATE, DELETE ON public.guest_sessions, public.guest_carts TO {}",
             "GRANT SELECT, INSERT ON public.guest_orders, public.order_idempotency TO {}",
-            # Re-running the tool removes the older table-wide grant too.
-            "REVOKE UPDATE ON public.live_restaurants FROM {}",
-            "REVOKE UPDATE (ordering_enabled, synthetic) ON public.live_restaurants FROM {}",
-            "GRANT SELECT, UPDATE (updated_at) ON public.live_restaurants TO {}",
+            "GRANT UPDATE (name, is_open) ON public.restaurants TO {}",
+            "GRANT SELECT, UPDATE (version, brand_label, hours, updated_at) ON public.live_restaurants TO {}",
             "GRANT SELECT, INSERT, UPDATE ON public.live_memberships TO {}",
             "REVOKE ALL ON public.live_membership_audit FROM {}",
             "GRANT INSERT ON public.live_membership_audit TO {}",
