@@ -320,3 +320,28 @@ def test_total_deadline_discards_late_keys_and_bounds_inflight_work(
     assert not flight.succeeded
     denied(req, 503, "identity_unavailable")
     assert len(transport["calls"]) == 1
+
+
+@pytest.mark.parametrize("case_name", ["missing_staff_token", "invalid_staff_token", "staff_jwks_unavailable"])
+def test_provider_matches_shared_authentication_failure_contract(
+    transport, signers, case_name
+):
+    fixture_path = Path(__file__).resolve().parents[2] / "tests/fixtures/restaurant-service/v1.json"
+    cases = json.loads(fixture_path.read_text())["protocol_negative_cases"]
+    expected = next(case for case in cases if case["contract"] == "CON-05" and case["name"] == case_name)
+    if case_name == "missing_staff_token":
+        req = request()
+    elif case_name == "invalid_staff_token":
+        req = request(make_token(signers, kid="two", headers={"kid": "one"}))
+    else:
+        transport["outage"] = True
+        req = request(make_token(signers))
+    with pytest.raises(identity.StaffIdentityError) as caught:
+        identity.verify_staff_token(req)
+    error = caught.value
+    assert (error.status_code, error.code, error.fields) == (
+        expected["expected_status"], expected["code"], expected["fields"],
+    )
+    assert error.message == expected["error"]["message"]
+    assert expected["no_write"] is True and expected["synthetic"] is True
+    # No principal was returned, so consumers must not proceed to membership lookup.
