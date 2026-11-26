@@ -302,7 +302,12 @@ async function proxy(request: NextRequest, context: RouteContext): Promise<NextR
       );
     }
 
-    return new NextResponse(upstream.body, {
+    // Live APIs return bounded JSON DTOs. Read them while the abort timer is
+    // still active so a stalled body yields 504, not a partial success.
+    const responseBody = matchedLive && upstream.body !== null
+      ? await upstream.arrayBuffer()
+      : upstream.body;
+    return new NextResponse(responseBody, {
       status: upstream.status,
       headers: responseHeaders,
     });
