@@ -1,0 +1,349 @@
+{
+  "contract": "CON-07",
+  "schema_version": 1,
+  "synthetic": true,
+  "live_activation": false,
+  "stage": "W6",
+  "routes": [
+    {
+      "path": "live/restaurants/r-demo/menu",
+      "method": "GET",
+      "authority": "guest",
+      "query": [],
+      "command": false
+    },
+    {
+      "path": "live/restaurants/r-demo/cart",
+      "method": "GET",
+      "authority": "guest",
+      "query": [],
+      "command": false
+    },
+    {
+      "path": "live/restaurants/r-demo/cart",
+      "method": "PUT",
+      "authority": "guest",
+      "query": [],
+      "command": false
+    },
+    {
+      "path": "live/restaurants/r-demo/cart",
+      "method": "DELETE",
+      "authority": "guest",
+      "query": [],
+      "command": false
+    },
+    {
+      "path": "live/restaurants/r-demo/quote",
+      "method": "POST",
+      "authority": "guest",
+      "query": [],
+      "command": false
+    },
+    {
+      "path": "live/restaurants/r-demo/orders",
+      "method": "GET",
+      "authority": "guest",
+      "query": [
+        "limit",
+        "cursor"
+      ],
+      "command": false
+    },
+    {
+      "path": "live/restaurants/r-demo/orders",
+      "method": "POST",
+      "authority": "guest",
+      "query": [],
+      "command": true
+    },
+    {
+      "path": "live/restaurants/r-demo/orders/00000001-1111-4111-8111-111111111111",
+      "method": "GET",
+      "authority": "guest",
+      "query": [],
+      "command": false
+    },
+    {
+      "path": "live/restaurants/r-demo/consents",
+      "method": "POST",
+      "authority": "guest",
+      "query": [],
+      "command": false
+    },
+    {
+      "path": "live/unsubscribe/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "method": "GET",
+      "authority": "token",
+      "query": [],
+      "command": false
+    },
+    {
+      "path": "live/unsubscribe/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "method": "POST",
+      "authority": "token",
+      "query": [],
+      "command": false
+    },
+    {
+      "path": "live/staff/memberships",
+      "method": "GET",
+      "authority": "staff",
+      "query": [],
+      "command": false
+    },
+    {
+      "path": "live/staff/restaurants/r-demo/members",
+      "method": "GET",
+      "authority": "staff",
+      "query": [],
+      "command": false
+    },
+    {
+      "path": "live/staff/restaurants/r-demo/members/clerk-synthetic-owner",
+      "method": "GET",
+      "authority": "staff",
+      "query": [],
+      "command": false
+    },
+    {
+      "path": "live/staff/restaurants/r-demo/members/clerk-synthetic-owner",
+      "method": "PUT",
+      "authority": "staff",
+      "query": [],
+      "command": false
+    },
+    {
+      "path": "live/staff/restaurants/r-demo/settings",
+      "method": "GET",
+      "authority": "staff",
+      "query": [],
+      "command": false
+    },
+    {
+      "path": "live/staff/restaurants/r-demo/settings",
+      "method": "PUT",
+      "authority": "staff",
+      "query": [],
+      "command": false
+    },
+    {
+      "path": "live/staff/restaurants/r-demo/menu",
+      "method": "GET",
+      "authority": "staff",
+      "query": [],
+      "command": false
+    },
+    {
+      "path": "live/staff/restaurants/r-demo/menu/i-one",
+      "method": "PUT",
+      "authority": "staff",
+      "query": [],
+      "command": false
+    },
+    {
+      "path": "live/staff/restaurants/r-demo/menu/i-one/availability",
+      "method": "PUT",
+      "authority": "staff",
+      "query": [],
+      "command": false
+    },
+    {
+      "path": "live/staff/restaurants/r-demo/tables",
+      "method": "GET",
+      "authority": "staff",
+      "query": [],
+      "command": false
+    },
+    {
+      "path": "live/staff/restaurants/r-demo/tables/00000001-1111-4111-8111-111111111111",
+      "method": "GET",
+      "authority": "staff",
+      "query": [],
+      "command": false
+    },
+    {
+      "path": "live/staff/restaurants/r-demo/tables/00000001-1111-4111-8111-111111111111",
+      "method": "PUT",
+      "authority": "staff",
+      "query": [],
+      "command": false
+    },
+    {
+      "path": "live/staff/restaurants/r-demo/offers",
+      "method": "GET",
+      "authority": "staff",
+      "query": [
+        "limit",
+        "cursor"
+      ],
+      "command": false
+    },
+    {
+      "path": "live/staff/restaurants/r-demo/offers/00000001-1111-4111-8111-111111111111",
+      "method": "GET",
+      "authority": "staff",
+      "query": [],
+      "command": false
+    },
+    {
+      "path": "live/staff/restaurants/r-demo/offers/00000001-1111-4111-8111-111111111111",
+      "method": "PUT",
+      "authority": "staff",
+      "query": [],
+      "command": false
+    },
+    {
+      "path": "live/staff/restaurants/r-demo/orders",
+      "method": "GET",
+      "authority": "staff",
+      "query": [
+        "view",
+        "limit",
+        "cursor"
+      ],
+      "command": false
+    },
+    {
+      "path": "live/staff/restaurants/r-demo/orders/00000001-1111-4111-8111-111111111111",
+      "method": "GET",
+      "authority": "staff",
+      "query": [],
+      "command": false
+    },
+    {
+      "path": "live/staff/restaurants/r-demo/orders/00000001-1111-4111-8111-111111111111/transitions",
+      "method": "POST",
+      "authority": "staff",
+      "query": [],
+      "command": true
+    },
+    {
+      "path": "live/staff/restaurants/r-demo/orders/00000001-1111-4111-8111-111111111111/payments",
+      "method": "POST",
+      "authority": "staff",
+      "query": [],
+      "command": true
+    },
+    {
+      "path": "live/staff/restaurants/r-demo/orders/00000001-1111-4111-8111-111111111111/payment-reversals",
+      "method": "POST",
+      "authority": "staff",
+      "query": [],
+      "command": true
+    },
+    {
+      "path": "live/staff/restaurants/r-demo/campaigns",
+      "method": "GET",
+      "authority": "staff",
+      "query": [],
+      "command": false
+    },
+    {
+      "path": "live/staff/restaurants/r-demo/campaigns",
+      "method": "POST",
+      "authority": "staff",
+      "query": [],
+      "command": false
+    },
+    {
+      "path": "live/staff/restaurants/r-demo/campaigns/00000006-1111-4111-8111-111111111111",
+      "method": "GET",
+      "authority": "staff",
+      "query": [],
+      "command": false
+    },
+    {
+      "path": "live/staff/restaurants/r-demo/campaigns/00000006-1111-4111-8111-111111111111",
+      "method": "PUT",
+      "authority": "staff",
+      "query": [],
+      "command": false
+    },
+    {
+      "path": "live/staff/restaurants/r-demo/campaigns/00000006-1111-4111-8111-111111111111/preview",
+      "method": "POST",
+      "authority": "staff",
+      "query": [],
+      "command": false
+    },
+    {
+      "path": "live/staff/restaurants/r-demo/campaigns/00000006-1111-4111-8111-111111111111/approve",
+      "method": "POST",
+      "authority": "staff",
+      "query": [],
+      "command": true
+    },
+    {
+      "path": "live/staff/restaurants/r-demo/campaigns/00000006-1111-4111-8111-111111111111/pause",
+      "method": "POST",
+      "authority": "staff",
+      "query": [],
+      "command": true
+    },
+    {
+      "path": "live/staff/restaurants/r-demo/campaigns/00000006-1111-4111-8111-111111111111/resume",
+      "method": "POST",
+      "authority": "staff",
+      "query": [],
+      "command": true
+    },
+    {
+      "path": "live/staff/restaurants/r-demo/campaigns/00000006-1111-4111-8111-111111111111/deliveries",
+      "method": "GET",
+      "authority": "staff",
+      "query": [],
+      "command": false
+    },
+    {
+      "path": "live/staff/restaurants/r-demo/reconcile",
+      "method": "POST",
+      "authority": "staff",
+      "query": [],
+      "command": false
+    },
+    {
+      "path": "live/staff/restaurants/r-demo/messaging-setup",
+      "method": "GET",
+      "authority": "staff",
+      "query": [],
+      "command": false
+    },
+    {
+      "path": "live/staff/restaurants/r-demo/summary",
+      "method": "GET",
+      "authority": "staff",
+      "query": [
+        "from",
+        "to"
+      ],
+      "command": false
+    }
+  ],
+  "denied": [
+    {
+      "path": "live/staff/restaurants/r-demo/orders/00000001-1111-4111-8111-111111111111/reversals",
+      "method": "POST"
+    },
+    {
+      "path": "live/demo/restaurants/r-demo/orders/00000001-1111-4111-8111-111111111111/payment-reversals",
+      "method": "POST"
+    },
+    {
+      "path": "live/demo/session",
+      "method": "POST"
+    },
+    {
+      "path": "live/webhooks/sendgrid/account",
+      "method": "POST"
+    },
+    {
+      "path": "live/staff/restaurants/r-demo/orders/../payments",
+      "method": "POST"
+    },
+    {
+      "path": "live/staff/restaurants/r-demo/orders/%2f/payments",
+      "method": "POST"
+    }
+  ]
+}

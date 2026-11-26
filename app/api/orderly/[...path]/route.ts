@@ -26,10 +26,62 @@ const ALLOWED_ROUTES: AllowedRoute[] = [
   { pattern: /^orders\/[A-Za-z0-9._~-]+$/, methods: new Set(['GET']) },
 ];
 
-function errorResponse(status: number, code: string, message: string): NextResponse {
+// CON-07: each entry binds method, path, credentials, query and command policy.
+// Demo-role routes are added only by DS-03/RS-58; provider callbacks are not browser APIs.
+type LiveRoute = { pattern: RegExp; method: string; authority: 'staff' | 'guest' | 'token'; query: readonly string[]; command: boolean };
+const liveRoutes: LiveRoute[] = [];
+const segment = '[A-Za-z0-9._~-]+';
+const uuid = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
+const rid = 'restaurants/' + segment;
+const staff = 'staff/' + rid;
+function live(path: string, methods: string[], authority: LiveRoute['authority'], query: readonly string[] = [], command = false) {
+  for (const method of methods) liveRoutes.push({ pattern: new RegExp('^live/' + path + '$'), method, authority, query, command });
+}
+
+// Public menu can resolve an isolated demo tenant only with its guest cookie.
+live(rid + '/menu', ['GET'], 'guest');
+live(rid + '/cart', ['GET', 'PUT', 'DELETE'], 'guest');
+live(rid + '/quote', ['POST'], 'guest');
+live(rid + '/orders', ['GET'], 'guest', ['limit', 'cursor']);
+live(rid + '/orders', ['POST'], 'guest', [], true);
+live(rid + '/orders/' + uuid, ['GET'], 'guest');
+live(rid + '/consents', ['POST'], 'guest');
+live('unsubscribe/[A-Za-z0-9_-]{43}', ['GET', 'POST'], 'token');
+live('staff/memberships', ['GET'], 'staff');
+live(staff + '/members', ['GET'], 'staff');
+live(staff + '/members/' + segment, ['GET', 'PUT'], 'staff');
+live(staff + '/settings', ['GET', 'PUT'], 'staff');
+live(staff + '/menu', ['GET'], 'staff');
+live(staff + '/menu/' + segment, ['PUT'], 'staff');
+live(staff + '/menu/' + segment + '/availability', ['PUT'], 'staff');
+live(staff + '/tables', ['GET'], 'staff');
+live(staff + '/tables/' + uuid, ['GET', 'PUT'], 'staff');
+live(staff + '/offers', ['GET'], 'staff', ['limit', 'cursor']);
+live(staff + '/offers/' + uuid, ['GET', 'PUT'], 'staff');
+live(staff + '/orders', ['GET'], 'staff', ['view', 'limit', 'cursor']);
+live(staff + '/orders/' + uuid, ['GET'], 'staff');
+for (const suffix of ['transitions', 'payments', 'payment-reversals']) {
+  live(staff + '/orders/' + uuid + '/' + suffix, ['POST'], 'staff', [], true);
+}
+live(staff + '/campaigns', ['GET', 'POST'], 'staff');
+live(staff + '/campaigns/' + uuid, ['GET', 'PUT'], 'staff');
+live(staff + '/campaigns/' + uuid + '/preview', ['POST'], 'staff');
+for (const suffix of ['approve', 'pause', 'resume']) {
+  live(staff + '/campaigns/' + uuid + '/' + suffix, ['POST'], 'staff', [], true);
+}
+live(staff + '/campaigns/' + uuid + '/deliveries', ['GET'], 'staff');
+live(staff + '/reconcile', ['POST'], 'staff');
+live(staff + '/messaging-setup', ['GET'], 'staff');
+live(staff + '/summary', ['GET'], 'staff', ['from', 'to']);
+
+function liveRoute(path: string, method: string): LiveRoute | undefined {
+  return liveRoutes.find(route => route.method === method && route.pattern.test(path));
+}
+
+function errorResponse(status: number, code: string, message: string, fields: string[] = []): NextResponse {
   return NextResponse.json(
-    { error: { code, message, request_id: crypto.randomUUID(), fields: [] } },
-    { status },
+    { error: { code, message, request_id: crypto.randomUUID(), fields } },
+    { status, headers: { 'cache-control': 'no-store' } },
   );
 }
 
@@ -64,8 +116,8 @@ function publicRequestOrigin(request: NextRequest): string {
 }
 
 function normalizedPath(segments: string[]): string | undefined {
-  if (segments.length === 0 || segments.length > 2) return undefined;
-  if (segments.some(segment => !/^[A-Za-z0-9._~-]+$/.test(segment))) return undefined;
+  if (segments.length === 0 || segments.length > 7) return undefined;
+  if (segments.some(segment => segment === '.' || segment === '..' || !/^[A-Za-z0-9._~-]+$/.test(segment))) return undefined;
   return segments.join('/');
 }
 
@@ -93,14 +145,36 @@ async function boundedBody(request: NextRequest): Promise<ArrayBuffer | undefine
     throw new RangeError('request_body_too_large');
   }
 
-  const data = await request.arrayBuffer();
-  if (data.byteLength > MAX_BODY_BYTES) {
-    throw new RangeError('request_body_too_large');
+  if (!request.body) return undefined;
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (size + value.byteLength > MAX_BODY_BYTES) {
+        // Stop reading rather than accumulating an unbounded chunked request.
+        void reader.cancel().catch(() => undefined);
+        throw new RangeError('request_body_too_large');
+      }
+      chunks.push(value);
+      size += value.byteLength;
+    }
+  } finally {
+    reader.releaseLock();
   }
-  return data.byteLength > 0 ? data : undefined;
+  if (!size) return undefined;
+  const data = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    data.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return data.buffer;
 }
 
-function upstreamHeaders(request: NextRequest, publicOrigin: string, path: string): Headers {
+function upstreamHeaders(request: NextRequest, publicOrigin: string, path: string, live?: LiveRoute): Headers {
   const headers = new Headers();
   const accept = request.headers.get('accept');
   const contentType = request.headers.get('content-type');
@@ -109,8 +183,14 @@ function upstreamHeaders(request: NextRequest, publicOrigin: string, path: strin
 
   if (accept) headers.set('accept', accept);
   if (contentType) headers.set('content-type', contentType);
-  if (cookie) headers.set('cookie', cookie);
-  if (path === 'orders' && request.method === 'POST' && idempotencyKey) {
+  if (!live && cookie) headers.set('cookie', cookie);
+  if (live?.authority === 'guest' && cookie) {
+    const guests = cookie.split(';').map(part => part.trim()).filter(part => part.startsWith('orderly_guest='));
+    if (guests.length === 1) headers.set('cookie', guests[0]);
+  }
+  const authorization = request.headers.get('authorization');
+  if (live?.authority === 'staff' && authorization) headers.set('authorization', authorization);
+  if ((live?.command || (!live && path === 'orders' && request.method === 'POST')) && idempotencyKey) {
     headers.set('idempotency-key', idempotencyKey);
   }
 
@@ -137,7 +217,8 @@ function rewriteGuestCookie(rawCookie: string, secureRequest: boolean): string {
 async function proxy(request: NextRequest, context: RouteContext): Promise<NextResponse> {
   const { path: segments } = await context.params;
   const path = normalizedPath(segments);
-  if (!path || !routeAllowed(path, request.method)) {
+  const matchedLive = path ? liveRoute(path, request.method) : undefined;
+  if (!path || (!matchedLive && !routeAllowed(path, request.method))) {
     return errorResponse(404, 'not_found', 'API route not found');
   }
 
@@ -169,7 +250,16 @@ async function proxy(request: NextRequest, context: RouteContext): Promise<NextR
     return errorResponse(503, 'invalid_config', 'API gateway is not configured');
   }
 
-  if (path === 'restaurants' || path.startsWith('restaurants/')) {
+  if (matchedLive) {
+    const seen = new Set<string>();
+    for (const [name, value] of request.nextUrl.searchParams) {
+      if (!matchedLive.query.includes(name) || seen.has(name)) {
+        return errorResponse(422, 'invalid_input', 'Check highlighted fields', [name]);
+      }
+      seen.add(name);
+      target.searchParams.set(name, value);
+    }
+  } else if (path === 'restaurants' || path.startsWith('restaurants/')) {
     target.search = request.nextUrl.search;
   } else if (path === 'orders' && request.method === 'GET') {
     for (const name of ['limit', 'cursor']) {
@@ -184,7 +274,7 @@ async function proxy(request: NextRequest, context: RouteContext): Promise<NextR
   try {
     const upstream = await fetch(target, {
       method: request.method,
-      headers: upstreamHeaders(request, publicOrigin, path),
+      headers: upstreamHeaders(request, publicOrigin, path, matchedLive),
       body,
       cache: 'no-store',
       redirect: 'manual',
@@ -202,14 +292,22 @@ async function proxy(request: NextRequest, context: RouteContext): Promise<NextR
     }
 
     const setCookie = upstream.headers.get('set-cookie');
-    if (setCookie) {
+    const liveCookies = matchedLive?.authority === 'guest'
+      ? upstream.headers.getSetCookie().filter(value => value.startsWith('orderly_guest=')) : [];
+    const permittedCookie = matchedLive ? (liveCookies.length === 1 ? liveCookies[0] : null) : setCookie;
+    if (permittedCookie) {
       responseHeaders.append(
         'set-cookie',
-        rewriteGuestCookie(setCookie, new URL(publicOrigin).protocol === 'https:'),
+        rewriteGuestCookie(permittedCookie, new URL(publicOrigin).protocol === 'https:'),
       );
     }
 
-    return new NextResponse(upstream.body, {
+    // Live APIs return bounded JSON DTOs. Read them while the abort timer is
+    // still active so a stalled body yields 504, not a partial success.
+    const responseBody = matchedLive && upstream.body !== null
+      ? await upstream.arrayBuffer()
+      : upstream.body;
+    return new NextResponse(responseBody, {
       status: upstream.status,
       headers: responseHeaders,
     });
@@ -237,4 +335,20 @@ export async function PUT(request: NextRequest, context: RouteContext): Promise<
 
 export async function DELETE(request: NextRequest, context: RouteContext): Promise<NextResponse> {
   return proxy(request, context);
+}
+
+
+// Next automatically handles OPTIONS and rejects unexported PATCH with 405.
+// Live-v1 requires an explicit 404 for every unsupported browser method.
+export async function PATCH(_request: NextRequest, context: RouteContext): Promise<NextResponse> {
+  const { path } = await context.params;
+  if (path[0] === 'live') return errorResponse(404, 'not_found', 'API route not found');
+  return new NextResponse(null, { status: 405 });
+}
+
+export async function OPTIONS(_request: NextRequest, context: RouteContext): Promise<NextResponse> {
+  const { path } = await context.params;
+  if (path[0] === 'live') return errorResponse(404, 'not_found', 'API route not found');
+  // Preserve the framework-generated mock Allow response, without advertising PATCH.
+  return new NextResponse(null, { status: 204, headers: { Allow: 'DELETE, GET, HEAD, OPTIONS, POST, PUT' } });
 }

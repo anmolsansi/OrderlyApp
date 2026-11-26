@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import liveFixture from './fixtures/restaurant-service/v1.json';
+import gatewayFixture from './fixtures/restaurant-service/gateway-v1.json';
 import { NextRequest } from 'next/server';
-import { DELETE, GET, POST, PUT } from '../app/api/orderly/[...path]/route';
+import { DELETE, GET, POST, PUT, PATCH, OPTIONS } from '../app/api/orderly/[...path]/route';
 
 type Handler = typeof GET | typeof POST | typeof PUT | typeof DELETE;
 type GatewayRequestInit = { headers?: HeadersInit; body?: BodyInit };
@@ -237,5 +239,217 @@ describe('same-origin Orderly API gateway', () => {
     expect(response.status).toBe(502);
     await expect(response.json()).resolves.toMatchObject({ error: { code: 'upstream_redirect_rejected' } });
     expect(response.headers.has('location')).toBe(false);
+  });
+});
+
+describe('CON-07 live transport', () => {
+  const oid = '00000001-1111-4111-8111-111111111111';
+  const staff = 'live/staff/restaurants/r-demo';
+  const guest = 'live/restaurants/r-demo';
+  const headers = {
+    authorization: 'Bearer synthetic-token',
+    cookie: 'clerk_cookie=private; orderly_guest=signed-token; analytics=private',
+    'idempotency-key': oid,
+    'x-user-id': 'forged',
+  };
+  afterEach(() => {
+    vi.restoreAllMocks();
+    delete process.env.ORDERLY_API_ORIGIN;
+  });
+
+  it('accepts exact method/path, rejects wrong method before network', async () => {
+    process.env.ORDERLY_API_ORIGIN = 'https://api.orderly.test';
+    const spy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'));
+    expect((await call(GET, 'GET', staff + '/settings')).status).toBe(200);
+    expect((await call(POST, 'POST', staff + '/settings')).status).toBe(404);
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(String(spy.mock.calls[0][0])).toBe('https://api.orderly.test/v1/' + staff + '/settings');
+  });
+
+  it.each([
+    [GET, 'GET', staff + '/settings', 'Bearer synthetic-token', null, null],
+    [GET, 'GET', guest + '/menu', null, 'orderly_guest=signed-token', null],
+    [POST, 'POST', guest + '/orders', null, 'orderly_guest=signed-token', oid],
+    [POST, 'POST', staff + '/orders/' + oid + '/payment-reversals', 'Bearer synthetic-token', null, oid],
+    [PUT, 'PUT', staff + '/settings', 'Bearer synthetic-token', null, null],
+    [POST, 'POST', staff + '/campaigns/' + oid + '/preview', 'Bearer synthetic-token', null, null],
+  ] as const)('isolates credentials for %s %s %s', async (handler, method, path, bearer, cookie, key) => {
+    process.env.ORDERLY_API_ORIGIN = 'https://api.orderly.test';
+    const spy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'));
+    expect((await call(handler, method, path, { headers })).status).toBe(200);
+    const sent = new Headers(spy.mock.calls[0][1]?.headers);
+    expect(sent.get('authorization')).toBe(bearer);
+    expect(sent.get('cookie')).toBe(cookie);
+    expect(sent.get('idempotency-key')).toBe(key);
+    expect(sent.has('x-user-id')).toBe(false);
+  });
+
+  it('forwards only documented query keys and rejects duplicates', async () => {
+    process.env.ORDERLY_API_ORIGIN = 'https://api.orderly.test';
+    const spy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'));
+    const path = staff + '/orders';
+    const invoke = (query: string) => GET(request('GET', path + query), context(...path.split('/')));
+    expect((await invoke('?view=active&limit=25&cursor=opaque')).status).toBe(200);
+    expect(String(spy.mock.calls[0][0])).toBe('https://api.orderly.test/v1/' + path + '?view=active&limit=25&cursor=opaque');
+    expect((await invoke('?owner_id=other')).status).toBe(422);
+    expect((await invoke('?limit=1&limit=2')).status).toBe(422);
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    staff + '/orders/' + oid + '/reversals',
+    'live/demo/restaurants/r-demo/orders/' + oid + '/payment-reversals',
+    'live/demo/session',
+    'live/webhooks/sendgrid/alias',
+    staff + '/orders/../payments',
+    staff + '/orders/%2f/payments',
+    staff + '/orders/not-a-uuid/payments',
+  ])('rejects unowned or malformed route %s', async path => {
+    const spy = vi.spyOn(globalThis, 'fetch');
+    expect((await call(POST, 'POST', path)).status).toBe(404);
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('rejects foreign origin and oversized live mutation without transport', async () => {
+    const spy = vi.spyOn(globalThis, 'fetch');
+    expect((await call(PUT, 'PUT', staff + '/settings', { headers: { origin: 'https://evil.example' } })).status).toBe(403);
+    expect((await call(PUT, 'PUT', staff + '/settings', { body: 'x'.repeat(65537) })).status).toBe(413);
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('classifies upstream abort as 504 and preserves no-store', async () => {
+    process.env.ORDERLY_API_ORIGIN = 'https://api.orderly.test';
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new DOMException('aborted', 'AbortError'));
+    const response = await call(POST, 'POST', guest + '/orders', { headers });
+    expect(response.status).toBe(504);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(await response.json()).toMatchObject({ error: { code: 'upstream_timeout' } });
+  });
+
+  it('never forwards staff response cookies or redirects', async () => {
+    process.env.ORDERLY_API_ORIGIN = 'https://api.orderly.test';
+    const spy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response('{}', { headers: { 'set-cookie': 'orderly_guest=unexpected' } })).mockResolvedValueOnce(new Response(null, { status: 307, headers: { location: 'https://evil.example' } }));
+    expect((await call(GET, 'GET', staff + '/settings')).headers.has('set-cookie')).toBe(false);
+    const response = await call(GET, 'GET', guest + '/menu');
+    expect(response.status).toBe(502);
+    expect(response.headers.has('location')).toBe(false);
+    expect(spy.mock.calls[1][1]?.redirect).toBe('manual');
+  });
+});
+
+describe('CON-07 shared wire fixture transport', () => {
+  afterEach(() => { vi.restoreAllMocks(); delete process.env.ORDERLY_API_ORIGIN; });
+  const handlers: Record<string, Handler> = { GET, POST, PUT, DELETE };
+  it.each(liveFixture.wire_cases.filter(vector => vector.path.startsWith('/v1/live/') && !vector.path.startsWith('/v1/live/demo/')))('maps $id to exact upstream', async vector => {
+    process.env.ORDERLY_API_ORIGIN = 'https://api.orderly.test';
+    const spy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'));
+    const path = vector.path.slice('/v1/'.length);
+    const segments = path.split('?')[0].split('/');
+    const result = await handlers[vector.method](request(vector.method, path), context(...segments));
+    expect(result.status).toBe(200);
+    expect(String(spy.mock.calls[0][0])).toBe('https://api.orderly.test' + vector.path);
+  });
+});
+
+
+describe('CON-07 unsupported browser methods', () => {
+  afterEach(() => vi.restoreAllMocks());
+  it('denies live PATCH, OPTIONS and HEAD without network, preserves mock method behavior', async () => {
+    const spy = vi.spyOn(globalThis, 'fetch');
+    const path = 'live/staff/restaurants/r-demo/settings';
+    expect((await call(PATCH, 'PATCH', path)).status).toBe(404);
+    expect((await call(OPTIONS, 'OPTIONS', path)).status).toBe(404);
+    expect((await call(GET, 'HEAD', path)).status).toBe(404);
+    expect((await call(PATCH, 'PATCH', 'cart')).status).toBe(405);
+    const options = await call(OPTIONS, 'OPTIONS', 'cart');
+    expect(options.status).toBe(204);
+    expect(options.headers.get('allow')).toBe('DELETE, GET, HEAD, OPTIONS, POST, PUT');
+    expect(spy).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('CON-07 approved complete W6 route matrix', () => {
+  const handlers: Record<string, Handler> = { GET, POST, PUT, DELETE };
+  const key = '11111111-1111-4111-8111-111111111111';
+  const queryValues: Record<string, string> = { limit: '25', cursor: 'opaque', view: 'active', from: '2026-11-01', to: '2026-11-02' };
+  const supplied = { origin: 'https://orderly.test', authorization: 'Bearer fixture', cookie: 'other=private; orderly_guest=fixture', 'idempotency-key': key };
+  afterEach(() => { vi.restoreAllMocks(); delete process.env.ORDERLY_API_ORIGIN; });
+
+  it.each(gatewayFixture.routes)('allows $method $path with exact credential/query policy', async vector => {
+    process.env.ORDERLY_API_ORIGIN = 'https://api.orderly.test';
+    const spy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'));
+    const query = new URLSearchParams(vector.query.map(name => [name, queryValues[name]]));
+    const suffix = query.size ? '?' + query : '';
+    const response = await handlers[vector.method](request(vector.method, vector.path + suffix, { headers: supplied }), context(...vector.path.split('/')));
+    expect(response.status).toBe(200);
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(String(spy.mock.calls[0][0])).toBe('https://api.orderly.test/v1/' + vector.path + suffix);
+    const sent = new Headers(spy.mock.calls[0][1]?.headers);
+    expect(sent.get('authorization')).toBe(vector.authority === 'staff' ? supplied.authorization : null);
+    expect(sent.get('cookie')).toBe(vector.authority === 'guest' ? 'orderly_guest=fixture' : null);
+    expect(sent.get('idempotency-key')).toBe(vector.command ? key : null);
+  });
+
+  const allowedPaths = [...new Set(gatewayFixture.routes.map(vector => vector.path))];
+  const deniedMethods = allowedPaths.flatMap(path => Object.keys(handlers)
+    .filter(method => !gatewayFixture.routes.some(vector => vector.path === path && vector.method === method))
+    .map(method => ({ path, method })));
+  it.each([...deniedMethods, ...gatewayFixture.denied])('denies $method $path without upstream access', async vector => {
+    const spy = vi.spyOn(globalThis, 'fetch');
+    const response = await call(handlers[vector.method], vector.method, vector.path, { headers: supplied });
+    expect(response.status).toBe(404);
+    expect(spy).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('CON-07 bounded transport regression', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    delete process.env.ORDERLY_API_ORIGIN;
+  });
+
+  it('cancels a chunked request as soon as the 64 KiB cap is exceeded', async () => {
+    let cancelled = false;
+    let chunks = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        chunks++;
+        if (chunks > 5) controller.close();
+        else controller.enqueue(new Uint8Array(40 * 1024));
+      },
+      cancel() { cancelled = true; },
+    });
+    const spy = vi.spyOn(globalThis, 'fetch');
+    const response = await call(PUT, 'PUT', 'live/staff/restaurants/r-demo/settings', { body });
+    expect(response.status).toBe(413);
+    expect(cancelled).toBe(true);
+    expect(chunks).toBeLessThan(5);
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('returns uncertain 504 when upstream sends headers but the live response body stalls', async () => {
+    vi.useFakeTimers();
+    process.env.ORDERLY_API_ORIGIN = 'https://api.orderly.test';
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_input, init) => new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          init?.signal?.addEventListener('abort', () => controller.error(new DOMException('aborted', 'AbortError')), { once: true });
+        },
+      }),
+      { status: 200 },
+    ));
+    const pending = call(POST, 'POST', 'live/restaurants/r-demo/orders');
+    await vi.advanceTimersByTimeAsync(5001);
+    const response = await pending;
+    expect(response.status).toBe(504);
+    expect(await response.json()).toMatchObject({ error: { code: 'upstream_timeout' } });
+  });
+
+  it('ensures route and shared wire fixtures cannot silently become empty', () => {
+    expect(gatewayFixture.routes).toHaveLength(43);
+    expect(liveFixture.wire_cases.filter(vector => vector.path.startsWith('/v1/live/') && !vector.path.startsWith('/v1/live/demo/')).length).toBeGreaterThanOrEqual(25);
   });
 });
