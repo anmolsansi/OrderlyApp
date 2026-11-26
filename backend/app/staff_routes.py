@@ -16,6 +16,7 @@ from starlette.requests import ClientDisconnect
 from .database import database_url, get_connection
 from .staff_identity import StaffPrincipal, verify_staff_token
 from .staff_db_security import assert_staff_runtime_role
+from .live_settings import Settings, SettingsUpdate, get_settings, put_settings
 from .staff_memberships import (
     Membership, MembershipSummary, MembershipUpdate, get_member, invalid,
     list_members, list_own_memberships, put_member, unavailable,
@@ -93,7 +94,7 @@ def _unique_json_object(pairs):
     return result
 
 
-async def _read_update(request: Request) -> MembershipUpdate:
+async def _read_update(request: Request, model=MembershipUpdate):
     # Stream-limit the direct backend too; do not rely on the future gateway.
     body = bytearray()
     try:
@@ -107,7 +108,7 @@ async def _read_update(request: Request) -> MembershipUpdate:
     try:
         # Reject duplicate fields before the strict DTO sees the document.
         json.loads(bytes(body), object_pairs_hook=_unique_json_object)
-        return MembershipUpdate.model_validate_json(bytes(body))
+        return model.model_validate_json(bytes(body))
     except ValidationError as exc:
         fields = list(dict.fromkeys(
             ".".join(str(part) for part in error["loc"]) or "body"
@@ -135,3 +136,27 @@ async def update_restaurant_member(rid: str, subject: str, request: Request, res
     response.status_code = 201 if created else 200
     response.headers["Cache-Control"] = "no-store"
     return membership
+
+
+@router.get("/restaurants/{rid}/settings", response_model=Settings)
+def restaurant_settings(rid: str, response: Response, principal: StaffPrincipal = Depends(staff_principal)):
+    response.headers["Cache-Control"] = "no-store"
+    with staff_connection() as conn:
+        return get_settings(conn, principal, rid)
+
+
+def _write_settings(principal: StaffPrincipal, rid: str, change: SettingsUpdate):
+    with staff_connection() as conn:
+        return put_settings(conn, principal, rid, change)
+
+
+@router.put("/restaurants/{rid}/settings", response_model=Settings,
+            openapi_extra={"requestBody": {"required": True, "content": {
+                "application/json": {"schema": SettingsUpdate.model_json_schema()}
+            }}})
+async def update_restaurant_settings(rid: str, request: Request, response: Response,
+                                     principal: StaffPrincipal = Depends(staff_principal)):
+    change = await _read_update(request, SettingsUpdate)
+    settings = await run_in_threadpool(_write_settings, principal, rid, change)
+    response.headers["Cache-Control"] = "no-store"
+    return settings

@@ -497,7 +497,7 @@ describe('RS-01 live-v1 synthetic contract readers', () => {
       const wire = byId(id);
       expect(validate(schemas[wire.request_schema as string], mutated(wire.request, change)), id + '/' + change.name).toContain(change.expected_field);
     }
-    expect(bundle.protocol_negative_cases.map(c => c.expected_status)).toEqual([401, 403, 404, 409, 409, 404, 503, 401, 401, 503, 409, 409, 403, 404]);
+    expect(bundle.protocol_negative_cases.map(c => c.expected_status)).toEqual([401, 403, 404, 409, 409, 404, 503, 401, 401, 503, 409, 409, 403, 404, 409, 422, 403, 404]);
     expect(bundle.protocol_negative_cases.filter(c => c.contract === "CON-05").map(c => [c.name, c.expected_status, c.code])).toEqual([
       ["missing_staff_token", 401, "staff_auth_required"],
       ["invalid_staff_token", 401, "staff_auth_required"],
@@ -510,6 +510,17 @@ describe('RS-01 live-v1 synthetic contract readers', () => {
       ["membership_role_denied", 403, "permission_denied"],
       ["membership_foreign_or_missing", 404, "not_found"],
     ]);
+    expect(bundle.protocol_negative_cases.filter(c => c.contract === "CON-09").map(c => [c.name, c.expected_status, c.code])).toEqual([
+      ["settings_stale_version", 409, "version_conflict"],
+      ["settings_invalid_hours", 422, "invalid_input"],
+      ["settings_role_denied", 403, "permission_denied"],
+      ["settings_foreign_or_missing", 404, "not_found"],
+    ]);
+    const settingsRead = bundle.wire_cases.find(w => w.id === 'CON-09-2');
+    const settingsNoop = bundle.wire_cases.find(w => w.id === 'CON-09-1');
+    const settingsChanged = bundle.wire_cases.find(w => w.id === 'CON-09-3');
+    expect(settingsRead?.response).toEqual(settingsNoop?.response);
+    expect(settingsChanged?.response).toMatchObject({ version: 2, ordering_enabled: false });
     for (const caseRecord of bundle.protocol_negative_cases) {
       expect(caseRecord.no_write).toBe(true);
       expect(caseRecord.synthetic).toBe(true);
