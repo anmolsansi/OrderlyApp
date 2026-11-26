@@ -309,3 +309,19 @@ export async function PUT(request: NextRequest, context: RouteContext): Promise<
 export async function DELETE(request: NextRequest, context: RouteContext): Promise<NextResponse> {
   return proxy(request, context);
 }
+
+
+// Next automatically handles OPTIONS and rejects unexported PATCH with 405.
+// Live-v1 requires an explicit 404 for every unsupported browser method.
+export async function PATCH(_request: NextRequest, context: RouteContext): Promise<NextResponse> {
+  const { path } = await context.params;
+  if (path[0] === 'live') return errorResponse(404, 'not_found', 'API route not found');
+  return new NextResponse(null, { status: 405 });
+}
+
+export async function OPTIONS(_request: NextRequest, context: RouteContext): Promise<NextResponse> {
+  const { path } = await context.params;
+  if (path[0] === 'live') return errorResponse(404, 'not_found', 'API route not found');
+  // Preserve the framework-generated mock Allow response, without advertising PATCH.
+  return new NextResponse(null, { status: 204, headers: { Allow: 'DELETE, GET, HEAD, OPTIONS, POST, PUT' } });
+}
