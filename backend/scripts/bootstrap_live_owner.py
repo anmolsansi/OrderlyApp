@@ -106,7 +106,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         validate_identity(args.restaurant_id, args.clerk_user_id)
         require_target()
         with get_connection() as connection:
-            connection.isolation_level = psycopg.IsolationLevel.READ_COMMITTED
+            if connection.info.transaction_status == psycopg.pq.TransactionStatus.IDLE:
+                connection.isolation_level = psycopg.IsolationLevel.READ_COMMITTED
             result = bootstrap_owner(connection, args.restaurant_id, args.clerk_user_id)
     except BootstrapError as error:
         print(f"error: {error}", file=sys.stderr)

@@ -43,6 +43,7 @@ def auth(monkeypatch):
     monkeypatch.setenv("ORDERLY_CLERK_JWKS_URL", ISSUER + "/jwks")
     monkeypatch.setenv("ORDERLY_CLERK_AUTHORIZED_PARTIES", PARTY)
     monkeypatch.delenv(members.VERIFIED_SUBJECTS_ENV, raising=False)
+    monkeypatch.delenv(members.VERIFIED_REACTIVATIONS_ENV, raising=False)
     identity._cache.cache_clear()
     monkeypatch.setattr(identity, "_fetch_keys", lambda url: {"rs06": key})
 
@@ -461,6 +462,12 @@ def test_reactivation_requires_current_operator_approval(client, auth, tenants, 
     error(client.put(target, headers=original_token, json=update(2, "owner")), 404, "not_found")
     assert state(postgres_database_url, t["a"]) == before
     monkeypatch.setenv(members.VERIFIED_SUBJECTS_ENV, json.dumps({t["a"]: [t["staff"]]}))
+    error(client.put(target, headers=owner_token, json=update(2, "order_staff")), 404, "not_found")
+    monkeypatch.setenv(members.VERIFIED_REACTIVATIONS_ENV, json.dumps({t["b"]: {t["staff"]: 2}}))
+    error(client.put(target, headers=owner_token, json=update(2, "order_staff")), 404, "not_found")
+    monkeypatch.setenv(members.VERIFIED_REACTIVATIONS_ENV, json.dumps({t["a"]: {t["staff"]: True}}))
+    error(client.put(target, headers=owner_token, json=update(2, "order_staff")), 503, "identity_unavailable")
+    monkeypatch.setenv(members.VERIFIED_REACTIVATIONS_ENV, json.dumps({t["a"]: {t["staff"]: 2}}))
     error(client.put(target, headers=owner_token, json=update(1, "order_staff")), 409, "version_conflict")
     restored = client.put(target, headers=owner_token, json=update(2, "order_staff"))
     assert restored.status_code == 200 and restored.json()["version"] == 3
@@ -468,6 +475,13 @@ def test_reactivation_requires_current_operator_approval(client, auth, tenants, 
         "memberships": [{"restaurant_id": t["a"], "role": "order_staff", "version": 3}]}
     _, audit = state(postgres_database_url, t["a"])
     assert len(audit) == 2 and audit[-1]["old_active"] is False and audit[-1]["new_active"] is True
+    assert client.put(target, headers=owner_token, json=update(3, "order_staff", False)).status_code == 200
+    error(client.put(target, headers=owner_token, json=update(4, "order_staff")), 404, "not_found")
+    assert client.get("/v1/live/staff/memberships", headers=original_token).json() == {"memberships": []}
+    monkeypatch.setenv(members.VERIFIED_REACTIVATIONS_ENV, json.dumps({t["a"]: {t["staff"]: 4}}))
+    assert client.put(target, headers=owner_token, json=update(4, "order_staff")).status_code == 200
+    _, audit = state(postgres_database_url, t["a"])
+    assert len(audit) == 4
 
 
 def test_runtime_role_cannot_erase_or_alter_audit(client, auth, tenants, staff_runtime_url, postgres_database_url):
