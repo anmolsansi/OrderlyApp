@@ -228,3 +228,34 @@ def test_existing_receipt_and_other_restaurant_unchanged(client, auth, tenants, 
     with psycopg.connect(postgres_database_url, row_factory=dict_row) as admin:
         assert admin.execute("SELECT snapshot FROM live_receipts WHERE restaurant_id=%s AND id=%s",
                              (rid, oid)).fetchone()["snapshot"] == receipt
+
+
+def test_authentication_and_exact_validation_fields(client, auth, tenants, postgres_database_url):
+    rid = tenants["a"]
+    path = endpoint(rid)
+    before = snapshot(postgres_database_url, rid)
+    error(client.get(path), 401, "staff_auth_required", [])
+    error(client.put(path, json=update()), 401, "staff_auth_required", [])
+    headers = auth(tenants["owner"])
+    for change, fields in (
+        ({"timezone": "UTC"}, ["timezone"]),
+        ({"name": ""}, ["name"]),
+        ({"brand_label": " "}, ["brand_label"]),
+        ({"ordering_enabled": True}, ["ordering_enabled"]),
+        ({"hours": [{"day": 1, "opens_minute": 0, "closes_minute": 1441}]}, ["hours.0.closes_minute"]),
+    ):
+        error(client.put(path, headers=headers, json=update(**change)), 422, "invalid_input", fields)
+    error(client.put(path, headers=headers, content='{"expected_version":1,"expected_version":2}'),
+          422, "invalid_input", ["body"])
+    assert snapshot(postgres_database_url, rid) == before
+
+
+def test_invalid_stored_configuration_fails_closed(client, auth, tenants, postgres_database_url):
+    rid = tenants["a"]
+    with psycopg.connect(postgres_database_url) as conn:
+        conn.execute("UPDATE live_restaurants SET hours='{}'::jsonb WHERE restaurant_id=%s", (rid,))
+    before = snapshot(postgres_database_url, rid)
+    headers = auth(tenants["owner"])
+    error(client.get(endpoint(rid), headers=headers), 503, "storage_unavailable", [])
+    error(client.put(endpoint(rid), headers=headers, json=update()), 503, "storage_unavailable", [])
+    assert snapshot(postgres_database_url, rid) == before
