@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import liveFixture from './fixtures/restaurant-service/v1.json';
+import gatewayFixture from './fixtures/restaurant-service/gateway-v1.json';
 import { NextRequest } from 'next/server';
 import { DELETE, GET, POST, PUT, PATCH, OPTIONS } from '../app/api/orderly/[...path]/route';
 
@@ -363,6 +364,41 @@ describe('CON-07 unsupported browser methods', () => {
     const options = await call(OPTIONS, 'OPTIONS', 'cart');
     expect(options.status).toBe(204);
     expect(options.headers.get('allow')).toBe('DELETE, GET, HEAD, OPTIONS, POST, PUT');
+    expect(spy).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('CON-07 approved complete W6 route matrix', () => {
+  const handlers: Record<string, Handler> = { GET, POST, PUT, DELETE };
+  const key = '11111111-1111-4111-8111-111111111111';
+  const queryValues: Record<string, string> = { limit: '25', cursor: 'opaque', view: 'active', from: '2026-11-01', to: '2026-11-02' };
+  const supplied = { origin: 'https://orderly.test', authorization: 'Bearer fixture', cookie: 'other=private; orderly_guest=fixture', 'idempotency-key': key };
+  afterEach(() => { vi.restoreAllMocks(); delete process.env.ORDERLY_API_ORIGIN; });
+
+  it.each(gatewayFixture.routes)('allows $method $path with exact credential/query policy', async vector => {
+    process.env.ORDERLY_API_ORIGIN = 'https://api.orderly.test';
+    const spy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'));
+    const query = new URLSearchParams(vector.query.map(name => [name, queryValues[name]]));
+    const suffix = query.size ? '?' + query : '';
+    const response = await handlers[vector.method](request(vector.method, vector.path + suffix, { headers: supplied }), context(...vector.path.split('/')));
+    expect(response.status).toBe(200);
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(String(spy.mock.calls[0][0])).toBe('https://api.orderly.test/v1/' + vector.path + suffix);
+    const sent = new Headers(spy.mock.calls[0][1]?.headers);
+    expect(sent.get('authorization')).toBe(vector.authority === 'staff' ? supplied.authorization : null);
+    expect(sent.get('cookie')).toBe(vector.authority === 'guest' ? 'orderly_guest=fixture' : null);
+    expect(sent.get('idempotency-key')).toBe(vector.command ? key : null);
+  });
+
+  const allowedPaths = [...new Set(gatewayFixture.routes.map(vector => vector.path))];
+  const deniedMethods = allowedPaths.flatMap(path => Object.keys(handlers)
+    .filter(method => !gatewayFixture.routes.some(vector => vector.path === path && vector.method === method))
+    .map(method => ({ path, method })));
+  it.each([...deniedMethods, ...gatewayFixture.denied])('denies $method $path without upstream access', async vector => {
+    const spy = vi.spyOn(globalThis, 'fetch');
+    const response = await call(handlers[vector.method], vector.method, vector.path, { headers: supplied });
+    expect(response.status).toBe(404);
     expect(spy).not.toHaveBeenCalled();
   });
 });
