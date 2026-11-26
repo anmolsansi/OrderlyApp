@@ -211,7 +211,8 @@ const schemas: Record<string, Spec> = {
   worker: { command: 'str', live_enabled: 'bool', marketing_send_enabled: 'bool' },
   error_payload: { code: 'str', message: 'str', fields: ['str'], request_id: 'str' },
   error: { error: '@error_payload' },
-  memberships_list: { memberships: ['@membership'] },
+  membership_summary: { restaurant_id: 'rid', role: 'enum:owner|order_staff|cashier', version: 'positive_int' },
+  memberships_list: { memberships: ['@membership_summary'] },
   tables_list: { tables: ['@table'] },
   guest_order: { receipt: '@receipt', operation: '@operation', payment: '@payment' },
   recorded: { recorded: 'bool' },
@@ -467,6 +468,13 @@ describe('RS-01 live-v1 synthetic contract readers', () => {
         expect([200, 201, 503]).toContain(wire.expected_status);
       }
     }
+    const summary = bundle.wire_cases.find(w => w.id === 'CON-06-1');
+    expect(summary?.response_schema).toBe('memberships_list');
+    const payload = summary?.response as { memberships: Array<Record<string, unknown>> };
+    const member = payload.memberships[0];
+    expect(Object.keys(member).sort()).toEqual(['restaurant_id', 'role', 'version']);
+    expect(validate(schemas.memberships_list, { memberships: [{ ...member, clerk_user_id: 'other' }] })).not.toEqual([]);
+    expect(validate(schemas.memberships_list, { memberships: [{ ...member, active: true }] })).not.toEqual([]);
     expect(bundle.wire_cases.some(w => w.path.endsWith('/payment-reversals'))).toBe(true);
     expect(bundle.wire_cases.every(w => !w.path.endsWith('/reversals'))).toBe(true);
   });
@@ -489,11 +497,18 @@ describe('RS-01 live-v1 synthetic contract readers', () => {
       const wire = byId(id);
       expect(validate(schemas[wire.request_schema as string], mutated(wire.request, change)), id + '/' + change.name).toContain(change.expected_field);
     }
-    expect(bundle.protocol_negative_cases.map(c => c.expected_status)).toEqual([401, 403, 404, 409, 409, 404, 503, 401, 401, 503]);
+    expect(bundle.protocol_negative_cases.map(c => c.expected_status)).toEqual([401, 403, 404, 409, 409, 404, 503, 401, 401, 503, 409, 409, 403, 404]);
     expect(bundle.protocol_negative_cases.filter(c => c.contract === "CON-05").map(c => [c.name, c.expected_status, c.code])).toEqual([
       ["missing_staff_token", 401, "staff_auth_required"],
       ["invalid_staff_token", 401, "staff_auth_required"],
       ["staff_jwks_unavailable", 503, "identity_unavailable"],
+    ]);
+    expect(bundle.protocol_negative_cases.filter(c => c.contract === "CON-06").map(c => [c.name, c.expected_status, c.code])).toEqual([
+      ["missing_staff_identity", 401, "staff_auth_required"],
+      ["membership_stale_version", 409, "version_conflict"],
+      ["membership_last_owner", 409, "last_owner"],
+      ["membership_role_denied", 403, "permission_denied"],
+      ["membership_foreign_or_missing", 404, "not_found"],
     ]);
     for (const caseRecord of bundle.protocol_negative_cases) {
       expect(caseRecord.no_write).toBe(true);
