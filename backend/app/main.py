@@ -60,6 +60,9 @@ from .pricing import (
     quote_current_cart,
 )
 from .redis_store import redis_client, redis_url
+from .staff_identity import StaffIdentityError
+from .staff_memberships import MembershipError
+from .staff_routes import router as staff_router
 from .store import (
     InvalidReceiptCursorError,
     ReceiptStorageUnavailableError,
@@ -126,6 +129,8 @@ async def request_id_middleware(request: Request, call_next):
     request.state.request_id = uuid4().hex
     response = await call_next(request)
     response.headers["X-Request-ID"] = request.state.request_id
+    if request.url.path.startswith("/v1/live/staff/"):
+        response.headers["Cache-Control"] = "no-store"
     return response
 
 
@@ -250,6 +255,15 @@ def _validation_field(error: dict) -> str:
     if len(location) == 1 and location[0].lower() == "idempotency-key":
         location[0] = "idempotency_key"
     return ".".join(location)
+
+
+@app.exception_handler(StaffIdentityError)
+@app.exception_handler(MembershipError)
+def staff_exception_handler(request: Request, exc: StaffIdentityError | MembershipError) -> JSONResponse:
+    return _error_response(request, exc.status_code, exc.code, exc.message, exc.fields)
+
+
+app.include_router(staff_router)
 
 
 @app.exception_handler(IdentityError)
