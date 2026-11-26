@@ -69,7 +69,7 @@ Follow the **[79-node/258-edge RF-01 graph and 30-wave schedule](docs/contracts/
 | <a id="rs-02"></a>[RS-02](docs/tickets/restaurant-service/RS-02.md) | Add live restaurant configuration and table storage | Not completed | [CON-02](docs/contracts/restaurant-service-v1.md) |
 | <a id="rs-03"></a>[RS-03](docs/tickets/restaurant-service/RS-03.md) | Add restaurant-owned order, receipt and action ledgers | Not completed | [CON-03](docs/contracts/restaurant-service-v1.md) |
 | <a id="rs-04"></a>[RS-04](docs/tickets/restaurant-service/RS-04.md) | Add memberships and an explicit initial-owner bootstrap | Not completed | [CON-04](docs/contracts/restaurant-service-v1.md) |
-| <a id="rs-05"></a>[RS-05](docs/tickets/restaurant-service/RS-05.md) | Verify Clerk session tokens in the backend | Not completed | [CON-05](docs/contracts/restaurant-service-v1.md) |
+| <a id="rs-05"></a>[RS-05](docs/tickets/restaurant-service/RS-05.md) | Verify Clerk session tokens in the backend | Awaiting independent security approval ([review evidence](docs/tickets/restaurant-service/RS-05-security-review.md)) | [CON-05](docs/contracts/restaurant-service-v1.md) |
 | <a id="rs-06"></a>[RS-06](docs/tickets/restaurant-service/RS-06.md) | Authorize restaurant roles and revoke staff membership | Not completed | [CON-06](docs/contracts/restaurant-service-v1.md) |
 | <a id="rs-07"></a>[RS-07](docs/tickets/restaurant-service/RS-07.md) | Extend the same-origin gateway for explicit live routes | Not completed | [CON-07](docs/contracts/restaurant-service-v1.md) |
 | <a id="rs-08"></a>[RS-08](docs/tickets/restaurant-service/RS-08.md) | Provide staff sign-in and active restaurant selection | Not completed | [CON-08](docs/contracts/restaurant-service-v1.md) |
