@@ -7573,6 +7573,51 @@
         "fields": [],
         "request_id": "synthetic-request-protocol-7"
       }
+    },
+    {
+      "name": "missing_staff_token",
+      "contract": "CON-05",
+      "expected_status": 401,
+      "code": "staff_auth_required",
+      "fields": [],
+      "no_write": true,
+      "synthetic": true,
+      "error": {
+        "code": "staff_auth_required",
+        "message": "Valid staff authentication required",
+        "fields": [],
+        "request_id": "synthetic-request-con-05-auth-1"
+      }
+    },
+    {
+      "name": "invalid_staff_token",
+      "contract": "CON-05",
+      "expected_status": 401,
+      "code": "staff_auth_required",
+      "fields": [],
+      "no_write": true,
+      "synthetic": true,
+      "error": {
+        "code": "staff_auth_required",
+        "message": "Valid staff authentication required",
+        "fields": [],
+        "request_id": "synthetic-request-con-05-auth-2"
+      }
+    },
+    {
+      "name": "staff_jwks_unavailable",
+      "contract": "CON-05",
+      "expected_status": 503,
+      "code": "identity_unavailable",
+      "fields": [],
+      "no_write": true,
+      "synthetic": true,
+      "error": {
+        "code": "identity_unavailable",
+        "message": "Staff identity unavailable",
+        "fields": [],
+        "request_id": "synthetic-request-con-05-auth-3"
+      }
     }
   ],
   "daily_send_budget_fixture": {
