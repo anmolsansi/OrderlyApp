@@ -6396,6 +6396,83 @@
       "request_schema": "settings_update"
     },
     {
+      "id": "CON-09-2",
+      "contract": "CON-09",
+      "synthetic": true,
+      "method": "GET",
+      "path": "/v1/live/staff/restaurants/r-demo/settings",
+      "gateway_path": "/api/orderly/live/staff/restaurants/r-demo/settings",
+      "auth": "clerk_owner",
+      "request": null,
+      "response_schema": "settings",
+      "response": {
+        "id": "r-demo",
+        "name": "Synthetic Restaurant",
+        "brand_label": "Demo Kitchen",
+        "is_open": true,
+        "ordering_enabled": false,
+        "timezone": "Asia/Kolkata",
+        "version": 1,
+        "hours": []
+      },
+      "expected_status": 200,
+      "idempotency_key": null,
+      "request_schema": null
+    },
+    {
+      "id": "CON-09-3",
+      "contract": "CON-09",
+      "synthetic": true,
+      "method": "PUT",
+      "path": "/v1/live/staff/restaurants/r-demo/settings",
+      "gateway_path": "/api/orderly/live/staff/restaurants/r-demo/settings",
+      "auth": "clerk_owner",
+      "request": {
+        "expected_version": 1,
+        "name": "New Restaurant",
+        "timezone": "Asia/Kolkata",
+        "hours": [
+          {
+            "day": 7,
+            "opens_minute": 1380,
+            "closes_minute": 1440
+          },
+          {
+            "day": 1,
+            "opens_minute": 0,
+            "closes_minute": 60
+          }
+        ],
+        "is_open": true,
+        "brand_label": "New Brand"
+      },
+      "response_schema": "settings",
+      "response": {
+        "id": "r-demo",
+        "name": "New Restaurant",
+        "brand_label": "New Brand",
+        "is_open": true,
+        "ordering_enabled": false,
+        "timezone": "Asia/Kolkata",
+        "version": 2,
+        "hours": [
+          {
+            "day": 1,
+            "opens_minute": 0,
+            "closes_minute": 60
+          },
+          {
+            "day": 7,
+            "opens_minute": 1380,
+            "closes_minute": 1440
+          }
+        ]
+      },
+      "expected_status": 200,
+      "idempotency_key": null,
+      "request_schema": "settings_update"
+    },
+    {
       "id": "CON-10-1",
       "contract": "CON-10",
       "synthetic": true,
@@ -7679,6 +7756,74 @@
         "message": "Not found",
         "fields": [],
         "request_id": "synthetic-request-con-06-auth-4"
+      }
+    },
+    {
+      "name": "settings_stale_version",
+      "contract": "CON-09",
+      "expected_status": 409,
+      "code": "version_conflict",
+      "fields": [
+        "expected_version"
+      ],
+      "no_write": true,
+      "synthetic": true,
+      "error": {
+        "code": "version_conflict",
+        "message": "Changed since review",
+        "fields": [
+          "expected_version"
+        ],
+        "request_id": "synthetic-request-con-09-settings_stale_version"
+      }
+    },
+    {
+      "name": "settings_invalid_hours",
+      "contract": "CON-09",
+      "expected_status": 422,
+      "code": "invalid_input",
+      "fields": [
+        "hours"
+      ],
+      "no_write": true,
+      "synthetic": true,
+      "error": {
+        "code": "invalid_input",
+        "message": "Check highlighted fields",
+        "fields": [
+          "hours"
+        ],
+        "request_id": "synthetic-request-con-09-settings_invalid_hours"
+      }
+    },
+    {
+      "name": "settings_role_denied",
+      "contract": "CON-09",
+      "expected_status": 403,
+      "code": "permission_denied",
+      "fields": [],
+      "no_write": true,
+      "synthetic": true,
+      "error": {
+        "code": "permission_denied",
+        "message": "No access",
+        "fields": [],
+        "request_id": "synthetic-request-con-09-settings_role_denied"
+      }
+    },
+    {
+      "name": "settings_foreign_or_missing",
+      "contract": "CON-09",
+      "expected_status": 404,
+      "code": "not_found",
+      "fields": [],
+      "no_write": true,
+      "synthetic": true,
+      "error": {
+        "code": "not_found",
+        "message": "Not found",
+        "fields": [],
+        "request_id": "synthetic-request-con-09-settings_foreign_or_missing"
       }
     }
   ],
