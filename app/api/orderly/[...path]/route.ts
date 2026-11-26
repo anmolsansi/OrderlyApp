@@ -145,11 +145,33 @@ async function boundedBody(request: NextRequest): Promise<ArrayBuffer | undefine
     throw new RangeError('request_body_too_large');
   }
 
-  const data = await request.arrayBuffer();
-  if (data.byteLength > MAX_BODY_BYTES) {
-    throw new RangeError('request_body_too_large');
+  if (!request.body) return undefined;
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (size + value.byteLength > MAX_BODY_BYTES) {
+        // Stop reading rather than accumulating an unbounded chunked request.
+        void reader.cancel().catch(() => undefined);
+        throw new RangeError('request_body_too_large');
+      }
+      chunks.push(value);
+      size += value.byteLength;
+    }
+  } finally {
+    reader.releaseLock();
   }
-  return data.byteLength > 0 ? data : undefined;
+  if (!size) return undefined;
+  const data = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    data.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return data.buffer;
 }
 
 function upstreamHeaders(request: NextRequest, publicOrigin: string, path: string, live?: LiveRoute): Headers {
