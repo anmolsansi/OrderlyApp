@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from time import time
+from concurrent.futures import ThreadPoolExecutor
+from threading import Event
+from time import monotonic, time
 from urllib.error import URLError
 
 import jwt
@@ -67,14 +69,27 @@ def transport(monkeypatch, signers):
     monkeypatch.setenv("ORDERLY_CLERK_JWKS_URL", JWKS_URL)
     monkeypatch.setenv("ORDERLY_CLERK_AUTHORIZED_PARTIES", PARTY)
     identity._cache.cache_clear()
-    state = {"payload": {"keys": [jwk(signers, "one")]}, "calls": [], "outage": False}
+    state = {"payload": {"keys": [jwk(signers, "one")]}, "calls": [], "outage": False,
+             "block_stage": None, "entered": Event(), "release": Event()}
+
+    def maybe_block(stage):
+        if state["block_stage"] == stage:
+            state["entered"].set()
+            if not state["release"].wait(3):
+                raise URLError("test transport release timeout")
+
+    class BlockingResponse(FakeResponse):
+        def read(self, size):
+            maybe_block("body")
+            return super().read(size)
 
     class Opener:
         def open(self, req, timeout):
             state["calls"].append((req.full_url, timeout))
             if state["outage"]:
                 raise URLError("private transport detail")
-            return FakeResponse(state["payload"])
+            maybe_block("open")
+            return BlockingResponse(state["payload"])
 
     def opener(*handlers):
         assert any(isinstance(h, identity._NoRedirect) for h in handlers)
@@ -82,6 +97,7 @@ def transport(monkeypatch, signers):
 
     monkeypatch.setattr(identity, "build_opener", opener)
     yield state
+    state["release"].set()
     identity._cache.cache_clear()
 
 
@@ -130,7 +146,12 @@ def test_invalid_token_times(transport, signers, changes):
 
 
 def test_altered_signature(transport, signers):
-    token = jwt.encode({"sub": SUBJECT}, signers["two"], algorithm="RS256", headers={"kid": "one"})
+    good = make_token(signers)
+    assert identity.verify_staff_token(request(good)).sub == SUBJECT
+    token = make_token(signers, kid="two", headers={"kid": "one"})
+    # All required claims are valid; only the signing key mismatches the kid.
+    assert jwt.decode(token, signers["two"].public_key(), algorithms=["RS256"],
+                      issuer=ISSUER, options={"verify_aud": False})["sub"] == SUBJECT
     denied(request(token))
 
 
@@ -170,7 +191,7 @@ def test_cache_reuse_and_unknown_kid_rotation(transport, signers):
     assert identity.verify_staff_token(two).sub == SUBJECT
     assert len(transport["calls"]) == 2
     denied(one)
-    assert len(transport["calls"]) == 3
+    assert len(transport["calls"]) == 2
 
 
 def test_unknown_kid_cold_cache_refreshes_only_once(transport, signers):
@@ -191,9 +212,11 @@ def test_cache_expiry_and_outage_never_use_stale_keys(transport, signers, monkey
     denied(req, 503, "identity_unavailable")
     assert len(transport["calls"]) == 2
     denied(req, 503, "identity_unavailable")
-    assert len(transport["calls"]) == 3
+    assert len(transport["calls"]) == 2
     transport["outage"] = False
+    clock[0] += identity.JWKS_REFRESH_COOLDOWN_SECONDS
     assert identity.verify_staff_token(req).sub == SUBJECT
+    assert len(transport["calls"]) == 3
 
 
 def test_rotation_outage_invalidates_cached_keys(transport, signers):
@@ -202,6 +225,7 @@ def test_rotation_outage_invalidates_cached_keys(transport, signers):
     transport["outage"] = True
     denied(request(make_token(signers, kid="two")), 503, "identity_unavailable")
     denied(one, 503, "identity_unavailable")
+    assert len(transport["calls"]) == 2
 
 
 @pytest.mark.parametrize("payload", [{}, {"keys": []}, {"keys": [None]}, {"keys": [{}] * 65}, {"keys": [{"kty": "RSA", "kid": "one"}]}])
@@ -234,3 +258,65 @@ def test_invalid_config_fails_closed_without_fetch(transport, signers, monkeypat
 
 def test_redirect_handler_refuses_redirect():
     assert identity._NoRedirect().redirect_request(None, None, 302, "", {}, "https://attacker.example.test") is None
+
+
+def test_unknown_kid_flood_is_globally_throttled_per_cache(transport, signers, monkeypatch):
+    clock = [1000.0]
+    monkeypatch.setattr(identity, "monotonic", lambda: clock[0])
+    known = request(make_token(signers))
+    assert identity.verify_staff_token(known).sub == SUBJECT
+    for index in range(20):
+        denied(request(make_token(signers, headers={"kid": f"unknown-{index}"})))
+    assert len(transport["calls"]) == 2
+    assert identity.verify_staff_token(known).sub == SUBJECT
+    transport["payload"] = {"keys": [jwk(signers, "two")]}
+    rotated = request(make_token(signers, kid="two"))
+    denied(rotated)
+    clock[0] += identity.JWKS_REFRESH_COOLDOWN_SECONDS
+    assert identity.verify_staff_token(rotated).sub == SUBJECT
+    assert len(transport["calls"]) == 3
+
+
+def test_cold_unknown_kid_does_not_trigger_second_immediate_refresh(transport, signers):
+    denied(request(make_token(signers, kid="two")))
+    denied(request(make_token(signers, headers={"kid": "other"})))
+    assert len(transport["calls"]) == 1
+
+
+def test_concurrent_cold_requests_share_one_refresh(transport, signers):
+    transport["block_stage"] = "open"
+    req = request(make_token(signers))
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        futures = [pool.submit(identity.verify_staff_token, req) for _ in range(8)]
+        try:
+            assert transport["entered"].wait(1)
+        finally:
+            transport["release"].set()
+        assert all(future.result(timeout=2).sub == SUBJECT for future in futures)
+    assert len(transport["calls"]) == 1
+
+
+@pytest.mark.parametrize("stage", ["open", "body"])
+def test_total_deadline_discards_late_keys_and_bounds_inflight_work(
+    transport, signers, monkeypatch, stage
+):
+    monkeypatch.setattr(identity, "JWKS_TIMEOUT_SECONDS", 0.15)
+    transport["block_stage"] = stage
+    req = request(make_token(signers))
+    cache = identity._cache(identity.load_staff_settings())
+    started = monotonic()
+    try:
+        denied(req, 503, "identity_unavailable")
+        assert monotonic() - started < 1
+        assert transport["entered"].is_set()
+        flight = cache.flight
+        assert flight is not None
+        for _ in range(10):
+            denied(req, 503, "identity_unavailable")
+        assert len(transport["calls"]) == 1
+    finally:
+        transport["release"].set()
+    assert flight.done.wait(2)
+    assert not flight.succeeded
+    denied(req, 503, "identity_unavailable")
+    assert len(transport["calls"]) == 1
