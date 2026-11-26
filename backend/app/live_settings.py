@@ -6,12 +6,12 @@ from typing import Any, Literal
 from zoneinfo import ZoneInfo
 
 from psycopg.types.json import Jsonb
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 from .staff_identity import StaffPrincipal
 from .staff_memberships import (
     MAX_VERSION, OWNER_ONLY, MembershipError, _lock_restaurant,
-    not_found, require_read_committed, require_role,
+    not_found, require_read_committed, require_role, unavailable,
 )
 
 
@@ -84,7 +84,11 @@ def _read(conn: Any, rid: str) -> Settings:
     ).fetchone()
     if row is None:
         raise not_found()
-    return Settings.model_validate(row)
+    try:
+        return Settings.model_validate(row)
+    except ValidationError:
+        # A corrupted operator/config row is unavailable, not a valid fallback.
+        raise unavailable() from None
 
 
 def _authorize_and_lock(conn: Any, principal: StaffPrincipal, rid: str, *, write: bool):
