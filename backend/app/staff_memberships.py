@@ -185,3 +185,74 @@ def get_member(conn: Any, principal: StaffPrincipal, rid: str, subject: str) -> 
         if row is None:
             raise not_found()
         return Membership.model_validate(row)
+
+
+def _version_conflict() -> MembershipError:
+    return MembershipError(409, "version_conflict", "Changed since review", ["expected_version"])
+
+
+def _audit(conn: Any, actor: StaffPrincipal, before: Membership | None,
+           after: Membership) -> None:
+    conn.execute(
+        """INSERT INTO live_membership_audit
+           (id, restaurant_id, subject, actor, old_role, new_role, old_active, new_active)
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+        (uuid4(), after.restaurant_id, after.clerk_user_id, actor.sub,
+         before.role if before is not None else None, after.role,
+         before.active if before is not None else None, after.active),
+    )
+
+
+def put_member(conn: Any, principal: StaffPrincipal, rid: str, subject: str,
+               change: MembershipUpdate) -> tuple[Membership, bool]:
+    """Return membership and created flag after one atomic, tenant-locked write."""
+    validate_identifiers(rid, subject)
+    with conn.transaction():
+        # All membership writers, including RS-04 bootstrap, lock parent first.
+        # Reauthorize only AFTER obtaining the lock, not at screen entry.
+        _lock_restaurant(conn, rid, write=True)
+        require_role(conn, principal, rid, OWNER_ONLY)
+        row = conn.execute(
+            f"SELECT {_COLUMNS} FROM live_memberships WHERE restaurant_id = %s "
+            "AND clerk_user_id = %s FOR UPDATE", (rid, subject),
+        ).fetchone()
+        before = Membership.model_validate(row) if row is not None else None
+        if before is None:
+            if change.expected_version != 0:
+                raise _version_conflict()
+            if not operator_verified(rid, subject):
+                raise not_found()
+            row = conn.execute(
+                f"""INSERT INTO live_memberships (restaurant_id, clerk_user_id, role, active)
+                    VALUES (%s, %s, %s, %s) RETURNING {_COLUMNS}""",
+                (rid, subject, change.role, change.active),
+            ).fetchone()
+        else:
+            if before.version != change.expected_version:
+                raise _version_conflict()
+            # Identical current-version PUT is a true no-op, matching CON-06-2.
+            if before.role == change.role and before.active == change.active:
+                return before, False
+            if before.version == MAX_VERSION:
+                raise _version_conflict()
+            if (before.role == "owner" and before.active
+                    and (change.role != "owner" or not change.active)):
+                other = conn.execute(
+                    """SELECT 1 FROM live_memberships WHERE restaurant_id = %s
+                       AND clerk_user_id <> %s AND role = 'owner' AND active LIMIT 1""",
+                    (rid, subject),
+                ).fetchone()
+                if other is None:
+                    raise MembershipError(409, "last_owner", "At least one active owner is required")
+            row = conn.execute(
+                f"""UPDATE live_memberships SET role = %s, active = %s,
+                       version = version + 1, updated_at = now()
+                    WHERE restaurant_id = %s AND clerk_user_id = %s AND version = %s
+                    RETURNING {_COLUMNS}""",
+                (change.role, change.active, rid, subject, change.expected_version),
+            ).fetchone()
+            if row is None:
+                raise _version_conflict()
+        after = Membership.model_validate(row)
+        _audit(conn, principal, before, after)
+        return after, before is None
