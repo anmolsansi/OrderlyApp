@@ -19,6 +19,8 @@ JWKS_REFRESH_COOLDOWN_SECONDS = 30
 MAX_JWKS_BYTES = 65536
 MAX_JWKS_KEYS = 64
 MAX_TOKEN_LENGTH = 16384
+MAX_SESSION_LIFETIME_SECONDS = 120
+MAX_SUBJECT_LENGTH = 256
 KEY_HEADERS = frozenset({"jku", "jwk", "x5u", "x5c", "jwks"})
 
 
@@ -267,15 +269,25 @@ def verify_staff_token(request: Request) -> StaffPrincipal:
     try:
         claims = jwt.decode(
             token, key.key, algorithms=["RS256"], issuer=settings.issuer,
-            options={"require": ["iss", "exp", "nbf", "sub", "azp"],
+            options={"require": ["iss", "exp", "nbf", "sub", "azp", "iat", "sid", "v"],
                      "verify_aud": False, "verify_exp": True, "verify_nbf": True},
         )
         # Clerk uses azp (authorized browser party), not a configured audience.
         if (
             type(claims["exp"]) is not int or type(claims["nbf"]) is not int
+            or type(claims["iat"]) is not int
+            or not 0 < claims["exp"] - claims["iat"] <= MAX_SESSION_LIFETIME_SECONDS
+            or claims["nbf"] > claims["iat"]
+            or type(claims["v"]) is not int or claims["v"] != 2
+            or not isinstance(claims["sid"], str) or not claims["sid"].startswith("sess_")
+            or not 5 < len(claims["sid"]) <= MAX_SUBJECT_LENGTH
+            or not claims["sid"].isascii() or not claims["sid"][5:].isalnum()
+            or ("sts" in claims and claims["sts"] != "active")
+            or "act" in claims
             or not isinstance(claims["azp"], str)
             or claims["azp"] not in settings.authorized_parties
             or not isinstance(claims["sub"], str) or not claims["sub"].strip()
+            or len(claims["sub"]) > MAX_SUBJECT_LENGTH
             or not claims["sub"].isprintable() or KEY_HEADERS.intersection(claims)
         ):
             raise _invalid()

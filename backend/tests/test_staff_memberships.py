@@ -44,7 +44,8 @@ def auth(monkeypatch):
 
     def headers(subject, **changes):
         now = int(time())
-        claims = {"iss": ISSUER, "azp": PARTY, "sub": subject, "exp": now + 120, "nbf": now - 5}
+        claims = {"iss": ISSUER, "azp": PARTY, "sub": subject, "exp": now + 120, "nbf": now - 5,
+              "iat": now, "sid": "sess_Synthetic123", "v": 2}
         claims.update(changes)
         token = jwt.encode(claims, signer, algorithm="RS256", headers={"kid": "rs06"})
         return {"Authorization": "Bearer " + token}
@@ -395,3 +396,10 @@ def test_shared_membership_negative_vectors(client, auth, tenants, postgres_data
         assert case["no_write"] is True
     assert state(postgres_database_url, t["a"]) == before_a
     assert state(postgres_database_url, t["b"]) == before_b
+
+
+@pytest.mark.parametrize("claims", [{"sts": "pending"}, {"sid": None}, {"v": None}, {"act": {"sub": "operator"}}])
+def test_wrong_session_profile_cannot_open_database(client, auth, monkeypatch, claims):
+    monkeypatch.setattr(staff_routes, "database_url", lambda: "synthetic-test")
+    monkeypatch.setattr(staff_routes, "get_connection", lambda **kwargs: pytest.fail("invalid session reached DB"))
+    error(client.get("/v1/live/staff/memberships", headers=auth("synthetic", **claims)), 401, "staff_auth_required", [])
