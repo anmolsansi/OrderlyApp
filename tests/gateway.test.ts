@@ -402,3 +402,54 @@ describe('CON-07 approved complete W6 route matrix', () => {
     expect(spy).not.toHaveBeenCalled();
   });
 });
+
+
+describe('CON-07 bounded transport regression', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    delete process.env.ORDERLY_API_ORIGIN;
+  });
+
+  it('cancels a chunked request as soon as the 64 KiB cap is exceeded', async () => {
+    let cancelled = false;
+    let chunks = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        chunks++;
+        if (chunks > 5) controller.close();
+        else controller.enqueue(new Uint8Array(40 * 1024));
+      },
+      cancel() { cancelled = true; },
+    });
+    const spy = vi.spyOn(globalThis, 'fetch');
+    const response = await call(PUT, 'PUT', 'live/staff/restaurants/r-demo/settings', { body });
+    expect(response.status).toBe(413);
+    expect(cancelled).toBe(true);
+    expect(chunks).toBeLessThan(5);
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('returns uncertain 504 when upstream sends headers but the live response body stalls', async () => {
+    vi.useFakeTimers();
+    process.env.ORDERLY_API_ORIGIN = 'https://api.orderly.test';
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_input, init) => new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          init?.signal?.addEventListener('abort', () => controller.error(new DOMException('aborted', 'AbortError')), { once: true });
+        },
+      }),
+      { status: 200 },
+    ));
+    const pending = call(POST, 'POST', 'live/restaurants/r-demo/orders');
+    await vi.advanceTimersByTimeAsync(5001);
+    const response = await pending;
+    expect(response.status).toBe(504);
+    expect(await response.json()).toMatchObject({ error: { code: 'upstream_timeout' } });
+  });
+
+  it('ensures route and shared wire fixtures cannot silently become empty', () => {
+    expect(gatewayFixture.routes).toHaveLength(43);
+    expect(liveFixture.wire_cases.filter(vector => vector.path.startsWith('/v1/live/') && !vector.path.startsWith('/v1/live/demo/')).length).toBeGreaterThanOrEqual(25);
+  });
+});
