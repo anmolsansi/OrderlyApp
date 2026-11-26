@@ -519,3 +519,65 @@ def test_lock_timeout_is_safe_and_does_not_write(client, auth, tenants, postgres
         error(client.put(path(t["a"], t["staff"]), headers=auth(t["owner"]), json=update(1, "cashier")),
               503, "storage_unavailable", [])
     assert state(postgres_database_url, t["a"]) == before
+
+
+def test_queued_owner_write_rechecks_revocation(tenants, staff_runtime_url, postgres_database_url, monkeypatch):
+    from threading import Event
+    t = tenants
+    queued = Event()
+    original = members._lock_restaurant
+
+    def observe(conn, rid, *, write):
+        queued.set()
+        return original(conn, rid, write=write)
+
+    def queued_mutation():
+        try:
+            with staff_routes.staff_connection() as conn:
+                members.put_member(conn, identity.StaffPrincipal(t["owner"]), t["a"], t["staff"],
+                                   members.MembershipUpdate(**update(1, "cashier")))
+        except members.MembershipError as exc:
+            return exc.code
+        return "unexpected success"
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        with psycopg.connect(postgres_database_url, row_factory=dict_row) as holder:
+            # Hold the parent, revoke the actor, but keep the revocation uncommitted.
+            holder.execute("SELECT restaurant_id FROM live_restaurants WHERE restaurant_id=%s FOR UPDATE", (t["a"],))
+            members.put_member(holder, identity.StaffPrincipal(t["second"]), t["a"], t["owner"],
+                               members.MembershipUpdate(**update(1, "owner", False)))
+            monkeypatch.setattr(members, "_lock_restaurant", observe)
+            pending = pool.submit(queued_mutation)
+            assert queued.wait(1.5)
+        assert pending.result(timeout=5) == "not_found"
+    rows, audit = state(postgres_database_url, t["a"])
+    assert next(row for row in rows if row["clerk_user_id"] == t["staff"])["role"] == "order_staff"
+    assert len(audit) == 1
+
+
+def test_two_owner_race_with_nondefault_connection_setting(tenants, staff_runtime_url, postgres_database_url, monkeypatch):
+    from contextlib import contextmanager
+    t = tenants
+    @contextmanager
+    def nondefault(**kwargs):
+        with psycopg.connect(staff_runtime_url, row_factory=dict_row) as conn:
+            conn.isolation_level = psycopg.IsolationLevel.REPEATABLE_READ
+            yield conn
+    monkeypatch.setattr(staff_routes, "get_connection", nondefault)
+    barrier = Barrier(2)
+
+    def remove_self(subject):
+        try:
+            with staff_routes.staff_connection() as conn:
+                barrier.wait(timeout=5)
+                members.put_member(conn, identity.StaffPrincipal(subject), t["a"], subject,
+                                   members.MembershipUpdate(**update(1, "owner", False)))
+            return "accepted"
+        except members.MembershipError as exc:
+            return exc.code
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        assert sorted(pool.map(remove_self, [t["owner"], t["second"]])) == ["accepted", "last_owner"]
+    rows, audit = state(postgres_database_url, t["a"])
+    assert sum(row["active"] and row["role"] == "owner" for row in rows) == 1
+    assert len(audit) == 1
