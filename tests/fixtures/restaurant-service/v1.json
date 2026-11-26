@@ -6330,9 +6330,7 @@
         "memberships": [
           {
             "restaurant_id": "r-demo",
-            "clerk_user_id": "clerk-synthetic-owner",
             "role": "owner",
-            "active": true,
             "version": 1
           }
         ]
@@ -7617,6 +7615,70 @@
         "message": "Staff identity unavailable",
         "fields": [],
         "request_id": "synthetic-request-con-05-auth-3"
+      }
+    },
+    {
+      "name": "membership_stale_version",
+      "contract": "CON-06",
+      "expected_status": 409,
+      "code": "version_conflict",
+      "fields": [
+        "expected_version"
+      ],
+      "no_write": true,
+      "synthetic": true,
+      "error": {
+        "code": "version_conflict",
+        "message": "Changed since review",
+        "fields": [
+          "expected_version"
+        ],
+        "request_id": "synthetic-request-con-06-auth-1"
+      }
+    },
+    {
+      "name": "membership_last_owner",
+      "contract": "CON-06",
+      "expected_status": 409,
+      "code": "last_owner",
+      "fields": [],
+      "no_write": true,
+      "synthetic": true,
+      "error": {
+        "code": "last_owner",
+        "message": "At least one active owner is required",
+        "fields": [],
+        "request_id": "synthetic-request-con-06-auth-2"
+      }
+    },
+    {
+      "name": "membership_role_denied",
+      "contract": "CON-06",
+      "expected_status": 403,
+      "code": "permission_denied",
+      "fields": [],
+      "no_write": true,
+      "synthetic": true,
+      "error": {
+        "code": "permission_denied",
+        "message": "No access",
+        "fields": [],
+        "request_id": "synthetic-request-con-06-auth-3"
+      }
+    },
+    {
+      "name": "membership_foreign_or_missing",
+      "contract": "CON-06",
+      "expected_status": 404,
+      "code": "not_found",
+      "fields": [],
+      "no_write": true,
+      "synthetic": true,
+      "error": {
+        "code": "not_found",
+        "message": "Not found",
+        "fields": [],
+        "request_id": "synthetic-request-con-06-auth-4"
       }
     }
   ],

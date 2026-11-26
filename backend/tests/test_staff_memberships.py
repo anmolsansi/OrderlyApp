@@ -162,7 +162,10 @@ def test_membership_summary_and_owner_listing(client, auth, tenants):
     t = tenants
     result = client.get("/v1/live/staff/memberships", headers=auth(t["owner"], role="cashier"))
     assert result.status_code == 200
-    assert result.json() == {"memberships": [{"restaurant_id": t["a"], "role": "owner", "version": 1}]}
+    fixture = json.loads((ROOT / "tests/fixtures/restaurant-service/v1.json").read_text())
+    wire = next(case for case in fixture["wire_cases"] if case["id"] == "CON-06-1")
+    expected_summary = dict(wire["response"]["memberships"][0], restaurant_id=t["a"])
+    assert result.json() == {"memberships": [expected_summary]}
     result = client.get(path(t["a"]), headers=auth(t["owner"]))
     assert result.status_code == 200
     subjects = [m["clerk_user_id"] for m in result.json()["memberships"]]
@@ -265,7 +268,18 @@ def test_stale_version_and_oversized_body_do_not_write(client, auth, tenants, po
     before = state(postgres_database_url, t["a"])
     target = path(t["a"], t["staff"])
     headers = auth(t["owner"])
-    error(client.put(target, headers=headers, json=update(0, "cashier")), 409, "version_conflict")
+    fixture = json.loads((ROOT / "tests/fixtures/restaurant-service/v1.json").read_text())
+    case = next(c for c in fixture["protocol_negative_cases"] if c["name"] == "membership_stale_version")
+    conflict = client.put(target, headers=headers, json=update(0, "cashier"))
+    payload = error(conflict, case["expected_status"], case["code"], case["fields"])
+    assert payload["message"] == case["error"]["message"]
+    # A fresh owner-authorized GET is the reconciliation boundary; the exact
+    # error envelope carries no membership data or retry authorization.
+    current = client.get(target, headers=headers)
+    assert current.status_code == 200
+    assert current.json() == next(row for row in before[0] if row["clerk_user_id"] == t["staff"])
+    error(client.get(target, headers=auth(t["staff"])), 403, "permission_denied")
+    error(client.get(target, headers=auth(t["foreign"])), 404, "not_found")
     error(client.put(target, headers=headers, content=b"x" * (65536 + 1)), 422, "invalid_input", ["body"])
     assert state(postgres_database_url, t["a"]) == before
 
@@ -361,3 +375,23 @@ def test_existing_mock_health_remains_unchanged(client):
     assert response.status_code == 200
     assert response.json()["live"] is True
     assert response.json()["schema_version"] == 1
+
+
+def test_shared_membership_negative_vectors(client, auth, tenants, postgres_database_url):
+    t = tenants
+    fixture = json.loads((ROOT / "tests/fixtures/restaurant-service/v1.json").read_text())
+    cases = {c["name"]: c for c in fixture["protocol_negative_cases"] if c["contract"] == "CON-06"}
+    before_a = state(postgres_database_url, t["a"])
+    before_b = state(postgres_database_url, t["b"])
+    responses = {
+        "membership_role_denied": client.put(path(t["a"], t["staff"]), headers=auth(t["cashier"]), json=update(1, "cashier")),
+        "membership_foreign_or_missing": client.get(path(t["b"], t["foreign"]), headers=auth(t["owner"])),
+        "membership_last_owner": client.put(path(t["b"], t["foreign"]), headers=auth(t["foreign"]), json=update(1, "cashier")),
+    }
+    for name, response in responses.items():
+        case = cases[name]
+        payload = error(response, case["expected_status"], case["code"], case["fields"])
+        assert payload["message"] == case["error"]["message"]
+        assert case["no_write"] is True
+    assert state(postgres_database_url, t["a"]) == before_a
+    assert state(postgres_database_url, t["b"]) == before_b
