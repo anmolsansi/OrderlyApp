@@ -499,7 +499,7 @@ def test_malformed_wire_requests_and_protocol_negatives_fail_closed() -> None:
         errors = validate(SCHEMAS[item["request_schema"]], request)
         assert field in errors, (case_id, field, errors)
     protocol = fixture["protocol_negative_cases"]
-    assert [item["expected_status"] for item in protocol] == [401, 403, 404, 409, 409, 404, 503, 401, 401, 503, 409, 409, 403, 404]
+    assert [item["expected_status"] for item in protocol] == [401, 403, 404, 409, 409, 404, 503, 401, 401, 503, 409, 409, 403, 404, 409, 422, 403, 404]
     assert [(item["name"], item["expected_status"], item["code"]) for item in protocol
             if item["contract"] == "CON-05"] == [
         ("missing_staff_token", 401, "staff_auth_required"),
@@ -514,6 +514,16 @@ def test_malformed_wire_requests_and_protocol_negatives_fail_closed() -> None:
         ('membership_role_denied', 403, 'permission_denied'),
         ('membership_foreign_or_missing', 404, 'not_found'),
     ]
+    assert [(item["name"], item["expected_status"], item["code"]) for item in protocol
+            if item["contract"] == "CON-09"] == [
+        ("settings_stale_version", 409, "version_conflict"),
+        ("settings_invalid_hours", 422, "invalid_input"),
+        ("settings_role_denied", 403, "permission_denied"),
+        ("settings_foreign_or_missing", 404, "not_found"),
+    ]
+    assert wires["CON-09-2"]["response"] == wires["CON-09-1"]["response"]
+    assert wires["CON-09-3"]["response"]["version"] == 2
+    assert wires["CON-09-3"]["response"]["ordering_enabled"] is False
     for item in protocol:
         assert item["no_write"] is True
         assert item["synthetic"] is True
