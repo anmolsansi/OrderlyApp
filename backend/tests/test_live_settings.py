@@ -208,3 +208,23 @@ def test_settings_grants_exclude_scope_and_regrant_revokes_excess(client, auth, 
         grant_staff_runtime(admin, role)
         grant_staff_runtime(admin, role)
     assert client.get(endpoint(rid), headers=auth(tenants["owner"])).status_code == 200
+
+
+def test_existing_receipt_and_other_restaurant_unchanged(client, auth, tenants, postgres_database_url):
+    from psycopg.types.json import Jsonb
+
+    rid = tenants["a"]
+    oid = uuid4()
+    receipt = {"id": str(oid), "restaurant_id": rid, "name": "Original Name", "currency": "INR", "total_minor": 100}
+    with psycopg.connect(postgres_database_url) as admin:
+        admin.execute("""INSERT INTO live_orders(restaurant_id,id,status,created_at,updated_at)
+                         VALUES (%s,%s,'Completed',now(),now())""", (rid, oid))
+        admin.execute("INSERT INTO live_receipts(restaurant_id,id,snapshot) VALUES (%s,%s,%s)",
+                      (rid, oid, Jsonb(receipt)))
+    foreign = snapshot(postgres_database_url, tenants["b"])
+    response = client.put(endpoint(rid), headers=auth(tenants["owner"]), json=update())
+    assert response.status_code == 200
+    assert snapshot(postgres_database_url, tenants["b"]) == foreign
+    with psycopg.connect(postgres_database_url, row_factory=dict_row) as admin:
+        assert admin.execute("SELECT snapshot FROM live_receipts WHERE restaurant_id=%s AND id=%s",
+                             (rid, oid)).fetchone()["snapshot"] == receipt
