@@ -31,7 +31,10 @@ def grant_staff_runtime(conn, role: str):
             "GRANT SELECT ON public.schema_migrations, public.restaurants, public.menu_items TO {}",
             "GRANT SELECT, INSERT, UPDATE, DELETE ON public.guest_sessions, public.guest_carts TO {}",
             "GRANT SELECT, INSERT ON public.guest_orders, public.order_idempotency TO {}",
-            "GRANT SELECT, UPDATE ON public.live_restaurants TO {}",
+            # Re-running the tool removes the older table-wide grant too.
+            "REVOKE UPDATE ON public.live_restaurants FROM {}",
+            "REVOKE UPDATE (ordering_enabled, synthetic) ON public.live_restaurants FROM {}",
+            "GRANT SELECT, UPDATE (updated_at) ON public.live_restaurants TO {}",
             "GRANT SELECT, INSERT, UPDATE ON public.live_memberships TO {}",
             "REVOKE ALL ON public.live_membership_audit FROM {}",
             "GRANT INSERT ON public.live_membership_audit TO {}",

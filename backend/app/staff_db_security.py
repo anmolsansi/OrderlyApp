@@ -11,12 +11,23 @@ def assert_staff_runtime_role(conn):
           AND NOT has_database_privilege(current_user, current_database(), 'CREATE')
           AND NOT EXISTS (SELECT 1 FROM pg_database d WHERE d.datname = current_database() AND d.datdba = r.oid)
           AND NOT EXISTS (SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-                          WHERE n.nspname = 'public' AND c.relname = 'live_membership_audit' AND c.relowner = r.oid)
+                          WHERE n.nspname = 'public' AND c.relname IN ('live_membership_audit', 'live_restaurants') AND c.relowner = r.oid)
           AND NOT EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
                           WHERE n.nspname = 'public' AND p.proname = 'live_reject_history_mutation' AND p.proowner = r.oid)
           AND NOT has_table_privilege(current_user, 'public.live_membership_audit', 'DELETE,TRUNCATE,TRIGGER')
           AND NOT has_any_column_privilege(current_user, 'public.live_membership_audit', 'UPDATE')
           AND has_table_privilege(current_user, 'public.live_membership_audit', 'INSERT')
+          -- Locking SELECT requires UPDATE on at least one column. Only the
+          -- metadata timestamp is authorized; never grant activation or scope.
+          AND has_column_privilege(current_user, 'public.live_restaurants', 'updated_at', 'UPDATE')
+          AND NOT has_table_privilege(current_user, 'public.live_restaurants', 'UPDATE,DELETE,TRUNCATE,TRIGGER')
+          AND NOT has_any_column_privilege(current_user, 'public.live_restaurants', 'INSERT')
+          AND NOT EXISTS (
+              SELECT 1 FROM pg_attribute a
+              WHERE a.attrelid = 'public.live_restaurants'::regclass
+                AND a.attnum > 0 AND NOT a.attisdropped AND a.attname <> 'updated_at'
+                AND has_column_privilege(current_user, a.attrelid, a.attnum, 'UPDATE')
+          )
           AS safe
         FROM pg_roles r WHERE r.rolname = current_user
         """).fetchone()

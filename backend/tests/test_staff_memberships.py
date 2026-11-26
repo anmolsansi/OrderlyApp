@@ -595,3 +595,61 @@ def test_two_owner_race_with_nondefault_connection_setting(tenants, staff_runtim
     rows, audit = state(postgres_database_url, t["a"])
     assert sum(row["active"] and row["role"] == "owner" for row in rows) == 1
     assert len(audit) == 1
+
+
+def test_runtime_restaurant_lock_privilege_cannot_change_scope(
+    client, auth, tenants, staff_runtime_url, postgres_database_url
+):
+    t = tenants
+    rid = t["a"]
+    # Both HTTP read and mutation paths use the actual restricted login.
+    assert client.get(path(rid), headers=auth(t["owner"])).status_code == 200
+    assert client.put(path(rid, t["new"]), headers=auth(t["owner"]), json=update(0, "cashier")).status_code == 201
+    with psycopg.connect(staff_runtime_url, row_factory=dict_row) as runtime:
+        assert_staff_runtime_role(runtime)
+        before = runtime.execute(
+            "SELECT ordering_enabled, synthetic FROM live_restaurants WHERE restaurant_id=%s", (rid,)
+        ).fetchone()
+        assert before == {"ordering_enabled": False, "synthetic": False}
+        for clause in ("FOR SHARE", "FOR UPDATE"):
+            assert runtime.execute(
+                "SELECT restaurant_id FROM live_restaurants WHERE restaurant_id=%s " + clause, (rid,)
+            ).fetchone()["restaurant_id"] == rid
+        for column in ("ordering_enabled", "synthetic"):
+            with pytest.raises(psycopg.errors.InsufficientPrivilege), runtime.transaction():
+                runtime.execute(sql.SQL("UPDATE live_restaurants SET {}=true WHERE restaurant_id=%s").format(
+                    sql.Identifier(column)), (rid,))
+        assert runtime.execute(
+            "SELECT ordering_enabled, synthetic FROM live_restaurants WHERE restaurant_id=%s", (rid,)
+        ).fetchone() == before
+
+
+def test_regrant_removes_previous_broad_restaurant_update(
+    client, auth, tenants, staff_runtime_url, postgres_database_url
+):
+    from psycopg.conninfo import conninfo_to_dict
+    role = sql.Identifier(conninfo_to_dict(staff_runtime_url)["user"])
+    with psycopg.connect(postgres_database_url, row_factory=dict_row) as admin:
+        admin.execute(sql.SQL("GRANT UPDATE ON public.live_restaurants TO {}").format(role))
+        admin.execute(sql.SQL("GRANT UPDATE (ordering_enabled, synthetic) ON public.live_restaurants TO {}").format(role))
+    error(client.get("/v1/live/staff/memberships", headers=auth(tenants["owner"])), 503, "storage_unavailable", [])
+    with psycopg.connect(postgres_database_url, row_factory=dict_row) as admin:
+        grant_staff_runtime(admin, conninfo_to_dict(staff_runtime_url)["user"])
+    with psycopg.connect(staff_runtime_url, row_factory=dict_row) as runtime:
+        assert_staff_runtime_role(runtime)
+        for column in ("ordering_enabled", "synthetic"):
+            assert runtime.execute(
+                "SELECT has_column_privilege(current_user, 'public.live_restaurants', %s, 'UPDATE') AS allowed",
+                (column,)
+            ).fetchone()["allowed"] is False
+    assert client.get(path(tenants["a"]), headers=auth(tenants["owner"])).status_code == 200
+
+
+def test_runtime_guard_rejects_column_only_scope_grant(
+    client, auth, tenants, staff_runtime_url, postgres_database_url
+):
+    from psycopg.conninfo import conninfo_to_dict
+    role = sql.Identifier(conninfo_to_dict(staff_runtime_url)["user"])
+    with psycopg.connect(postgres_database_url, row_factory=dict_row) as admin:
+        admin.execute(sql.SQL("GRANT UPDATE (synthetic) ON public.live_restaurants TO {}").format(role))
+    error(client.get("/v1/live/staff/memberships", headers=auth(tenants["owner"])), 503, "storage_unavailable", [])
