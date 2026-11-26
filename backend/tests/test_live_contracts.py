@@ -193,7 +193,8 @@ SCHEMAS: dict[str, Any] = {
     },
     "error": {"error": "@error_payload"},
 
-    "memberships_list": {"memberships": ["@membership"]},
+    "membership_summary": {"restaurant_id": "rid", "role": "enum:owner|order_staff|cashier", "version": "positive_int"},
+    "memberships_list": {"memberships": ["@membership_summary"]},
     "tables_list": {"tables": ["@table"]},
     "guest_order": {"receipt": "@receipt", "operation": "@operation", "payment": "@payment"},
     "recorded": {"recorded": "bool"},
@@ -498,12 +499,20 @@ def test_malformed_wire_requests_and_protocol_negatives_fail_closed() -> None:
         errors = validate(SCHEMAS[item["request_schema"]], request)
         assert field in errors, (case_id, field, errors)
     protocol = fixture["protocol_negative_cases"]
-    assert [item["expected_status"] for item in protocol] == [401, 403, 404, 409, 409, 404, 503, 401, 401, 503]
+    assert [item["expected_status"] for item in protocol] == [401, 403, 404, 409, 409, 404, 503, 401, 401, 503, 409, 409, 403, 404]
     assert [(item["name"], item["expected_status"], item["code"]) for item in protocol
             if item["contract"] == "CON-05"] == [
         ("missing_staff_token", 401, "staff_auth_required"),
         ("invalid_staff_token", 401, "staff_auth_required"),
         ("staff_jwks_unavailable", 503, "identity_unavailable"),
+    ]
+    assert [(item['name'], item['expected_status'], item['code']) for item in protocol
+            if item['contract'] == 'CON-06'] == [
+        ('missing_staff_identity', 401, 'staff_auth_required'),
+        ('membership_stale_version', 409, 'version_conflict'),
+        ('membership_last_owner', 409, 'last_owner'),
+        ('membership_role_denied', 403, 'permission_denied'),
+        ('membership_foreign_or_missing', 404, 'not_found'),
     ]
     for item in protocol:
         assert item["no_write"] is True
@@ -562,3 +571,13 @@ def test_old_mock_fixture_blobs_are_byte_identical_to_base() -> None:
         raw = path.read_bytes()
         actual = hashlib.sha1(b"blob " + str(len(raw)).encode() + b"\0" + raw).hexdigest()
         assert actual == expected[path.name], path.name
+
+
+def test_con06_summary_excludes_private_member_fields() -> None:
+    wire = next(case for case in read_bundle()["wire_cases"] if case["id"] == "CON-06-1")
+    assert wire["response_schema"] == "memberships_list"
+    member = wire["response"]["memberships"][0]
+    assert set(member) == {"restaurant_id", "role", "version"}
+    assert validate(SCHEMAS["memberships_list"], wire["response"]) == []
+    assert validate(SCHEMAS["memberships_list"], {"memberships": [{**member, "clerk_user_id": "other"}]})
+    assert validate(SCHEMAS["memberships_list"], {"memberships": [{**member, "active": True}]})
