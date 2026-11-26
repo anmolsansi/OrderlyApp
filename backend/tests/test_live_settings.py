@@ -62,7 +62,11 @@ def test_round_trip_noop_conflict_and_fixture(client, auth, tenants, postgres_da
     path = endpoint(rid)
     headers = auth(tenants["owner"])
     fixture = json.loads((ROOT / "tests/fixtures/restaurant-service/v1.json").read_text())
-    wire = next(case for case in fixture["wire_cases"] if case["id"] == "CON-09-1")
+    wires = {case["id"]: case for case in fixture["wire_cases"]}
+    wire = wires["CON-09-1"]
+    read_wire = wires["CON-09-2"]
+    changed_wire = wires["CON-09-3"]
+    negatives = {case["name"]: case for case in fixture["protocol_negative_cases"] if case["contract"] == "CON-09"}
     with psycopg.connect(postgres_database_url) as conn:
         conn.execute("UPDATE restaurants SET name=%s,is_open=%s WHERE id=%s",
                      (wire["request"]["name"], wire["request"]["is_open"], rid))
@@ -70,16 +74,22 @@ def test_round_trip_noop_conflict_and_fixture(client, auth, tenants, postgres_da
                      (wire["request"]["brand_label"], rid))
     before = client.get(path, headers=headers)
     assert before.status_code == 200
-    assert before.json() == dict(wire["response"], id=rid)
+    assert before.json() == dict(read_wire["response"], id=rid)
     noop = client.put(path, headers=headers, json=wire["request"])
     assert noop.status_code == 200 and noop.json() == before.json()
-    changed = client.put(path, headers=headers, json=update())
+    changed = client.put(path, headers=headers, json=changed_wire["request"])
     assert changed.status_code == 200, changed.text
     result = changed.json()
-    assert result["version"] == 2 and not result["ordering_enabled"]
-    assert result["hours"] == list(reversed(update()["hours"]))
+    assert result == dict(changed_wire["response"], id=rid)
     assert client.get(path, headers=headers).json() == result
-    error(client.put(path, headers=headers, json=update()), 409, "version_conflict", ["expected_version"])
+    stale = negatives["settings_stale_version"]
+    error(client.put(path, headers=headers, json=changed_wire["request"]), stale["expected_status"], stale["code"], stale["fields"])
+    overlap = dict(changed_wire["request"], expected_version=2, hours=[
+        {"day": 1, "opens_minute": 0, "closes_minute": 60},
+        {"day": 1, "opens_minute": 59, "closes_minute": 70},
+    ])
+    invalid_hours = negatives["settings_invalid_hours"]
+    error(client.put(path, headers=headers, json=overlap), invalid_hours["expected_status"], invalid_hours["code"], invalid_hours["fields"])
     assert client.get(path, headers=headers).json() == result
 
 
