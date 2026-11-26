@@ -59,6 +59,8 @@ For completion, record the ticket ID, changed files, exact source commit, checks
 
 If a required input is blocked, take another dependency-ready task. Never silently substitute synthetic behavior into live acceptance. Review the cumulative diff and contract changes after every five completed packets, as required by the main plan.
 
+Separately, follow the owner-approved [independent security review cadence](../development.md#independent-security-review-cadence): after every six accepted implementation tickets, conduct an independent cumulative security review and resolve blocking findings before starting the next cycle. The last checkpoint was RS-06. Cycle 02 is RS-07 → RS-09 → RS-08 → RS-10 → RS-41 → RS-12, then independent review before RS-40. Use the maintained roadmap for the counter and evidence requirements. Per-ticket CI, contract acceptance and mandatory targeted security gates (including RS-09's privilege-expansion review) are not deferred by this cadence.
+
 ## 3. Full baseline implementation order
 
 The table covers **all 67 RS tickets, four integration checkpoints and the release gate**. W numbers are dependency levels, not calendar weeks. Tickets in one row may run in parallel only if their exact file ownership and upstream evidence permit it. A single developer can complete them one at a time in the listed order.
