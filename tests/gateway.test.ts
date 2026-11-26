@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import liveFixture from './fixtures/restaurant-service/v1.json';
 import { NextRequest } from 'next/server';
 import { DELETE, GET, POST, PUT } from '../app/api/orderly/[...path]/route';
 
@@ -332,5 +333,19 @@ describe('CON-07 live transport', () => {
     expect(response.status).toBe(502);
     expect(response.headers.has('location')).toBe(false);
     expect(spy.mock.calls[1][1]?.redirect).toBe('manual');
+  });
+});
+
+describe('CON-07 shared wire fixture transport', () => {
+  afterEach(() => { vi.restoreAllMocks(); delete process.env.ORDERLY_API_ORIGIN; });
+  const handlers: Record<string, Handler> = { GET, POST, PUT, DELETE };
+  it.each(liveFixture.wire_cases.filter(vector => vector.path.startsWith('/v1/live/') && !vector.path.startsWith('/v1/live/demo/')))('maps $id to exact upstream', async vector => {
+    process.env.ORDERLY_API_ORIGIN = 'https://api.orderly.test';
+    const spy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'));
+    const path = vector.path.slice('/v1/'.length);
+    const segments = path.split('?')[0].split('/');
+    const result = await handlers[vector.method](request(vector.method, path), context(...segments));
+    expect(result.status).toBe(200);
+    expect(String(spy.mock.calls[0][0])).toBe('https://api.orderly.test' + vector.path);
   });
 });
