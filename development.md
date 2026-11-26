@@ -7,10 +7,35 @@
 1. Start with the [current repository architecture](docs/repo_context.md) and the [ticket execution flow](docs/ticket-execution-flow.md); the latter retains its original baseline wave listing. **For accepted RF-01 sequencing use the new [authoritative proposed DAG and waves](docs/contracts/restaurant-service-plan.md#187-dependency-dag)** instead of a stale pre-RF-01 table.
 2. Select **one** [RS/RF/RS-INT/RS-RELEASE packet](docs/tickets/restaurant-service/) or [DS proposal packet](docs/tickets/restaurant-service/DS-01.md) after verifying actual merged prerequisite evidence and same-file serialization. The full provider contracts have not been implemented merely because they are documented.
 3. Read the packet in full, its source files, [RS-01 frozen shared contracts](docs/contracts/restaurant-service-v1.md), the [contract/change-control map](docs/contracts/restaurant-service-plan.md), and the [RF-01 simulation overlay](docs/demo/restaurant-sales-walkthrough.md) when applicable. The packet's copied schemas/DTOs are self-contained execution snapshots. If different from the maintained source, return `Needs Architect Decision: contract mismatch` and update producer, fixtures and consumers together.
-4. Execute the packet's first scenario and its negative/failure/security tests. Keep each change atomic and separately validated. Record commit SHA, target environment, commands, observed results, documentation impact and remaining blockers. Review combined changes after five implemented packets.
+4. Execute the packet's first scenario and its negative/failure/security tests. Keep each change atomic and separately validated. Record commit SHA, target environment, commands, observed results, documentation impact and remaining blockers. Review combined changes after five implemented packets; conduct the separate comprehensive independent security review after every six completed implementation tickets (see policy below).
 5. Open a PR, run the required CI and review the integration gates. **Do not mark a ticket complete just because a plan, PR, test fixture or draft exists.** A builder may not change live auth, money, send or database contracts on its own.
 
 [Original intern handbook and exact local baseline](docs/plans/orderly-history.md#0-intern-execution-handbook) · [Local test/Compose instructions](docs/plans/orderly-history.md#02-establish-a-reproducible-local-baseline) · [Historical mock acceptance](docs/releases/stabilization-acceptance.md)
+
+## Independent security review cadence
+
+**Owner-approved policy (November 26, 2026):** conduct a comprehensive independent security review after every six completed implementation tickets, in actual dependency-execution order, not numerical ticket order. This is separate from the existing five-packet cumulative engineering diff/contract review and does not waive any per-ticket acceptance gate.
+
+- Count each implementation ticket once after its required conformance checks, review, owner-authorized merge and acceptance record. Drafts, open PRs, documentation-only updates, review remediation commits and duplicate/reopened work do not advance the count. Record synthetic-only acceptance as such; it cannot certify production readiness.
+- Every ticket still requires scoped micro-commits, relevant security/negative/regression tests, required CI, review and contract handoff. An implementation agent must not self-approve independent security evidence or bypass an explicit contract freeze.
+- Escalate critical security findings, authorization/tenant-boundary regressions, privilege-expanding or destructive changes, and live activation immediately. Existing mandatory independent gates remain in force, including the approved W6-C runtime-grant review for RS-09. Targeted reviews do not reset the six-ticket counter unless the owner explicitly accepts them as the full checkpoint.
+- At each checkpoint, an independent reviewer examines the cumulative diff and exact integrated source SHA against the last accepted baseline: authentication, authorization, tenant isolation, least privilege, transactions and concurrency, request validation, dependency security, privacy/logging, replay and uncertainty, immutable financial history, relevant provider/activation boundaries, and regression against earlier contracts. Review the areas affected by the batch; explicitly record untested/external acceptance gates.
+- Record the six ticket IDs and PR links, baseline and reviewed source SHAs, CI/test evidence, reviewer identity or owner-supplied independent assessment, findings/severity, remediation commits and retest results, explicit PASS/FAIL/BLOCKED decision, remaining external gates and next baseline in GitHub. Fix blocking findings and obtain independent re-review before accepting the checkpoint or starting the next cycle. Review the final partial batch before release; all existing release and U1–U4 gates remain mandatory.
+
+### Security review cycle 02
+
+Last accepted comprehensive checkpoint: RS-06, with CON-05/06 synthetic acceptance in [PR #87](https://github.com/anmolsansi/OrderlyApp/pull/87) and [closeout #88](https://github.com/anmolsansi/OrderlyApp/pull/88). The next six-ticket sequence follows the [authoritative DAG and waves](docs/contracts/restaurant-service-plan.md#188-workstreams-and-execution-waves).
+
+| Cycle position | Ticket | Wave |
+|---|---|---|
+| 1 | [RS-07](docs/tickets/restaurant-service/RS-07.md) — Explicit live gateway | W6 |
+| 2 | [RS-09](docs/tickets/restaurant-service/RS-09.md) — Owner restaurant settings | W6 |
+| 3 | [RS-08](docs/tickets/restaurant-service/RS-08.md) — Staff sign-in and restaurant selection | W7 |
+| 4 | [RS-10](docs/tickets/restaurant-service/RS-10.md) — Menu and availability edits | W7 |
+| 5 | [RS-41](docs/tickets/restaurant-service/RS-41.md) — Typed live API adapter | W7 |
+| 6 | [RS-12](docs/tickets/restaurant-service/RS-12.md) — Active table links | W8 |
+
+**Next comprehensive checkpoint: after RS-12, before RS-40.** This is a planned serial order within the existing dependency graph, not a new provider edge. Verify prerequisites before each assignment. RS-07/09 implementation PRs [#89](https://github.com/anmolsansi/OrderlyApp/pull/89) and [#90](https://github.com/anmolsansi/OrderlyApp/pull/90) are tracked in [issue #86](https://github.com/anmolsansi/OrderlyApp/issues/86); verify current merge/acceptance evidence before counting them. Later cycles use the same rule and actual accepted ticket order, rather than freezing a speculative schedule.
 
 ## Scope and decisions
 
