@@ -48,18 +48,18 @@ flowchart TD
     F --> G{"All required evidence passes?"}
     G -->|No| H["Fix or mark blocked; do not mark complete"]
     H --> F
-    G -->|Yes| I["Review diff; publish PR and complete merge gate"]
-    I --> J["Integrator records SHA, results and contract handoff"]
-    J --> K["Mark completed; unlock actual consumers"]
+    G -->|Yes| I["Review diff; publish PR and verify merge gates"]
+    I --> J["Integrator records exact SHA and approved handoff"]
+    J --> K["Unlock only eligible consumers; record acceptance separately"]
 ```
 
-Before starting, inspect current source and confirm that upstream contracts are implemented/frozen as required. Fixture-based UI preparation is allowed only where the packet permits it; it does not satisfy a provider merge gate. Check which files another ticket owns before doing parallel work.
+Before starting, inspect current source and confirm upstream contracts are implemented/frozen as required, or have an effective exact-version [cycle 02 synthetic development handoff](../development.md#independent-security-review-cadence) for the named isolated consumer. Fixture-only preparation does not satisfy a runtime or provider merge gate. Check which files another ticket owns before doing parallel work.
 
 For completion, record the ticket ID, changed files, exact source commit, checks and their results, manual evidence when required, remaining limitations and consumers unlocked. A successful build is not a payment, privacy, concurrency or device acceptance result. Missing PostgreSQL/provider/device evidence stays blocked. The integration owner updates statuses and shared documentation after review; implementers do not race to edit the master guide.
 
 If a required input is blocked, take another dependency-ready task. Never silently substitute synthetic behavior into live acceptance. Review the cumulative diff and contract changes after every five completed packets, as required by the main plan.
 
-Separately, follow the owner-approved [independent security review cadence](../development.md#independent-security-review-cadence): after every six accepted implementation tickets, conduct an independent cumulative security review and resolve blocking findings before starting the next cycle. The last checkpoint was RS-06. Cycle 02 is RS-07 → RS-09 → RS-08 → RS-10 → RS-41 → RS-12, then independent review before RS-40. Use the maintained roadmap for the counter and evidence requirements. Per-ticket CI, contract acceptance and mandatory targeted security gates (including RS-09's privilege-expansion review) are not deferred by this cadence.
+Separately, follow the owner-approved [independent security review cadence](../development.md#independent-security-review-cadence). Cycle 02 is RS-07 → RS-09 → RS-08 → RS-10 → RS-41 → RS-12, then independent review before RS-40. Under the November 28 amendment, once merged, record technical validation and exact-version synthetic handoff separately from independent acceptance/freeze. Defer eligible independent signoff only; required technical security checks, isolation, provider-first merge order, known blocking findings and all production gates remain mandatory. Open PRs do not count toward the integrated checkpoint. See [W6 evidence and proposed handoffs](../development.md#cycle-02-w6-technical-reconciliation-and-proposed-synthetic-handoffs--2026-11-28).
 
 ## 3. Full baseline implementation order
 
