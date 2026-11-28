@@ -30,7 +30,7 @@ function isRestaurantId(value: unknown): value is string {
 }
 
 function isToken(value: unknown): value is string {
-  return typeof value === 'string' && value.length > 0 && !/\s/u.test(value);
+  return typeof value === 'string' && value.length <= 16384 && /^[!-~]+$/u.test(value);
 }
 
 /** Decode the accepted CON-06 own-membership response. Invalid is not empty. */
@@ -125,4 +125,28 @@ export function projectStaffSelection(state: StaffSelectionState): StaffSession 
   if (state.view === 'workspace') return selectedStaffSession(state.token, state.memberships, state.restaurantId);
   const status = state.view === 'loading' || state.view === 'signed_out' ? state.view : 'unavailable';
   return { status, token: null, restaurantId: null, role: null };
+}
+
+/** Deliberately omit bearer credentials from presentation props. */
+export type StaffSelectionView = Readonly<{
+  generation: number;
+  scopeKey: number;
+  view: StaffView;
+  memberships: readonly StaffMembership[];
+  restaurantId: string | null;
+  activeRole: StaffRole | null;
+  dirty: boolean;
+}>;
+
+export function staffSelectionView(state: StaffSelectionState): StaffSelectionView {
+  const session = projectStaffSelection(state);
+  return {
+    generation: state.generation,
+    scopeKey: state.scopeKey,
+    view: state.view,
+    memberships: state.view === 'choose' || session.status === 'ready' ? state.memberships : [],
+    restaurantId: session.restaurantId,
+    activeRole: session.role,
+    dirty: session.status === 'ready' && state.dirty,
+  };
 }

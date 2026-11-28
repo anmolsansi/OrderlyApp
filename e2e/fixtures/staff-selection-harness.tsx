@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { StaffSelectionPanel } from '../../app/staff/_components/StaffSelectionPanel';
 import {
   chooseStaffRestaurant, failStaffMemberships, initialStaffSelection, resetStaffSelection,
-  resolveStaffMemberships, setStaffDraftDirty, type StaffSelectionState,
+  resolveStaffMemberships, setStaffDraftDirty, staffSelectionView, type StaffSelectionState,
 } from '../../lib/staff-session';
 
 const token = 'synthetic-token-not-valid-for-auth';
@@ -35,7 +35,7 @@ function Draft({ onDirty }: { onDirty: (dirty: boolean) => void }) {
 
 function Harness() {
   const [state, setState] = useState(() => fresh(window.location.hash));
-  return <StaffSelectionPanel state={state}
+  return <StaffSelectionPanel state={staffSelectionView(state)}
     onChoose={(rid, confirmed) => setState((previous) => chooseStaffRestaurant(previous, rid, confirmed))}
     onRetry={() => setState((previous) => {
       const loading = resetStaffSelection(previous, 'loading');

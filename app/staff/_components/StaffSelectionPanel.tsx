@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { projectStaffSelection, type StaffRole, type StaffSelectionState } from '../../../lib/staff-session';
+import type { StaffRole, StaffSelectionView } from '../../../lib/staff-session';
 
 const roleLabel: Record<StaffRole, string> = {
   owner: 'Owner',
@@ -10,7 +10,7 @@ const roleLabel: Record<StaffRole, string> = {
 };
 
 type Props = {
-  state: StaffSelectionState;
+  state: StaffSelectionView;
   onChoose: (restaurantId: string, discardConfirmed: boolean) => void;
   onRetry: () => void;
   onSignOut: () => void;
@@ -22,12 +22,15 @@ type Props = {
  * Isolated presentation preparation. This component has no provider or fetch
  * binding. Only the eventual Clerk/CON-06 controller may supply its state.
  */
-export function StaffSelectionPanel({ state, onChoose, onRetry, onSignOut, signIn, workspace }: Props) {
+export function StaffSelectionPanel(props: Props) {
+  return <StaffSelectionPanelContent key={props.state.generation} {...props} />;
+}
+
+function StaffSelectionPanelContent({ state, onChoose, onRetry, onSignOut, signIn, workspace }: Props) {
   const [pending, setPending] = useState<{ restaurantId: string; scopeKey: number } | null>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const restoreFocus = useRef(false);
-  const session = projectStaffSelection(state);
   const pendingSelection = state.view === 'workspace' && pending?.scopeKey === state.scopeKey &&
     state.memberships.some((row) => row.restaurant_id === pending.restaurantId) ? pending : null;
 
@@ -103,9 +106,9 @@ export function StaffSelectionPanel({ state, onChoose, onRetry, onSignOut, signI
           <button type="button" className="live-primary-action" style={{ marginBlockStart: '1rem' }} onClick={onSignOut}>Sign out</button>
         )}
       </div>
-      {session.status === 'ready' && (
+      {state.view === 'workspace' && state.restaurantId !== null && state.activeRole !== null && (
         <div key={state.scopeKey} aria-label="Selected restaurant workspace">
-          <p role="status">{session.restaurantId} · {roleLabel[session.role]}</p>
+          <p role="status">{state.restaurantId} · {roleLabel[state.activeRole]}</p>
           {workspace}
         </div>
       )}

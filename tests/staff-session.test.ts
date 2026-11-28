@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   decodeOwnMemberships, decodeStaffSession, selectedStaffSession, initialStaffSelection,
   resetStaffSelection, resolveStaffMemberships, failStaffMemberships, chooseStaffRestaurant,
-  setStaffDraftDirty, projectStaffSelection,
+  setStaffDraftDirty, projectStaffSelection, staffSelectionView,
 } from '../lib/staff-session';
 
 const fixture = JSON.parse(readFileSync(join(process.cwd(), 'tests', 'fixtures', 'restaurant-service', 'v1.json'), 'utf8')) as {
@@ -128,5 +128,22 @@ describe('CON-08 isolated tenant transition model', () => {
     }
     const choosing = resolveStaffMemberships(loading, loading.generation, token, payload);
     expect(resolveStaffMemberships(choosing, loading.generation, token, payload)).toBe(choosing);
+  });
+});
+
+describe('staff presentation credential minimization', () => {
+  it('omits the bearer token from the view and clears selection after reset', () => {
+    const loading = resetStaffSelection(initialStaffSelection(), 'loading');
+    const loaded = resolveStaffMemberships(loading, loading.generation, token, { memberships: [row] });
+    const selected = chooseStaffRestaurant(loaded, 'r-demo');
+    const view = staffSelectionView(selected);
+    expect(view.activeRole).toBe('owner');
+    expect(Object.hasOwn(view, 'token')).toBe(false);
+    expect(JSON.stringify(view)).not.toContain(token);
+    expect(staffSelectionView(resetStaffSelection(selected, 'signed_out')).memberships).toEqual([]);
+  });
+
+  it.each(['x\u0000', 'abc\nxyz', 'x'.repeat(16385), '', 'nonasciié'])('rejects unsafe bearer text', (unsafeToken) => {
+    expect(decodeStaffSession({ status: 'ready', token: unsafeToken, restaurantId: 'r-demo', role: 'owner' })).toBeNull();
   });
 });

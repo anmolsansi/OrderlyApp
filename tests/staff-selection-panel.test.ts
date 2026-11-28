@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { StaffSelectionPanel } from '../app/staff/_components/StaffSelectionPanel';
-import { chooseStaffRestaurant, failStaffMemberships, initialStaffSelection, resetStaffSelection, resolveStaffMemberships, type StaffSelectionState } from '../lib/staff-session';
+import { chooseStaffRestaurant, failStaffMemberships, initialStaffSelection, resetStaffSelection, resolveStaffMemberships, staffSelectionView, type StaffSelectionState } from '../lib/staff-session';
 
 const token = 'synthetic-token-not-valid-for-auth';
 const payload = { memberships: [
@@ -13,7 +13,7 @@ const payload = { memberships: [
 
 function render(state: StaffSelectionState) {
   return renderToStaticMarkup(createElement(StaffSelectionPanel, {
-    state,
+    state: staffSelectionView(state),
     onChoose: () => undefined,
     onRetry: () => undefined,
     onSignOut: () => undefined,
