@@ -36,7 +36,7 @@ describe('CON-08 isolated session preparation', () => {
     { memberships: [{ ...row, version: Number.MAX_SAFE_INTEGER + 1 }] },
     { memberships: [{ ...row, restaurant_id: '' }] },
     { memberships: [{ ...row, extra: true }] },
-  ])('rejects malformed or duplicate memberships (%j)', (value) => {
+  ].map((value) => ({ value })))('rejects malformed or duplicate memberships ($value)', ({ value }) => {
     expect(decodeOwnMemberships(value)).toBeNull();
   });
 
