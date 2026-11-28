@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { projectStaffSelection, type StaffRole, type StaffSelectionState } from '@/lib/staff-session';
+import { projectStaffSelection, type StaffRole, type StaffSelectionState } from '../../../lib/staff-session';
 
 const roleLabel: Record<StaffRole, string> = {
   owner: 'Owner',
@@ -26,12 +26,17 @@ export function StaffSelectionPanel({ state, onChoose, onRetry, onSignOut, signI
   const [pending, setPending] = useState<{ restaurantId: string; scopeKey: number } | null>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const restoreFocus = useRef(false);
   const session = projectStaffSelection(state);
   const pendingSelection = state.view === 'workspace' && pending?.scopeKey === state.scopeKey &&
     state.memberships.some((row) => row.restaurant_id === pending.restaurantId) ? pending : null;
 
   useEffect(() => {
     if (pendingSelection) cancelRef.current?.focus();
+    else if (restoreFocus.current) {
+      restoreFocus.current = false;
+      triggerRef.current?.focus();
+    }
   }, [pendingSelection]);
 
   function choose(restaurantId: string, trigger: HTMLButtonElement) {
@@ -45,8 +50,8 @@ export function StaffSelectionPanel({ state, onChoose, onRetry, onSignOut, signI
   }
 
   function cancelSwitch() {
+    restoreFocus.current = true;
     setPending(null);
-    triggerRef.current?.focus();
   }
 
   function confirmSwitch() {
