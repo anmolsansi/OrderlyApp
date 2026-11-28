@@ -60,6 +60,8 @@ function StaffSelectionPanelContent({ state, onChoose, onRetry, onSignOut, signI
   function confirmSwitch() {
     if (!pendingSelection) return;
     const restaurantId = pendingSelection.restaurantId;
+    // The confirmation control unmounts; restore focus to the chosen restaurant.
+    restoreFocus.current = true;
     setPending(null);
     onChoose(restaurantId, true);
   }
