@@ -71,3 +71,58 @@ export function selectedStaffSession(token: unknown, memberships: readonly Staff
   }
   return { status: 'ready', token, restaurantId: selected.restaurant_id, role: selected.role };
 }
+
+/** Internal view reasons do not extend the public CON-08 discriminants. */
+export type StaffView = 'loading' | 'signed_out' | 'unavailable' | 'denied' | 'empty' | 'choose' | 'workspace';
+export type StaffSelectionState = Readonly<{
+  generation: number;
+  scopeKey: number;
+  view: StaffView;
+  token: string | null;
+  memberships: readonly StaffMembership[];
+  restaurantId: string | null;
+  dirty: boolean;
+}>;
+
+export function initialStaffSelection(): StaffSelectionState {
+  return { generation: 0, scopeKey: 0, view: 'loading', token: null, memberships: [], restaurantId: null, dirty: false };
+}
+
+/** Call before a new identity/session load or when signing out. Invalidate all old results. */
+export function resetStaffSelection(state: StaffSelectionState, view: 'loading' | 'signed_out' | 'unavailable'): StaffSelectionState {
+  return { ...initialStaffSelection(), generation: state.generation + 1, scopeKey: state.scopeKey + 1, view };
+}
+
+/** Complete a single outstanding load only. No async result can revive an invalidated scope. */
+export function resolveStaffMemberships(state: StaffSelectionState, generation: number, token: unknown, payload: unknown): StaffSelectionState {
+  if (state.generation !== generation || state.view !== 'loading') return state;
+  const memberships = decodeOwnMemberships(payload);
+  if (!memberships || !isToken(token)) return { ...state, view: 'unavailable' };
+  if (!memberships.length) return { ...state, view: 'empty' };
+  return { ...state, view: 'choose', token, memberships };
+}
+
+export function failStaffMemberships(state: StaffSelectionState, generation: number, reason: 'signed_out' | 'denied' | 'unavailable'): StaffSelectionState {
+  if (state.generation !== generation || state.view !== 'loading') return state;
+  return { ...state, view: reason };
+}
+
+/** The UI must ask before calling with discardConfirmed=true when dirty. */
+export function chooseStaffRestaurant(state: StaffSelectionState, restaurantId: string, discardConfirmed = false): StaffSelectionState {
+  if ((state.view !== 'choose' && state.view !== 'workspace') || !state.token ||
+      !state.memberships.some((row) => row.restaurant_id === restaurantId) ||
+      state.restaurantId === restaurantId || (state.dirty && !discardConfirmed)) return state;
+  return { ...state, view: 'workspace', restaurantId, dirty: false, scopeKey: state.scopeKey + 1 };
+}
+
+/** Only the current mounted workspace may update draft state. */
+export function setStaffDraftDirty(state: StaffSelectionState, scopeKey: number, dirty: boolean): StaffSelectionState {
+  if (state.view !== 'workspace' || state.scopeKey !== scopeKey || state.dirty === dirty) return state;
+  return { ...state, dirty };
+}
+
+export function projectStaffSelection(state: StaffSelectionState): StaffSession {
+  if (state.view === 'workspace') return selectedStaffSession(state.token, state.memberships, state.restaurantId);
+  const status = state.view === 'loading' || state.view === 'signed_out' ? state.view : 'unavailable';
+  return { status, token: null, restaurantId: null, role: null };
+}
