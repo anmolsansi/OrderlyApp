@@ -47,7 +47,10 @@ async function mount(page: Page, mode = '', theme = 'light') {
 async function assertNoStoredToken(page: Page) {
   expect(await page.evaluate((token) => {
     const storageText = [localStorage, sessionStorage].flatMap((storage) =>
-      Array.from({ length: storage.length }, (_, index) => storage.getItem(storage.key(index) ?? '') ?? ''),
+      Array.from({ length: storage.length }, (_, index) => {
+        const key = storage.key(index) ?? '';
+        return [key, storage.getItem(key) ?? ''].join(' ');
+      }),
     ).join('');
     return storageText.includes(token) || document.body.innerText.includes(token);
   }, syntheticToken)).toBe(false);
@@ -72,7 +75,11 @@ test('isolated staff panel keyboard cancellation preserves draft and confirmed s
   await expect(staff).toBeFocused();
   await expect(draft).toHaveValue('unsaved owner draft');
   await page.keyboard.press('Enter');
-  await page.getByRole('button', { name: 'Discard changes and switch' }).click();
+  await expect(cancel).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: 'Discard changes and switch' })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(staff).toBeFocused();
   await expect(draft).toHaveValue('');
   await expect(staff).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: 'r-three (Cashier)' }).click();
